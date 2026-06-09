@@ -1,0 +1,76 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    restart: unless-stopped
+    runtime: nvidia
+    ports:
+      - "8001:8000"
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    # 6GB VRAM 向け: Gemma 4-E2B AWQ-INT4 (~2.5GB重み) gpu-memory-utilization=0.6
+    # embedding は CPU 動作のため VRAM 専有なし
+    command: >
+      --model ${LLM_MODEL:-cyankiwi/gemma-4-E2B-it-AWQ-INT4}
+      --quantization awq
+      --dtype auto
+      --max-model-len 4096
+      --gpu-memory-utilization 0.6
+      --served-model-name local-llm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./volumes/watched:/watched
+      - sqlite_data:/app/data
+      - hf_cache:/root/.cache/huggingface
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - LLM_MODEL=${LLM_MODEL:-local-llm}
+      - EMBED_MODEL=${EMBED_MODEL:-intfloat/multilingual-e5-large}
+      - WATCHED_PATH=/watched
+      - DATA_DIR=/app/data
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+    depends_on:
+      - qdrant
+      - vllm
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  qdrant_data:
+  sqlite_data:
+  hf_cache:
