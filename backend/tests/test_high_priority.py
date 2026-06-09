@@ -33,16 +33,17 @@ def _reset_provider():
 
 
 def test_get_provider_returns_singleton(monkeypatch):
-    monkeypatch.setattr(llm_module.settings, "llm_provider", "vllm")
-    p1 = llm_module.get_provider()
-    p2 = llm_module.get_provider()
+    from app.services.providers import get_provider, reset_instances
+    reset_instances()
+    p1 = asyncio.run(get_provider("vllm"))
+    p2 = asyncio.run(get_provider("vllm"))
     assert p1 is p2
 
 
-def test_get_provider_raises_for_unknown(monkeypatch):
-    monkeypatch.setattr(llm_module.settings, "llm_provider", "totally-fake")
-    with pytest.raises(ValueError, match="Unknown LLM provider"):
-        llm_module.get_provider()
+def test_get_provider_raises_for_unknown():
+    from app.services.providers import get_provider
+    with pytest.raises(KeyError, match="Unknown provider"):
+        asyncio.run(get_provider("totally-fake"))
 
 
 def test_stream_answer_uses_injected_provider():
