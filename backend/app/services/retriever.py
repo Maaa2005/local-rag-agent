@@ -1,4 +1,3 @@
-from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     FieldCondition,
     Filter,
@@ -12,9 +11,8 @@ from qdrant_client.models import (
 
 from app.config import settings
 from app.services.embedder import embed_query
+from app.services.qdrant import get_client
 from app.services.sparse import build_sparse
-
-_client = AsyncQdrantClient(url=settings.qdrant_url)
 
 
 async def retrieve(question: str, user_access_level: int) -> list[dict]:
@@ -50,7 +48,7 @@ async def retrieve(question: str, user_access_level: int) -> list[dict]:
             )
         )
 
-    response = await _client.query_points(
+    response = await get_client().query_points(
         collection_name=settings.qdrant_collection,
         prefetch=prefetch_list,
         query=FusionQuery(fusion=Fusion.RRF),

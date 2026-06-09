@@ -1,6 +1,5 @@
 import re
 import uuid
-from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
     FieldCondition,
@@ -14,23 +13,23 @@ from qdrant_client.models import (
 
 from app.config import settings
 from app.services.embedder import embed_texts
+from app.services.qdrant import get_client
 from app.services.sparse import build_sparse
-
-_client = AsyncQdrantClient(url=settings.qdrant_url)
 
 
 async def ensure_collection() -> None:
-    existing = [c.name for c in (await _client.get_collections()).collections]
+    client = get_client()
+    existing = [c.name for c in (await client.get_collections()).collections]
 
     if settings.qdrant_collection in existing:
-        info = await _client.get_collection(settings.qdrant_collection)
+        info = await client.get_collection(settings.qdrant_collection)
         vcfg = info.config.params.vectors
         if isinstance(vcfg, dict) and "dense" in vcfg:
             return  # 正しいフォーマット（dense + sparse 名前付きベクトル）
         # 旧フォーマット（無名ベクトル）→ 再作成
-        await _client.delete_collection(settings.qdrant_collection)
+        await client.delete_collection(settings.qdrant_collection)
 
-    await _client.create_collection(
+    await client.create_collection(
         collection_name=settings.qdrant_collection,
         vectors_config={"dense": VectorParams(size=settings.vector_size, distance=Distance.COSINE)},
         sparse_vectors_config={"sparse": SparseVectorParams()},
@@ -40,7 +39,7 @@ async def ensure_collection() -> None:
         ("document_id", "keyword"),
         ("is_active", "bool"),
     ]:
-        await _client.create_payload_index(
+        await client.create_payload_index(
             collection_name=settings.qdrant_collection,
             field_name=field,
             field_schema=schema,
@@ -49,6 +48,10 @@ async def ensure_collection() -> None:
 
 def _chunk_text(text: str, size: int, overlap: int) -> list[str]:
     """文末で区切るシンプルなチャンク分割。"""
+    if size <= 0:
+        raise ValueError("size must be positive")
+    if overlap < 0 or overlap >= size:
+        raise ValueError("overlap must satisfy 0 <= overlap < size")
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if len(text) <= size:
         return [text]
@@ -71,7 +74,7 @@ def _chunk_text(text: str, size: int, overlap: int) -> list[str]:
 
 async def deactivate_document(document_id: str) -> None:
     """旧バージョンのチャンクをソフト削除して古い情報を防ぐ。"""
-    await _client.set_payload(
+    await get_client().set_payload(
         collection_name=settings.qdrant_collection,
         payload={"is_active": False},
         points=Filter(
@@ -82,7 +85,7 @@ async def deactivate_document(document_id: str) -> None:
 
 async def delete_document(document_id: str) -> None:
     """ドキュメントの全チャンクを Qdrant から物理削除する。"""
-    await _client.delete(
+    await get_client().delete(
         collection_name=settings.qdrant_collection,
         points_selector=Filter(
             must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))]
@@ -96,7 +99,7 @@ async def index_document(
     source_file: str,
     access_level: int,
 ) -> int:
-    await ensure_collection()
+    # コレクションの存在チェックは lifespan で 1 度だけ。タスクごとには呼ばない。
     await deactivate_document(document_id)
 
     chunks = _chunk_text(text, settings.chunk_size, settings.chunk_overlap)
@@ -126,5 +129,5 @@ async def index_document(
             )
         )
 
-    await _client.upsert(collection_name=settings.qdrant_collection, points=points)
+    await get_client().upsert(collection_name=settings.qdrant_collection, points=points)
     return len(points)

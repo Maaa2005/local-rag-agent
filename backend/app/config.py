@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     qdrant_collection: str = "documents"
     vector_size: int = 1024  # multilingual-e5-large
 
+    # 推論プロバイダ: "vllm" | "openai" (将来 "transformers" 等を追加可能)
+    llm_provider: str = "vllm"
     vllm_base_url: str = "http://localhost:8001/v1"
     llm_model: str = "local-llm"
     llm_max_tokens: int = 1024

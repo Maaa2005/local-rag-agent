@@ -18,16 +18,16 @@ from app.core.security import hash_password
 def isolated_db(tmp_path, monkeypatch):
     db_path = tmp_path / "app.db"
 
+    # DB_PATH を一時ファイルへ差し替え、シングルトン接続もリセット
     monkeypatch.setattr(db_module, "DB_PATH", db_path)
-    monkeypatch.setattr(db_module.db, "_path", str(db_path))
+    db_module.db._conn = None
 
-    sql = (Path(__file__).resolve().parent.parent / "migrations" / "init.sql").read_text(
-        encoding="utf-8"
-    )
-    with sqlite3.connect(db_path) as conn:
-        conn.executescript(sql)
-
+    # lifespan の init_db でもスキーマ初期化される (DEFAULT admin 投入)。
     yield db_path
+
+    # 後始末: テスト間で接続を持ち越さない
+    if db_module.db._conn is not None:
+        asyncio.run(db_module.db.close())
 
 
 @pytest.fixture()
@@ -39,7 +39,6 @@ def client(isolated_db, monkeypatch):
     def _noop_sync(*args, **kwargs):
         return None
 
-    monkeypatch.setattr("app.main.init_db", _noop)
     monkeypatch.setattr("app.main.ensure_collection", _noop)
     monkeypatch.setattr("app.main.start_watcher", _noop_sync)
     monkeypatch.setattr("app.main.stop_watcher", _noop_sync)
