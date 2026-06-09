@@ -1,3 +1,7 @@
+import json
+from typing import Any
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -26,6 +30,20 @@ class Settings(BaseSettings):
 
     use_polling_watcher: bool = False
     smb_poll_interval: int = 300
+
+    # 既定はローカル開発用フロントエンドのオリジン。
+    # 本番ではカンマ区切りまたは JSON 配列文字列で CORS_ORIGINS を上書きする。
+    cors_origins: list[str] = ["http://localhost:3000"]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            s = v.strip()
+            if s.startswith("["):
+                return json.loads(s)
+            return [item.strip() for item in s.split(",") if item.strip()]
+        return v
 
     class Config:
         env_file = ".env"

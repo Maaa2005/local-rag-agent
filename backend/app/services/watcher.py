@@ -50,6 +50,19 @@ class SyncDatabase:
             conn.execute(sql, params)
             conn.commit()
 
+    def execute_many_atomic(self, statements: list[tuple[str, tuple]]) -> None:
+        """複数 SQL を単一トランザクションで実行。途中失敗時は全てロールバック。"""
+        import sqlite3
+        with sqlite3.connect(self._path) as conn:
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                for sql, params in statements:
+                    conn.execute(sql, params)
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
 
 def _get_access_level_for_path(path: str, db_sync: SyncDatabase) -> int:
     folders = db_sync.fetchall(
@@ -85,29 +98,33 @@ class _Handler(FileSystemEventHandler):
         if existing is None:
             doc_id = str(uuid.uuid4())
             access_level = _get_access_level_for_path(path, self._db)
-            self._db.execute(
-                "INSERT INTO documents (id, source_path, file_hash, access_level, file_type, "
-                "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
-                (doc_id, path, file_hash, access_level, p.suffix.lower(), now, now),
-            )
-            self._db.execute(
-                "INSERT INTO tasks (document_id, status, created_at, updated_at) "
-                "VALUES (?, 'pending', ?, ?)",
-                (doc_id, now, now),
-            )
+            self._db.execute_many_atomic([
+                (
+                    "INSERT INTO documents (id, source_path, file_hash, access_level, file_type, "
+                    "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+                    (doc_id, path, file_hash, access_level, p.suffix.lower(), now, now),
+                ),
+                (
+                    "INSERT INTO tasks (document_id, status, created_at, updated_at) "
+                    "VALUES (?, 'pending', ?, ?)",
+                    (doc_id, now, now),
+                ),
+            ])
             logger.info("New file queued: %s", path)
         elif existing["file_hash"] != file_hash:
             doc_id = existing["id"]
-            self._db.execute(
-                "UPDATE documents SET file_hash=?, status='pending', error_msg=NULL, "
-                "updated_at=? WHERE id=?",
-                (file_hash, now, doc_id),
-            )
-            self._db.execute(
-                "INSERT INTO tasks (document_id, status, created_at, updated_at) "
-                "VALUES (?, 'pending', ?, ?)",
-                (doc_id, now, now),
-            )
+            self._db.execute_many_atomic([
+                (
+                    "UPDATE documents SET file_hash=?, status='pending', error_msg=NULL, "
+                    "updated_at=? WHERE id=?",
+                    (file_hash, now, doc_id),
+                ),
+                (
+                    "INSERT INTO tasks (document_id, status, created_at, updated_at) "
+                    "VALUES (?, 'pending', ?, ?)",
+                    (doc_id, now, now),
+                ),
+            ])
             logger.info("Updated file queued: %s", path)
 
     def _handle_delete(self, path: str) -> None:

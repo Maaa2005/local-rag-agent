@@ -4,9 +4,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.core.security import get_current_user
-from app.services import task_processor
 from app.services.llm import stream_answer
 from app.services.retriever import retrieve
+from app.services.task_processor import chat_session
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -16,8 +16,7 @@ class ChatRequest(BaseModel):
 
 
 async def _event_stream(question: str, user_access_level: int):
-    task_processor.chat_active = True
-    try:
+    async with chat_session():
         chunks = await retrieve(question, user_access_level)
 
         # 参照ソースを最初に送信
@@ -31,8 +30,6 @@ async def _event_stream(question: str, user_access_level: int):
                 yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
 
         yield "data: {\"type\": \"done\"}\n\n"
-    finally:
-        task_processor.chat_active = False
 
 
 @router.post("")

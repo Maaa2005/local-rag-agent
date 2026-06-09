@@ -1,9 +1,10 @@
 """
 バックグラウンドタスク処理ループ。
-chat_active フラグが True の間は一時停止して VRAM をチャットに全振りする。
+チャット実行中はカウンタで管理し、同時並行チャットでも誤って早期解除しない。
 """
 import asyncio
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from app.database import db
@@ -12,23 +13,53 @@ from app.services.parser import parse_file
 
 logger = logging.getLogger(__name__)
 
-# チャット中は True に設定してバックグラウンド処理を一時停止
-chat_active = False
+# 並列チャットを安全にカウントするためのロック付きカウンタ
+_chat_lock = asyncio.Lock()
+_active_chats: int = 0
 _POLL_INTERVAL = 5  # 秒
+
+
+def is_chat_active() -> bool:
+    """テストや内部ループから現在の状態を確認するための参照。"""
+    return _active_chats > 0
+
+
+@asynccontextmanager
+async def chat_session():
+    """チャット開始時に enter / 終了時に exit。複数同時呼び出しでも安全。"""
+    global _active_chats
+    async with _chat_lock:
+        _active_chats += 1
+    try:
+        yield
+    finally:
+        async with _chat_lock:
+            _active_chats = max(0, _active_chats - 1)
+
+
+async def _claim_next_task() -> dict | None:
+    """pending タスクを 1 件アトミックに processing へ遷移して返す。"""
+    now = datetime.now(timezone.utc).isoformat()
+    row = await db.fetchone(
+        "UPDATE tasks SET status='processing', updated_at=? "
+        "WHERE id = (SELECT id FROM tasks WHERE status='pending' "
+        "            ORDER BY created_at LIMIT 1) "
+        "RETURNING id, document_id, attempts",
+        (now,),
+    )
+    if row is None:
+        return None
+    claimed = dict(row)
+    await db.execute(
+        "UPDATE documents SET status='processing', updated_at=? WHERE id=?",
+        (now, claimed["document_id"]),
+    )
+    return claimed
 
 
 async def _process_task(task: dict) -> None:
     task_id = task["id"]
     doc_id = task["document_id"]
-
-    await db.execute(
-        "UPDATE tasks SET status='processing', updated_at=? WHERE id=?",
-        (datetime.now(timezone.utc).isoformat(), task_id),
-    )
-    await db.execute(
-        "UPDATE documents SET status='processing', updated_at=? WHERE id=?",
-        (datetime.now(timezone.utc).isoformat(), doc_id),
-    )
 
     doc = await db.fetchone(
         "SELECT source_path, access_level FROM documents WHERE id=?", (doc_id,)
@@ -77,20 +108,17 @@ async def run_task_processor() -> None:
     logger.info("Task processor started")
     while True:
         await asyncio.sleep(_POLL_INTERVAL)
-        if chat_active:
+        if is_chat_active():
             continue
 
         await _process_deleted()
 
-        task = await db.fetchone(
-            "SELECT id, document_id, attempts FROM tasks WHERE status='pending' "
-            "ORDER BY created_at LIMIT 1"
-        )
+        task = await _claim_next_task()
         if task is None:
             continue
 
         try:
-            await _process_task(dict(task))
+            await _process_task(task)
         except Exception as exc:
             logger.error("Task %d failed: %s", task["id"], exc)
             now = datetime.now(timezone.utc).isoformat()

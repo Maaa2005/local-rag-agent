@@ -27,7 +27,10 @@ class Database:
         async with aiosqlite.connect(self._path) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.execute(sql, params) as cur:
-                return await cur.fetchone()
+                row = await cur.fetchone()
+            # UPDATE/INSERT/DELETE ... RETURNING でも安全に永続化する
+            await conn.commit()
+            return row
 
     async def fetchall(self, sql: str, params: tuple = ()) -> list[aiosqlite.Row]:
         async with aiosqlite.connect(self._path) as conn:
