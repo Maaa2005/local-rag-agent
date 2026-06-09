@@ -279,6 +279,8 @@ th { color: var(--text-muted); font-weight: 600; }
 }
 .provider-badge.external { background: rgba(255, 165, 0, 0.12); color: var(--warn); border-color: rgba(255,165,0,0.4); }
 .provider-badge.local    { background: rgba(80, 200, 120, 0.12); color: var(--success); border-color: rgba(80,200,120,0.4); }
+.provider-badge.agent    { background: rgba(180, 80, 255, 0.15); color: #c490ff; border-color: rgba(180,80,255,0.45); }
+.agent-warn { margin-top: 12px; padding: 8px 12px; border-left: 3px solid #c490ff; background: rgba(180,80,255,0.08); border-radius: 4px; font-size: 13px; }
 
 /* ── Modal ── */
 .modal {

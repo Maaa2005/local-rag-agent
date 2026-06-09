@@ -21,16 +21,42 @@ from app.services.providers import list_providers, get_meta
 
 
 # ─── registry ─────────────────────────────────────────────────
+EXPECTED = {
+    "vllm", "anthropic", "openai", "gemini", "azure_openai", "bedrock",
+    "claude_code", "codex",
+}
+
+
 def test_all_expected_providers_registered():
     names = {p.name for p in list_providers()}
-    assert {"vllm", "anthropic", "openai", "gemini", "azure_openai", "bedrock"} <= names
+    assert EXPECTED <= names
 
 
 def test_external_flags_are_correct():
     assert get_meta("vllm").is_external is False
-    for ext in ("anthropic", "openai", "gemini", "azure_openai", "bedrock"):
+    for ext in EXPECTED - {"vllm"}:
         assert get_meta(ext).is_external is True
         assert get_meta(ext).requires_credentials is True
+
+
+def test_agent_kind_for_phase3_providers():
+    """Phase 3 で追加した 2 つは kind='agent'。"""
+    assert get_meta("claude_code").kind == "agent"
+    assert get_meta("codex").kind == "agent"
+    # API 系は "api"
+    for api in ("vllm", "anthropic", "openai", "gemini", "azure_openai", "bedrock"):
+        assert get_meta(api).kind == "api"
+
+
+def test_agent_providers_validate_credentials():
+    """資格情報なしで factory を呼ぶと ValueError。"""
+    from app.services.providers import base as pb
+    for name in ("claude_code", "codex"):
+        _, factory = pb._registry[name]
+        with pytest.raises(ValueError):
+            factory(None)
+        with pytest.raises(ValueError):
+            factory({"api_key": ""})
 
 
 # ─── credentials encrypt/decrypt ─────────────────────────────
@@ -171,7 +197,7 @@ def test_list_providers_endpoint(client):
     assert r.status_code == 200
     body = r.json()
     names = {p["name"] for p in body}
-    assert {"vllm", "anthropic", "openai", "gemini", "azure_openai", "bedrock"} <= names
+    assert EXPECTED <= names
     vllm = next(p for p in body if p["name"] == "vllm")
     assert vllm["available"] is True
     assert vllm["is_external"] is False

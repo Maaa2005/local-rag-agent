@@ -98,7 +98,10 @@ function renderProviderSelect() {
   providers.forEach((p) => {
     const opt = document.createElement('option');
     opt.value = p.name;
-    const flag = p.is_external ? ' ☁︎' : ' ⌂';
+    let flag;
+    if (p.kind === 'agent')      flag = ' ◆ Agent';
+    else if (p.is_external)      flag = ' ☁︎';
+    else                          flag = ' ⌂';
     const dim  = p.available ? '' : ' (未設定)';
     opt.textContent = p.display_name + flag + dim;
     opt.disabled = !p.available;
@@ -120,8 +123,12 @@ function updateProviderBadge() {
   const p = providers.find((x) => x.name === selectedProvider);
   if (!p) { providerBadge.hidden = true; return; }
   providerBadge.hidden = false;
-  providerBadge.textContent = p.is_external ? '外部送信' : 'ローカル';
-  providerBadge.className = 'provider-badge ' + (p.is_external ? 'external' : 'local');
+  let label, cls;
+  if (p.kind === 'agent')      { label = 'エージェント (外部+ツール実行)'; cls = 'agent'; }
+  else if (p.is_external)      { label = '外部送信'; cls = 'external'; }
+  else                          { label = 'ローカル'; cls = 'local'; }
+  providerBadge.textContent = label;
+  providerBadge.className = 'provider-badge ' + cls;
 }
 
 providerSelect.addEventListener('change', () => {
@@ -133,6 +140,9 @@ providerSelect.addEventListener('change', () => {
 function requestExternalConsent(providerMeta) {
   return new Promise((resolve) => {
     extModalName.textContent = providerMeta.display_name;
+    // エージェント選択時はモーダルに追加注意書きを反映
+    const note = document.getElementById('external-modal-note');
+    if (note) note.hidden = providerMeta.kind !== 'agent';
     extModal.hidden = false;
     const onConfirm = () => { cleanup(); consentedProviders.add(providerMeta.name); resolve(true); };
     const onCancel  = () => { cleanup(); resolve(false); };

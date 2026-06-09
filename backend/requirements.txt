@@ -21,3 +21,6 @@ anthropic==0.39.0
 google-genai==0.3.0
 boto3==1.35.74
 cryptography==44.0.0
+# エージェント SDK (Phase 3): Claude Code / Codex MCP 接続
+claude-agent-sdk==0.0.10
+mcp==1.2.0
