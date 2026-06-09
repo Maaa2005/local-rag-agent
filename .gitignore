@@ -43,5 +43,8 @@ hf_cache/
 dist/
 build/
 
+# Evaluation outputs
+evaluation/results/
+
 # Zone.Identifier files (WSL artifacts)
 *:Zone.Identifier
