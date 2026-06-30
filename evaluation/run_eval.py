@@ -1,9 +1,11 @@
 """RAG 評価ランナー (CLI)。
 
 使用例:
-    python -m evaluation.run_eval --provider vllm --judge anthropic
-    python -m evaluation.run_eval --all --judge anthropic
+    python -m evaluation.run_eval --provider vllm --judge vllm
     python -m evaluation.run_eval --provider vllm --no-judge
+
+ジャッジもローカル LLM (vllm) を用いる。社内文書を含む評価を外部 API に
+送らないため、外部プロバイダはジャッジにも使わない。
 
 出力:
     evaluation/results/<UTC timestamp>/raw.jsonl  各質問のスコア
@@ -26,7 +28,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.services import credentials  # noqa: E402
 from app.services.llm import stream_answer  # noqa: E402
 from app.services.providers import (  # noqa: E402
     get_meta,
@@ -114,21 +115,15 @@ async def evaluate_question(
 
 # ─── プロバイダ準備 ─────────────────────────────────────────────
 async def _resolve_provider(name: str):
+    # ローカル LLM 固定アプリ。外部送信プロバイダ・資格情報は持たない。
     meta = get_meta(name)
-    creds = None
     if meta.requires_credentials:
-        creds = await credentials.load_credentials(name)
-        if creds is None:
-            raise RuntimeError(f"Provider '{name}' has no credentials")
-    return await get_provider(name, creds)
+        raise RuntimeError(f"Provider '{name}' は資格情報が必要だが本アプリは未対応")
+    return await get_provider(name)
 
 
 async def _available_providers() -> list[str]:
-    out: list[str] = []
-    for meta in list_providers():
-        if not meta.requires_credentials or await credentials.has_credentials(meta.name):
-            out.append(meta.name)
-    return out
+    return [meta.name for meta in list_providers()]
 
 
 # ─── 1 プロバイダ評価 ──────────────────────────────────────────
@@ -151,7 +146,7 @@ async def main():
     parser = argparse.ArgumentParser(description="RAG evaluation runner")
     parser.add_argument("--provider", help="単一プロバイダ名 (例: vllm)")
     parser.add_argument("--all", action="store_true", help="利用可能な全プロバイダを評価")
-    parser.add_argument("--judge", default="anthropic", help="LLM-judge に使うプロバイダ (既定 anthropic)")
+    parser.add_argument("--judge", default="vllm", help="LLM-judge に使うプロバイダ (既定 vllm / ローカル固定)")
     parser.add_argument("--no-judge", action="store_true", help="LLM 採点をスキップし性能/構造系のみ計算")
     parser.add_argument("--report", help="report.md の出力先")
     parser.add_argument("--dataset", help="dataset.jsonl のパスを上書き")
