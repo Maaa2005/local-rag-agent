@@ -65,13 +65,20 @@ class SyncDatabase:
 
 
 def _get_access_level_for_path(path: str, db_sync: SyncDatabase) -> int:
+    """ファイルパスが属する監視フォルダの access_level を返す (最長一致)。
+
+    一致はパス境界で判定する。`/watched/exec` の設定が `/watched/exec-public/...`
+    のような**兄弟ディレクトリ**へ誤って適用されるのを防ぐため、完全一致または
+    `フォルダパス + "/"` で始まる場合のみ一致とみなす。どの監視フォルダにも属さない
+    パスは既定 1 (一般)。
+    """
     folders = db_sync.fetchall(
         "SELECT path, access_level FROM watch_folders WHERE is_active=1"
     )
-    best_level, best_len = 1, 0
+    best_level, best_len = 1, -1
     for folder in folders:
-        fp = folder["path"]
-        if path.startswith(fp) and len(fp) > best_len:
+        fp = folder["path"].rstrip("/")
+        if (path == fp or path.startswith(fp + "/")) and len(fp) > best_len:
             best_len = len(fp)
             best_level = folder["access_level"]
     return best_level

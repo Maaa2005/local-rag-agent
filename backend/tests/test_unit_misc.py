@@ -106,3 +106,45 @@ def test_inactive_folder_ignored(sync_db):
     """is_active=0 の登録は無視されデフォルト 1 になる。"""
     lv = _get_access_level_for_path("/watched/inactive/file.txt", sync_db)
     assert lv == 1
+
+
+def test_sibling_dir_does_not_inherit_level(sync_db):
+    """境界一致: /watched/manager-public は /watched/manager の権限を継承しない。
+
+    生の startswith では `/watched/manager-public/...` が `/watched/manager` に
+    誤マッチして Lv2 になっていた (権限の誤適用)。境界一致で既定 1 に落ちること。
+    """
+    lv = _get_access_level_for_path("/watched/manager-public/notice.pdf", sync_db)
+    assert lv == 1
+
+
+def test_sibling_of_confidential_falls_back_to_parent(sync_db):
+    """/watched/general/exec-archive は exec(3) でなく親 general(1) 扱い。"""
+    lv = _get_access_level_for_path("/watched/general/exec-archive/old.pdf", sync_db)
+    assert lv == 1
+
+
+def test_exact_folder_path_matches(sync_db):
+    """フォルダパスと完全一致するパスも一致と見なす。"""
+    lv = _get_access_level_for_path("/watched/manager", sync_db)
+    assert lv == 2
+
+
+def test_trailing_slash_in_folder_is_normalized(sync_db, tmp_path):
+    """登録パスに末尾スラッシュがあっても境界一致が壊れない。"""
+    import sqlite3 as _sqlite
+    db_path = tmp_path / "ts.db"
+    with _sqlite.connect(db_path) as conn:
+        conn.execute(
+            "CREATE TABLE watch_folders (id INTEGER PRIMARY KEY, path TEXT UNIQUE NOT NULL,"
+            " access_level INTEGER NOT NULL DEFAULT 1, is_active INTEGER NOT NULL DEFAULT 1,"
+            " created_at TEXT NOT NULL DEFAULT (datetime('now')))"
+        )
+        conn.execute(
+            "INSERT INTO watch_folders (path, access_level, is_active) VALUES (?, ?, ?)",
+            ("/watched/hr/", 3, 1),
+        )
+        conn.commit()
+    db = SyncDatabase(str(db_path))
+    assert _get_access_level_for_path("/watched/hr/salary.pdf", db) == 3
+    assert _get_access_level_for_path("/watched/hr-team/x.pdf", db) == 1

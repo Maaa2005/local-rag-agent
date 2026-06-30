@@ -15,6 +15,20 @@ from app.services.qdrant import get_client
 from app.services.sparse import build_sparse
 
 
+def build_access_filter(user_access_level: int) -> Filter:
+    """権限プレフィルタ: access_level <= user_access_level かつ is_active=True。
+
+    権限外文書 (access_level > ユーザー権限) と無効化チャンク (is_active=False) を
+    Qdrant 側で除外する。リリース基準「権限フィルタ正答率 100%」の中核。
+    """
+    return Filter(
+        must=[
+            FieldCondition(key="access_level", range=Range(lte=user_access_level)),
+            FieldCondition(key="is_active", match=MatchValue(value=True)),
+        ]
+    )
+
+
 async def retrieve(question: str, user_access_level: int) -> list[dict]:
     """
     ハイブリッド検索 (dense + sparse) + RRF でチャンクを返す。
@@ -23,12 +37,7 @@ async def retrieve(question: str, user_access_level: int) -> list[dict]:
     dense_vec = await embed_query(question)
     s_idx, s_val = build_sparse(question)
 
-    access_filter = Filter(
-        must=[
-            FieldCondition(key="access_level", range=Range(lte=user_access_level)),
-            FieldCondition(key="is_active", match=MatchValue(value=True)),
-        ]
-    )
+    access_filter = build_access_filter(user_access_level)
 
     prefetch_list: list[Prefetch] = [
         Prefetch(
