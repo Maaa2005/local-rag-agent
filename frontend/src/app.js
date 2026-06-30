@@ -4,9 +4,6 @@
 let token = sessionStorage.getItem('token') || '';
 let currentUser = null;
 let isStreaming = false;
-let providers = [];        // [{name, display_name, is_external, available, ...}]
-let selectedProvider = sessionStorage.getItem('provider') || '';
-const consentedProviders = new Set(); // per-session 同意済み外部プロバイダ
 
 // ── DOM refs ───────────────────────────────────────────────
 const loginScreen     = document.getElementById('login-screen');
@@ -19,12 +16,6 @@ const messages        = document.getElementById('messages');
 const questionInput   = document.getElementById('question-input');
 const sendBtn         = document.getElementById('send-btn');
 const adminNavBtn     = document.getElementById('admin-nav-btn');
-const providerSelect  = document.getElementById('provider-select');
-const providerBadge   = document.getElementById('provider-badge');
-const extModal        = document.getElementById('external-modal');
-const extModalName    = document.getElementById('external-modal-name');
-const extModalConfirm = document.getElementById('external-modal-confirm');
-const extModalCancel  = document.getElementById('external-modal-cancel');
 
 // ── API helper ─────────────────────────────────────────────
 async function api(method, path, body) {
@@ -78,82 +69,9 @@ async function initChat() {
 
   adminNavBtn.style.display = currentUser.access_level >= 3 ? '' : 'none';
 
-  await loadProviders();
-
   loginScreen.hidden = true;
   chatScreen.hidden = false;
   questionInput.focus();
-}
-
-// ── Providers ─────────────────────────────────────────────
-async function loadProviders() {
-  const res = await api('GET', '/api/providers');
-  if (!res || !res.ok) return;
-  providers = await res.json();
-  renderProviderSelect();
-}
-
-function renderProviderSelect() {
-  providerSelect.innerHTML = '';
-  providers.forEach((p) => {
-    const opt = document.createElement('option');
-    opt.value = p.name;
-    let flag;
-    if (p.kind === 'agent')      flag = ' ◆ Agent';
-    else if (p.is_external)      flag = ' ☁︎';
-    else                          flag = ' ⌂';
-    const dim  = p.available ? '' : ' (未設定)';
-    opt.textContent = p.display_name + flag + dim;
-    opt.disabled = !p.available;
-    providerSelect.appendChild(opt);
-  });
-
-  const fallback = providers.find((p) => p.available)?.name || '';
-  if (!selectedProvider || !providers.find((p) => p.name === selectedProvider && p.available)) {
-    selectedProvider = fallback;
-  }
-  if (selectedProvider) {
-    providerSelect.value = selectedProvider;
-    sessionStorage.setItem('provider', selectedProvider);
-  }
-  updateProviderBadge();
-}
-
-function updateProviderBadge() {
-  const p = providers.find((x) => x.name === selectedProvider);
-  if (!p) { providerBadge.hidden = true; return; }
-  providerBadge.hidden = false;
-  let label, cls;
-  if (p.kind === 'agent')      { label = 'エージェント (外部+ツール実行)'; cls = 'agent'; }
-  else if (p.is_external)      { label = '外部送信'; cls = 'external'; }
-  else                          { label = 'ローカル'; cls = 'local'; }
-  providerBadge.textContent = label;
-  providerBadge.className = 'provider-badge ' + cls;
-}
-
-providerSelect.addEventListener('change', () => {
-  selectedProvider = providerSelect.value;
-  sessionStorage.setItem('provider', selectedProvider);
-  updateProviderBadge();
-});
-
-function requestExternalConsent(providerMeta) {
-  return new Promise((resolve) => {
-    extModalName.textContent = providerMeta.display_name;
-    // エージェント選択時はモーダルに追加注意書きを反映
-    const note = document.getElementById('external-modal-note');
-    if (note) note.hidden = providerMeta.kind !== 'agent';
-    extModal.hidden = false;
-    const onConfirm = () => { cleanup(); consentedProviders.add(providerMeta.name); resolve(true); };
-    const onCancel  = () => { cleanup(); resolve(false); };
-    function cleanup() {
-      extModal.hidden = true;
-      extModalConfirm.removeEventListener('click', onConfirm);
-      extModalCancel.removeEventListener('click', onCancel);
-    }
-    extModalConfirm.addEventListener('click', onConfirm);
-    extModalCancel.addEventListener('click', onCancel);
-  });
 }
 
 // ── Panel switching ────────────────────────────────────────
@@ -220,13 +138,6 @@ async function sendQuestion() {
   const q = questionInput.value.trim();
   if (!q || isStreaming) return;
 
-  // 外部プロバイダの場合、未同意ならモーダルで同意を取る
-  const meta = providers.find((p) => p.name === selectedProvider);
-  if (meta && meta.is_external && !consentedProviders.has(meta.name)) {
-    const ok = await requestExternalConsent(meta);
-    if (!ok) return;
-  }
-
   questionInput.value = '';
   questionInput.style.height = '';
   appendMessage('user', q);
@@ -242,7 +153,7 @@ async function sendQuestion() {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token,
       },
-      body: JSON.stringify({ question: q, provider: selectedProvider || undefined }),
+      body: JSON.stringify({ question: q }),
     });
 
     if (!res.ok) {
@@ -314,84 +225,7 @@ questionInput.addEventListener('input', () => {
 
 // ── Admin ──────────────────────────────────────────────────
 async function loadAdminData() {
-  await Promise.all([loadFolders(), loadDocuments(), loadTasks(), loadProviderCredentials()]);
-}
-
-async function loadProviderCredentials() {
-  const res = await api('GET', '/api/providers');
-  if (!res || !res.ok) return;
-  const list = await res.json();
-  const container = document.getElementById('provider-cred-list');
-  container.innerHTML = '';
-
-  list.forEach((p) => {
-    if (!p.requires_credentials) return;
-    const card = document.createElement('div');
-    card.className = 'cred-row';
-
-    const head = document.createElement('div');
-    head.className = 'cred-head';
-    head.innerHTML = `<b>${p.display_name}</b> <span class="cred-status ${p.has_credentials ? 'ok' : 'missing'}">${p.has_credentials ? '登録済み' : '未登録'}</span>`;
-    card.appendChild(head);
-
-    const form = document.createElement('form');
-    form.className = 'cred-form';
-
-    const apiInput = document.createElement('input');
-    apiInput.type = 'password';
-    apiInput.placeholder = 'API キー (再設定する場合のみ入力)';
-    apiInput.dataset.field = 'api_key';
-    form.appendChild(apiInput);
-
-    p.extra_fields.forEach((f) => {
-      const inp = document.createElement('input');
-      inp.type = 'text';
-      inp.placeholder = f;
-      inp.dataset.field = f;
-      form.appendChild(inp);
-    });
-
-    const save = document.createElement('button');
-    save.type = 'submit';
-    save.textContent = '保存';
-    form.appendChild(save);
-
-    if (p.has_credentials) {
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'btn-ghost';
-      del.textContent = '削除';
-      del.addEventListener('click', async () => {
-        if (!confirm(`${p.display_name} の資格情報を削除しますか?`)) return;
-        await api('DELETE', `/api/providers/${p.name}/credentials`);
-        await loadProviderCredentials();
-        await loadProviders();
-      });
-      form.appendChild(del);
-    }
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const apiKey = apiInput.value.trim();
-      if (!apiKey) { alert('API キーを入力してください'); return; }
-      const extra = {};
-      form.querySelectorAll('input[data-field]').forEach((inp) => {
-        if (inp.dataset.field === 'api_key') return;
-        if (inp.value.trim()) extra[inp.dataset.field] = inp.value.trim();
-      });
-      const res = await api('PUT', `/api/providers/${p.name}/credentials`, { api_key: apiKey, extra });
-      if (res && res.ok) {
-        await loadProviderCredentials();
-        await loadProviders();
-      } else {
-        const err = res ? await res.json().catch(() => ({})) : {};
-        alert(err.detail || '保存に失敗しました');
-      }
-    });
-
-    card.appendChild(form);
-    container.appendChild(card);
-  });
+  await Promise.all([loadFolders(), loadDocuments(), loadTasks()]);
 }
 
 async function loadFolders() {

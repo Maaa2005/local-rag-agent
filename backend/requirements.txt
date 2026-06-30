@@ -16,11 +16,6 @@ bcrypt==4.0.1
 python-multipart==0.0.20
 pydantic-settings==2.6.1
 httpx==0.28.1
-# プロバイダ SDK (Anthropic / Google / AWS) + 資格情報暗号化
-anthropic==0.39.0
-google-genai==0.3.0
-boto3==1.35.74
-cryptography==44.0.0
-# エージェント SDK (Phase 3): Claude Code / Codex MCP 接続
-claude-agent-sdk==0.0.10
-mcp==1.2.0
+# 注: 外部 LLM プロバイダ SDK (anthropic / google-genai / boto3 / claude-agent-sdk / mcp) は
+# フロンティア専用アプリ frontier-llm-agent へ分離。本アプリはローカル LLM (vLLM) 固定のため不要。
+# vLLM へは OpenAI 互換 API (上記 openai パッケージ) で接続する。

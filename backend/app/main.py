@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, chat, admin, providers as providers_api
+from app.api import auth, chat, admin
 from app.config import settings
 from app.database import DB_PATH, close_db, init_db
 from app.services.indexer import ensure_collection
@@ -51,7 +51,6 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
-app.include_router(providers_api.router)
 
 
 @app.get("/health")

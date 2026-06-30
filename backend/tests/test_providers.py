@@ -1,12 +1,12 @@
-"""LLM プロバイダ層とクラウド統合機能のテスト。
+"""ローカル LLM プロバイダ層のテスト (社内機密 RAG 専用・ローカル固定)。
 
-- registry: 期待される 6 プロバイダがすべて登録されている
-- credentials: Fernet ラウンドトリップ
-- chat API: provider 指定が伝搬する、未設定プロバイダは 400
+外部送信プロバイダ (Anthropic / OpenAI / Codex 等) は別アプリ frontier-llm-agent に
+分離済み。本アプリには vLLM のみが登録され、外部経路・資格情報管理は存在しないことを検証する。
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import sqlite3
 from pathlib import Path
 
@@ -14,55 +14,41 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.database as db_module
-from app.services import credentials as creds_module
 from app.services import llm as llm_module
 from app.services.providers import base as providers_base
 from app.services.providers import list_providers, get_meta
 
 
-# ─── registry ─────────────────────────────────────────────────
-EXPECTED = {
-    "vllm", "anthropic", "openai", "gemini", "azure_openai", "bedrock",
-    "claude_code", "codex",
-}
-
-
-def test_all_expected_providers_registered():
+# ─── registry: ローカル固定 ───────────────────────────────────
+def test_only_local_provider_registered():
     names = {p.name for p in list_providers()}
-    assert EXPECTED <= names
+    assert names == {"vllm"}
 
 
-def test_external_flags_are_correct():
-    assert get_meta("vllm").is_external is False
-    for ext in EXPECTED - {"vllm"}:
-        assert get_meta(ext).is_external is True
-        assert get_meta(ext).requires_credentials is True
+def test_vllm_is_local_and_needs_no_credentials():
+    meta = get_meta("vllm")
+    assert meta.is_external is False
+    assert meta.requires_credentials is False
+    assert meta.kind == "api"
 
 
-def test_agent_kind_for_phase3_providers():
-    """Phase 3 で追加した 2 つは kind='agent'。"""
-    assert get_meta("claude_code").kind == "agent"
-    assert get_meta("codex").kind == "agent"
-    # API 系は "api"
-    for api in ("vllm", "anthropic", "openai", "gemini", "azure_openai", "bedrock"):
-        assert get_meta(api).kind == "api"
+def test_no_external_providers_registered():
+    """外部プロバイダ名は一切登録されていない (流出経路なし)。"""
+    for ext in ("anthropic", "openai", "gemini", "azure_openai", "bedrock", "claude_code", "codex"):
+        with pytest.raises(KeyError):
+            get_meta(ext)
 
 
-def test_agent_providers_validate_credentials():
-    """資格情報なしで factory を呼ぶと ValueError。"""
-    from app.services.providers import base as pb
-    for name in ("claude_code", "codex"):
-        _, factory = pb._registry[name]
-        with pytest.raises(ValueError):
-            factory(None)
-        with pytest.raises(ValueError):
-            factory({"api_key": ""})
+def test_get_provider_raises_for_unknown():
+    from app.services.providers import get_provider
+    with pytest.raises(KeyError, match="Unknown provider"):
+        asyncio.run(get_provider("anthropic"))
 
 
-# ─── credentials encrypt/decrypt ─────────────────────────────
+# ─── isolated DB ─────────────────────────────────────────────
 @pytest.fixture()
 def isolated_db(tmp_path, monkeypatch):
-    db_path = tmp_path / "creds.db"
+    db_path = tmp_path / "test.db"
     monkeypatch.setattr(db_module, "DB_PATH", db_path)
     db_module.db._conn = None
     sql = (Path(__file__).resolve().parent.parent / "migrations" / "init.sql").read_text(encoding="utf-8")
@@ -73,34 +59,7 @@ def isolated_db(tmp_path, monkeypatch):
     asyncio.run(db_module.db.close())
 
 
-def test_credentials_roundtrip(isolated_db):
-    asyncio.run(creds_module.save_credentials("anthropic", "sk-test-abc", {"model": "claude-x"}))
-    loaded = asyncio.run(creds_module.load_credentials("anthropic"))
-    assert loaded == {"api_key": "sk-test-abc", "extra": {"model": "claude-x"}}
-
-
-def test_credentials_overwrite(isolated_db):
-    asyncio.run(creds_module.save_credentials("openai", "k1", {"model": "gpt-5"}))
-    asyncio.run(creds_module.save_credentials("openai", "k2", {"model": "gpt-5-mini"}))
-    loaded = asyncio.run(creds_module.load_credentials("openai"))
-    assert loaded["api_key"] == "k2"
-    assert loaded["extra"]["model"] == "gpt-5-mini"
-
-
-def test_credentials_delete(isolated_db):
-    asyncio.run(creds_module.save_credentials("gemini", "k", {}))
-    assert asyncio.run(creds_module.has_credentials("gemini")) is True
-    asyncio.run(creds_module.delete_credentials("gemini"))
-    assert asyncio.run(creds_module.has_credentials("gemini")) is False
-    assert asyncio.run(creds_module.load_credentials("gemini")) is None
-
-
-def test_credentials_rejects_unknown_provider(isolated_db):
-    with pytest.raises(KeyError):
-        asyncio.run(creds_module.save_credentials("not-a-provider", "k", {}))
-
-
-# ─── stream_answer + provider injection ─────────────────────
+# ─── stream_answer ───────────────────────────────────────────
 class _FakeProvider:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -112,37 +71,25 @@ class _FakeProvider:
             yield t
 
 
-def test_stream_answer_uses_registered_provider(isolated_db):
+def test_stream_answer_uses_local_provider_and_injects_question():
     fake = _FakeProvider(["a", "b"])
     providers_base._instances["vllm"] = fake
     try:
         async def collect():
-            out = []
-            async for tok in llm_module.stream_answer(
-                "Q", [{"content": "C", "source_file": "f"}], provider_name="vllm"
-            ):
-                out.append(tok)
-            return out
+            return [
+                t async for t in llm_module.stream_answer(
+                    "Q", [{"content": "社内文書C", "source_file": "f"}]
+                )
+            ]
 
-        tokens = asyncio.run(collect())
-        assert tokens == ["a", "b"]
+        assert asyncio.run(collect()) == ["a", "b"]
         assert "Q" in fake.received[1]["content"]
+        assert "社内文書C" in fake.received[1]["content"]
     finally:
         providers_base.reset_instances()
 
 
-def test_stream_answer_raises_when_external_credentials_missing(isolated_db):
-    async def run():
-        gen = llm_module.stream_answer(
-            "Q", [{"content": "C", "source_file": "f"}], provider_name="anthropic"
-        )
-        return [tok async for tok in gen]
-
-    with pytest.raises(ValueError, match="no credentials"):
-        asyncio.run(run())
-
-
-# ─── chat API: provider param ────────────────────────────────
+# ─── chat / providers API ────────────────────────────────────
 @pytest.fixture()
 def client(isolated_db, monkeypatch):
     async def _noop(*a, **k): return None
@@ -169,66 +116,60 @@ def _login(client, user="admin", pw="admin"):
     return r.json()["access_token"]
 
 
-def test_chat_rejects_unknown_provider(client):
-    token = _login(client)
-    r = client.post(
-        "/api/chat",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"question": "テスト", "provider": "totally-fake"},
-    )
-    assert r.status_code == 400
+def _sse_events(raw: str) -> list[dict]:
+    out = []
+    for line in raw.splitlines():
+        if line.startswith("data: "):
+            out.append(json.loads(line[len("data: "):]))
+    return out
 
 
-def test_chat_rejects_external_provider_without_credentials(client):
-    token = _login(client)
-    r = client.post(
-        "/api/chat",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"question": "テスト", "provider": "anthropic"},
-    )
-    assert r.status_code == 400
-    assert "credentials" in r.json()["detail"].lower()
-
-
-# ─── providers API ───────────────────────────────────────────
-def test_list_providers_endpoint(client):
+def test_providers_api_is_removed(client):
+    """資格情報・プロバイダ選択の管理 API はローカル固定アプリには存在しない。"""
     token = _login(client)
     r = client.get("/api/providers", headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200
-    body = r.json()
-    names = {p["name"] for p in body}
-    assert EXPECTED <= names
-    vllm = next(p for p in body if p["name"] == "vllm")
-    assert vllm["available"] is True
-    assert vllm["is_external"] is False
+    assert r.status_code == 404
 
 
-def test_admin_can_upsert_credentials(client):
+def test_chat_uses_local_rag(client, monkeypatch):
     token = _login(client)
-    r = client.put(
-        "/api/providers/anthropic/credentials",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"api_key": "sk-test", "extra": {"model": "claude-sonnet-4-6"}},
-    )
-    assert r.status_code == 200
 
-    r2 = client.get("/api/providers", headers={"Authorization": f"Bearer {token}"})
-    anthropic = next(p for p in r2.json() if p["name"] == "anthropic")
-    assert anthropic["has_credentials"] is True
-    assert anthropic["available"] is True
+    async def _fake_retrieve(question, level):
+        return [{"content": "就業規則の本文", "source_file": "rules.pdf"}]
+
+    monkeypatch.setattr("app.api.chat.retrieve", _fake_retrieve)
+    providers_base._instances["vllm"] = _FakeProvider(["回答です"])
+    try:
+        r = client.post(
+            "/api/chat",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"question": "有給は何日?"},
+        )
+        assert r.status_code == 200
+        events = _sse_events(r.text)
+        sources_ev = next(e for e in events if e["type"] == "sources")
+        assert sources_ev["sources"] == ["rules.pdf"]
+        assert any(e.get("content") == "回答です" for e in events)
+    finally:
+        providers_base.reset_instances()
 
 
-def test_non_admin_cannot_upsert(client):
-    from app.core.security import hash_password
-    import app.database as db_mod
-    asyncio.run(db_mod.db.execute(
-        "INSERT INTO users (username, password_hash, access_level) VALUES (?, ?, ?)",
-        ("bob", hash_password("pw"), 1),
-    ))
-    token = _login(client, "bob", "pw")
-    r = client.put(
-        "/api/providers/anthropic/credentials",
-        headers={"Authorization": f"Bearer {token}"},
-        json={"api_key": "x"},
-    )
-    assert r.status_code == 403
+def test_chat_ignores_unknown_provider_field(client, monkeypatch):
+    """provider フィールドを送っても無視され、常にローカル RAG で処理される。"""
+    token = _login(client)
+
+    async def _fake_retrieve(question, level):
+        return [{"content": "x", "source_file": "a.txt"}]
+
+    monkeypatch.setattr("app.api.chat.retrieve", _fake_retrieve)
+    providers_base._instances["vllm"] = _FakeProvider(["ok"])
+    try:
+        r = client.post(
+            "/api/chat",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"question": "Q", "provider": "anthropic"},
+        )
+        assert r.status_code == 200
+        assert any(e.get("content") == "ok" for e in _sse_events(r.text))
+    finally:
+        providers_base.reset_instances()

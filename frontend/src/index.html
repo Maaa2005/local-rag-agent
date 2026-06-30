@@ -44,9 +44,7 @@
     <!-- Chat panel -->
     <section id="panel-chat" class="panel active">
       <div class="chat-toolbar">
-        <label for="provider-select" class="toolbar-label">モデル</label>
-        <select id="provider-select" class="provider-select" aria-label="使用する LLM プロバイダ"></select>
-        <span id="provider-badge" class="provider-badge" hidden></span>
+        <span class="toolbar-label">社内ナレッジ（ローカル LLM）</span>
       </div>
       <div id="messages" class="messages" aria-live="polite" aria-label="会話履歴"></div>
       <div class="input-bar">
@@ -98,12 +96,6 @@
           </table>
         </div>
 
-        <div class="admin-card admin-card-wide">
-          <h2>LLM プロバイダ資格情報</h2>
-          <p class="hint">外部 API キーを暗号化して保存します。空欄のまま保存しないでください。</p>
-          <div id="provider-cred-list"></div>
-        </div>
-
         <div class="admin-card">
           <h2>ユーザー作成</h2>
           <form id="user-form" class="inline-form col">
@@ -122,26 +114,6 @@
       </div>
     </section>
   </main>
-</div>
-
-<!-- ─────────────────── External provider 警告モーダル ─────────────────── -->
-<div id="external-modal" class="modal" hidden>
-  <div class="modal-card">
-    <h3>外部 LLM への送信確認</h3>
-    <p>
-      選択中のプロバイダ <strong id="external-modal-name"></strong> は
-      <b>外部 API へ質問と検索済みの社内文書チャンクを送信します</b>。
-      続行しますか?
-    </p>
-    <p id="external-modal-note" class="agent-warn" hidden>
-      ⚠ このプロバイダは<b>エージェント</b>です。回答生成中にサーバー側で
-      ファイル読み書きやシェル実行 (全ツール許可) が走る可能性があります。
-    </p>
-    <div class="modal-actions">
-      <button id="external-modal-cancel" class="btn-ghost">キャンセル</button>
-      <button id="external-modal-confirm">同意して使用</button>
-    </div>
-  </div>
 </div>
 
 <script src="app.js"></script>

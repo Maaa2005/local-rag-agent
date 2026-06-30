@@ -41,13 +41,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS provider_credentials (
-    provider_name TEXT    PRIMARY KEY,
-    api_key_enc   BLOB    NOT NULL,
-    extra         TEXT    NOT NULL DEFAULT '{}',
-    updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-
 -- 初期管理者ユーザー (パスワード: admin / 本番では必ず変更)
 -- bcrypt hash of "admin" (rounds=12)
 INSERT OR IGNORE INTO users (username, password_hash, access_level)

@@ -11,7 +11,6 @@ from __future__ import annotations
 from typing import AsyncIterator
 
 from app.config import settings
-from app.services import credentials
 from app.services.providers import LLMProvider, get_meta, get_provider, reset_instances
 
 SYSTEM_PROMPT = """あなたは社内情報専門のアシスタントです。
@@ -37,13 +36,11 @@ def _build_messages(question: str, chunks: list[dict]) -> list[dict]:
 
 
 async def _resolve_provider(name: str) -> LLMProvider:
+    # ローカル LLM 固定アプリのため資格情報は不要 (vLLM は requires_credentials=False)。
     meta = get_meta(name)
-    creds = None
     if meta.requires_credentials:
-        creds = await credentials.load_credentials(name)
-        if creds is None:
-            raise ValueError(f"Provider '{name}' has no credentials configured")
-    return await get_provider(name, creds)
+        raise ValueError(f"Provider '{name}' は資格情報が必要ですが本アプリは未対応です")
+    return await get_provider(name)
 
 
 async def stream_answer(
