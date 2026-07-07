@@ -14,8 +14,8 @@ def _load_model() -> SentenceTransformer:
 
 def _embed_sync(texts: list[str], is_query: bool) -> list[list[float]]:
     model = _load_model()
-    # multilingual-e5-large は prefix が必要
-    prefix = "query: " if is_query else "passage: "
+    # multilingual-e5-large は prefix が必要 (config 化: 他モデルへの切替に対応)
+    prefix = settings.embed_query_prefix if is_query else settings.embed_passage_prefix
     prefixed = [prefix + t for t in texts]
     vecs = model.encode(prefixed, normalize_embeddings=True, show_progress_bar=False)
     return vecs.tolist()

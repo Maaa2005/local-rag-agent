@@ -11,6 +11,7 @@ from app.database import DB_PATH, close_db, init_db
 from app.services.embedder import embed_query
 from app.services.indexer import ensure_collection
 from app.services.qdrant import close_client
+from app.services.reranker import warmup as warmup_reranker
 from app.services.task_processor import run_task_processor
 from app.services.watcher import start_watcher, stop_watcher
 
@@ -28,6 +29,14 @@ async def _warmup_embedder() -> None:
         logging.getLogger(__name__).exception("Embedder warmup failed")
 
 
+async def _warmup_reranker() -> None:
+    try:
+        await warmup_reranker()
+        logging.getLogger(__name__).info("Reranker warmed up")
+    except Exception:
+        logging.getLogger(__name__).exception("Reranker warmup failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -37,6 +46,9 @@ async def lifespan(app: FastAPI):
     # 初回チャットでのモデルロード待ちを避けるため、起動をブロックせずウォームアップする。
     # 短命タスクなので shutdown 時の cancel は不要だが、GC 回収を防ぐため参照だけ保持。
     _warmup_task = asyncio.create_task(_warmup_embedder())
+    _warmup_rerank_task = None
+    if settings.rerank_enabled:
+        _warmup_rerank_task = asyncio.create_task(_warmup_reranker())
     try:
         yield
     finally:

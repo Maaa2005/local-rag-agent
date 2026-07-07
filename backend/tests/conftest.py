@@ -52,7 +52,21 @@ class _StubSentenceTransformer:
         return np.stack(out)
 
 
-_stub_module("sentence_transformers", SentenceTransformer=_StubSentenceTransformer)
+class _StubCrossEncoder:
+    """CrossEncoder の差し替え。テストでは monkeypatch で predict を上書きする想定。"""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def predict(self, pairs):
+        return [0.0 for _ in pairs]
+
+
+_stub_module(
+    "sentence_transformers",
+    SentenceTransformer=_StubSentenceTransformer,
+    CrossEncoder=_StubCrossEncoder,
+)
 
 
 # ─── docling のスタブ ────────────────────────────────────────────────

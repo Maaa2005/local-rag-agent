@@ -22,6 +22,17 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.1
 
     embed_model: str = "intfloat/multilingual-e5-large"
+    # e5 系は query/passage で異なる prefix が必要。Ruri 系など方式が異なる
+    # モデルへ切り替える際はここを変更する (embed_model 変更時は全文書の再インデックスが必要)。
+    embed_query_prefix: str = "query: "
+    embed_passage_prefix: str = "passage: "
+
+    # Cross-Encoder によるリランキング (検索品質向上)。
+    rerank_enabled: bool = True
+    rerank_model: str = "BAAI/bge-reranker-v2-m3"
+    # dense+sparse+RRF で取得する候補数。retrieval_top_k より多めに取り、
+    # リランク後に retrieval_top_k 件へ絞り込む。
+    rerank_candidates: int = 30
 
     watched_path: str = "/watched"
     data_dir: str = "/app/data"

@@ -12,6 +12,7 @@ from qdrant_client.models import (
 from app.config import settings
 from app.services.embedder import embed_query
 from app.services.qdrant import get_client
+from app.services.reranker import rerank
 from app.services.sparse import build_sparse
 
 
@@ -33,17 +34,23 @@ async def retrieve(question: str, user_access_level: int) -> list[dict]:
     """
     ハイブリッド検索 (dense + sparse) + RRF でチャンクを返す。
     access_level <= user_access_level かつ is_active=True のみ対象。
+    rerank_enabled の場合は候補を rerank_candidates 件取得し、Cross-Encoder で
+    リランクしてから retrieval_top_k 件へ絞り込む。
     """
     dense_vec = await embed_query(question)
     s_idx, s_val = build_sparse(question)
 
     access_filter = build_access_filter(user_access_level)
 
+    # リランクする場合は候補数を広めに取り、リランク後に top_k へ絞る。
+    fetch_limit = settings.rerank_candidates if settings.rerank_enabled else settings.retrieval_top_k
+    prefetch_limit = max(fetch_limit, settings.retrieval_top_k) * 3
+
     prefetch_list: list[Prefetch] = [
         Prefetch(
             query=dense_vec,
             using="dense",
-            limit=settings.retrieval_top_k * 3,
+            limit=prefetch_limit,
             filter=access_filter,
         ),
     ]
@@ -52,7 +59,7 @@ async def retrieve(question: str, user_access_level: int) -> list[dict]:
             Prefetch(
                 query=SparseVector(indices=s_idx, values=s_val),
                 using="sparse",
-                limit=settings.retrieval_top_k * 3,
+                limit=prefetch_limit,
                 filter=access_filter,
             )
         )
@@ -61,11 +68,11 @@ async def retrieve(question: str, user_access_level: int) -> list[dict]:
         collection_name=settings.qdrant_collection,
         prefetch=prefetch_list,
         query=FusionQuery(fusion=Fusion.RRF),
-        limit=settings.retrieval_top_k,
+        limit=fetch_limit,
         with_payload=True,
     )
 
-    return [
+    chunks = [
         {
             "content": h.payload["content"],
             "source_file": h.payload.get("source_file", ""),
@@ -73,3 +80,8 @@ async def retrieve(question: str, user_access_level: int) -> list[dict]:
         }
         for h in response.points
     ]
+
+    if settings.rerank_enabled:
+        chunks = await rerank(question, chunks)
+
+    return chunks[: settings.retrieval_top_k]
