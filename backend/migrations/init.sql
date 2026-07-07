@@ -57,6 +57,29 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Phase3: 会話履歴の永続化
+CREATE TABLE IF NOT EXISTS conversations (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    title      TEXT    NOT NULL DEFAULT '',
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+    -- user | assistant
+    role            TEXT    NOT NULL,
+    content         TEXT    NOT NULL,
+    -- JSON配列: [{"id", "source_file", "content", "score"}, ...]
+    sources         TEXT    NOT NULL DEFAULT '[]',
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+
 -- 初期管理者ユーザー (パスワード: admin / 本番では必ず変更)
 -- bcrypt hash of "admin" (rounds=12)
 INSERT OR IGNORE INTO users (username, password_hash, access_level)

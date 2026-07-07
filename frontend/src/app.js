@@ -4,6 +4,7 @@
 let token = sessionStorage.getItem('token') || '';
 let currentUser = null;
 let isStreaming = false;
+let currentConversationId = null;
 
 // ── DOM refs ───────────────────────────────────────────────
 const loginScreen     = document.getElementById('login-screen');
@@ -63,6 +64,7 @@ logoutBtn.addEventListener('click', logout);
 function logout() {
   token = '';
   currentUser = null;
+  currentConversationId = null;
   sessionStorage.removeItem('token');
   chatScreen.hidden = true;
   loginScreen.hidden = false;
@@ -81,6 +83,7 @@ async function initChat() {
   loginScreen.hidden = true;
   chatScreen.hidden = false;
   questionInput.focus();
+  loadConversations();
 }
 
 // ── Password change ──────────────────────────────────────────
@@ -164,17 +167,151 @@ function appendAssistantShell() {
   return { bubble, sourcesRow, cursor };
 }
 
+function sourceBasename(source) {
+  return (source.source_file || '').split('/').pop() || '(不明)';
+}
+
+// ── Citation dialog ────────────────────────────────────────
+const citationDialog = document.getElementById('citation-dialog');
+const citationDialogBody = document.getElementById('citation-dialog-body');
+document.getElementById('citation-close-btn').addEventListener('click', () => {
+  citationDialog.close();
+});
+
+function openCitationDialog(source) {
+  citationDialogBody.innerHTML = '';
+  const fileEl = document.createElement('div');
+  fileEl.className = 'citation-file';
+  fileEl.textContent = sourceBasename(source);
+  const contentEl = document.createElement('pre');
+  contentEl.className = 'citation-content';
+  contentEl.textContent = source.content || '(本文なし)';
+  citationDialogBody.appendChild(fileEl);
+  citationDialogBody.appendChild(contentEl);
+  citationDialog.showModal();
+}
+
 function setSources(sourcesRow, sources) {
   sourcesRow.innerHTML = '';
-  const unique = [...new Set(sources)];
-  unique.forEach((s) => {
-    const tag = document.createElement('span');
+  const seen = new Set();
+  (sources || []).forEach((s) => {
+    const key = s.source_file || '';
+    if (seen.has(key)) return;
+    seen.add(key);
+    const tag = document.createElement('button');
+    tag.type = 'button';
     tag.className = 'source-tag';
-    tag.title = s;
-    tag.textContent = s.split('/').pop();
+    tag.title = key;
+    tag.textContent = sourceBasename(s);
+    tag.addEventListener('click', () => openCitationDialog(s));
     sourcesRow.appendChild(tag);
   });
 }
+
+// 回答テキスト中の [1] [2] ... を、対応する引用元があればクリック可能なチップに変換する。
+// テキストは必ず textContent / createElement で挿入し、innerHTML に生文字列を渡さない。
+function renderAnswerWithCitations(bubble, text, sources) {
+  bubble.innerHTML = '';
+  const byId = new Map((sources || []).map((s) => [String(s.id), s]));
+  const re = /\[(\d+)\]/g;
+  let lastIndex = 0;
+  let match;
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      bubble.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+    }
+    const src = byId.get(match[1]);
+    if (src) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'citation-chip';
+      chip.textContent = `[${match[1]}]`;
+      chip.addEventListener('click', () => openCitationDialog(src));
+      bubble.appendChild(chip);
+    } else {
+      bubble.appendChild(document.createTextNode(match[0]));
+    }
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    bubble.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+}
+
+// ── Conversation sidebar ───────────────────────────────────
+async function loadConversations() {
+  const res = await api('GET', '/api/conversations');
+  if (!res || !res.ok) return;
+  renderConversationList(await res.json());
+}
+
+function renderConversationList(rows) {
+  const list = document.getElementById('conversation-list');
+  list.innerHTML = '';
+  rows.forEach((c) => {
+    const li = document.createElement('li');
+    li.className = 'conversation-item' + (c.id === currentConversationId ? ' active' : '');
+    li.dataset.id = String(c.id);
+
+    const titleBtn = document.createElement('button');
+    titleBtn.type = 'button';
+    titleBtn.className = 'conversation-title';
+    titleBtn.textContent = c.title || '(無題)';
+    titleBtn.addEventListener('click', () => selectConversation(c.id));
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'conversation-delete';
+    delBtn.title = '削除';
+    delBtn.textContent = '×';
+    delBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('この会話を削除しますか？')) return;
+      const r = await api('DELETE', `/api/conversations/${c.id}`);
+      if (r && r.ok) {
+        if (currentConversationId === c.id) startNewConversation();
+        loadConversations();
+      }
+    });
+
+    li.appendChild(titleBtn);
+    li.appendChild(delBtn);
+    list.appendChild(li);
+  });
+}
+
+function startNewConversation() {
+  currentConversationId = null;
+  messages.innerHTML = '';
+  document.querySelectorAll('.conversation-item').forEach((li) => li.classList.remove('active'));
+}
+
+async function selectConversation(id) {
+  if (isStreaming) return;
+  const res = await api('GET', `/api/conversations/${id}/messages`);
+  if (!res || !res.ok) return;
+  const msgs = await res.json();
+  currentConversationId = id;
+  messages.innerHTML = '';
+  msgs.forEach((m) => {
+    if (m.role === 'user') {
+      appendMessage('user', m.content);
+      return;
+    }
+    const { bubble, sourcesRow, cursor } = appendAssistantShell();
+    cursor.remove();
+    setSources(sourcesRow, m.sources || []);
+    renderAnswerWithCitations(bubble, m.content, m.sources || []);
+  });
+  document.querySelectorAll('.conversation-item').forEach((li) => {
+    li.classList.toggle('active', li.dataset.id === String(id));
+  });
+}
+
+document.getElementById('new-conversation-btn').addEventListener('click', () => {
+  if (isStreaming) return;
+  startNewConversation();
+});
 
 async function sendQuestion() {
   const q = questionInput.value.trim();
@@ -188,6 +325,10 @@ async function sendQuestion() {
   isStreaming = true;
   sendBtn.disabled = true;
 
+  let rawAnswer = '';
+  let latestSources = [];
+  let hadError = false;
+
   try {
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -195,7 +336,7 @@ async function sendQuestion() {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + token,
       },
-      body: JSON.stringify({ question: q }),
+      body: JSON.stringify({ question: q, conversation_id: currentConversationId }),
     });
 
     if (!res.ok) {
@@ -222,17 +363,23 @@ async function sendQuestion() {
         let evt;
         try { evt = JSON.parse(line.slice(6)); } catch { continue; }
 
-        if (evt.type === 'sources') {
-          setSources(sourcesRow, evt.sources || []);
+        if (evt.type === 'meta') {
+          currentConversationId = evt.conversation_id;
+          loadConversations();
+        } else if (evt.type === 'sources') {
+          latestSources = evt.sources || [];
+          setSources(sourcesRow, latestSources);
         } else if (evt.type === 'token') {
           if (!textNode) {
             cursor.remove();
             textNode = document.createTextNode('');
             bubble.appendChild(textNode);
           }
+          rawAnswer += evt.content;
           textNode.textContent += evt.content;
           messages.scrollTop = messages.scrollHeight;
         } else if (evt.type === 'error') {
+          hadError = true;
           cursor.remove();
           const err = document.createElement('div');
           err.className = 'inline-error';
@@ -243,6 +390,11 @@ async function sendQuestion() {
         }
       }
     }
+
+    if (!hadError && rawAnswer) {
+      renderAnswerWithCitations(bubble, rawAnswer, latestSources);
+    }
+    loadConversations();
   } catch (err) {
     bubble.textContent = 'ネットワークエラーが発生しました。';
     cursor.remove();

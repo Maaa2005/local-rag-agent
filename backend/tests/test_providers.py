@@ -148,7 +148,7 @@ def test_chat_uses_local_rag(client, monkeypatch):
         assert r.status_code == 200
         events = _sse_events(r.text)
         sources_ev = next(e for e in events if e["type"] == "sources")
-        assert sources_ev["sources"] == ["rules.pdf"]
+        assert [s["source_file"] for s in sources_ev["sources"]] == ["rules.pdf"]
         assert any(e.get("content") == "回答です" for e in events)
     finally:
         providers_base.reset_instances()

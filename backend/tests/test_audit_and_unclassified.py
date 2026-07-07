@@ -384,7 +384,7 @@ def test_chat_stream_records_audit_log(monkeypatch, isolated_db):
         await db.connect()
         try:
             user = {"id": 1, "username": "admin", "access_level": 3}
-            events = [e async for e in chat_module._event_stream("質問です", user)]
+            events = [e async for e in chat_module._event_stream("質問です", user, None)]
             assert any('"type": "sources"' in e for e in events)
             row = await db.fetchone(
                 "SELECT username, question, answer, error, retrieved_chunks FROM audit_logs"
@@ -420,7 +420,7 @@ def test_chat_stream_records_error_in_audit_log(monkeypatch, isolated_db):
         await db.connect()
         try:
             user = {"id": 1, "username": "admin", "access_level": 3}
-            _ = [e async for e in chat_module._event_stream("質問です", user)]
+            _ = [e async for e in chat_module._event_stream("質問です", user, None)]
             return await db.fetchone("SELECT answer, error FROM audit_logs")
         finally:
             await db.close()

@@ -41,6 +41,10 @@
       <button class="nav-item active" data-panel="chat">チャット</button>
       <button class="nav-item" data-panel="admin" id="admin-nav-btn">管理</button>
     </nav>
+    <div class="conversation-panel">
+      <button id="new-conversation-btn" class="btn-new-conv">＋ 新規会話</button>
+      <ul id="conversation-list" class="conversation-list" aria-label="会話一覧"></ul>
+    </div>
   </aside>
 
   <main class="main-area">
@@ -143,6 +147,17 @@
     <dl id="audit-detail-body" class="audit-detail-body"></dl>
     <div class="dialog-actions">
       <button type="button" id="audit-close-btn" class="btn-ghost">閉じる</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ───────────────────────── Citation detail dialog ───────────────────────── -->
+<dialog id="citation-dialog">
+  <div class="citation-detail">
+    <h2>引用元</h2>
+    <div id="citation-dialog-body" class="citation-dialog-body"></div>
+    <div class="dialog-actions">
+      <button type="button" id="citation-close-btn" class="btn-ghost">閉じる</button>
     </div>
   </div>
 </dialog>
