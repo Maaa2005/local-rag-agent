@@ -17,14 +17,30 @@ def test_build_context_lists_sources_with_index():
         {"content": "規定B", "source_file": "/watched/handbook.docx"},
     ]
     ctx = _build_context(chunks)
-    assert "[1] /watched/rules.pdf" in ctx
-    assert "[2] /watched/handbook.docx" in ctx
+    assert "[1] rules.pdf" in ctx
+    assert "[2] handbook.docx" in ctx
     assert "規定A" in ctx and "規定B" in ctx
 
 
 def test_build_context_uses_unknown_when_missing():
     ctx = _build_context([{"content": "本文"}])
     assert "[1] 不明" in ctx
+
+
+def test_build_context_strips_full_path_to_basename():
+    """LLM コンテキストへの機密ディレクトリパス漏洩防止 (フルパス → ファイル名)。"""
+    chunks = [{"content": "本文", "source_file": "/watched/exec/secret-project/plan.docx"}]
+    ctx = _build_context(chunks)
+    assert "[1] plan.docx" in ctx
+    assert "exec" not in ctx
+    assert "secret-project" not in ctx
+
+
+def test_build_context_strips_windows_style_path_to_basename():
+    chunks = [{"content": "本文", "source_file": r"\\smbserver\exec\budget.xlsx"}]
+    ctx = _build_context(chunks)
+    assert "[1] budget.xlsx" in ctx
+    assert "smbserver" not in ctx
 
 
 def test_system_prompt_forbids_external_knowledge():

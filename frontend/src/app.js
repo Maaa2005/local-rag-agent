@@ -267,8 +267,88 @@ questionInput.addEventListener('input', () => {
 
 // ── Admin ──────────────────────────────────────────────────
 async function loadAdminData() {
-  await Promise.all([loadFolders(), loadDocuments(), loadTasks()]);
+  await Promise.all([
+    loadFolders(),
+    loadDocuments(),
+    loadTasks(),
+    loadUnclassified(),
+    loadAuditLogs(),
+  ]);
 }
+
+async function loadUnclassified() {
+  const warningCard = document.getElementById('unclassified-warning');
+  const res = await api('GET', '/api/admin/documents/unclassified');
+  if (!res || !res.ok) { warningCard.hidden = true; return; }
+  const rows = await res.json();
+  warningCard.hidden = rows.length === 0;
+  const tbody = document.querySelector('#unclassified-table tbody');
+  tbody.innerHTML = '';
+  rows.forEach((r) => {
+    const name = r.source_path.split('/').pop();
+    const ts = r.updated_at ? r.updated_at.slice(0, 16).replace('T', ' ') : '-';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td title="${r.source_path}">${name}</td>
+      <td>${r.file_type}</td>
+      <td class="status-${r.status}">${r.status}</td>
+      <td>${ts}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+let auditLogCache = [];
+
+async function loadAuditLogs() {
+  const res = await api('GET', '/api/admin/audit-logs?limit=50&offset=0');
+  if (!res || !res.ok) return;
+  auditLogCache = await res.json();
+  const tbody = document.querySelector('#audit-table tbody');
+  tbody.innerHTML = '';
+  auditLogCache.forEach((r, idx) => {
+    const ts = r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '-';
+    const tr = document.createElement('tr');
+    tr.dataset.idx = idx;
+    tr.innerHTML = `
+      <td>${ts}</td>
+      <td>${r.username}</td>
+      <td>${(r.question || '').slice(0, 40)}</td>
+      <td>${(r.retrieved_chunks || []).length}</td>`;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('tr').forEach((tr) => {
+    tr.addEventListener('click', () => openAuditDetail(auditLogCache[Number(tr.dataset.idx)]));
+  });
+}
+
+function openAuditDetail(entry) {
+  const body = document.getElementById('audit-detail-body');
+  const sources = (entry.retrieved_chunks || [])
+    .map((c) => `${c.source_file ?? '不明'} (score=${c.score ?? '-'}, lv=${c.access_level ?? '-'})`)
+    .join('\n') || 'なし';
+  body.innerHTML = '';
+  const fields = [
+    ['日時', entry.created_at || '-'],
+    ['ユーザー', entry.username || '-'],
+    ['質問', entry.question || '-'],
+    ['参照チャンク', sources],
+    ['回答', entry.answer || (entry.error ? '(エラーのため回答なし)' : '-')],
+    ['エラー', entry.error || 'なし'],
+  ];
+  fields.forEach(([label, value]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    body.appendChild(dt);
+    body.appendChild(dd);
+  });
+  document.getElementById('audit-dialog').showModal();
+}
+
+document.getElementById('audit-close-btn').addEventListener('click', () => {
+  document.getElementById('audit-dialog').close();
+});
 
 async function loadFolders() {
   const res = await api('GET', '/api/admin/folders');

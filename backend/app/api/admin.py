@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+import json
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.core.security import get_current_user, require_admin
@@ -102,3 +104,33 @@ async def list_tasks():
         "ORDER BY t.created_at DESC LIMIT 100"
     )
     return [dict(r) for r in rows]
+
+
+@router.get("/documents/unclassified", dependencies=[Depends(require_admin)])
+async def list_unclassified_documents():
+    """どの監視フォルダにも一致せず fail-open で Lv1 (全員閲覧可) になっている文書。"""
+    rows = await db.fetchall(
+        "SELECT id, source_path, file_type, status, access_level, created_at, updated_at "
+        "FROM documents WHERE unclassified=1 AND status NOT IN ('deleted', 'purged') "
+        "ORDER BY updated_at DESC"
+    )
+    return [dict(r) for r in rows]
+
+
+# ─── 監査ログ ────────────────────────────────────────────────
+@router.get("/audit-logs", dependencies=[Depends(require_admin)])
+async def list_audit_logs(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)):
+    rows = await db.fetchall(
+        "SELECT id, user_id, username, question, retrieved_chunks, answer, error, created_at "
+        "FROM audit_logs ORDER BY id DESC LIMIT ? OFFSET ?",
+        (limit, offset),
+    )
+    results = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["retrieved_chunks"] = json.loads(d["retrieved_chunks"])
+        except (TypeError, ValueError):
+            d["retrieved_chunks"] = []
+        results.append(d)
+    return results

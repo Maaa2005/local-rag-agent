@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS documents (
     status       TEXT    NOT NULL DEFAULT 'pending',
     chunk_count  INTEGER NOT NULL DEFAULT 0,
     error_msg    TEXT,
+    -- どの監視フォルダにも一致せず既定 (Lv1=全員閲覧可) でインデックスされた場合 1。
+    -- フォルダが追加されて一致するようになった resync 時に 0 へ戻る。
+    unclassified INTEGER NOT NULL DEFAULT 0,
     created_at   TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -39,6 +42,19 @@ CREATE TABLE IF NOT EXISTS tasks (
     error_msg   TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- チャット監査ログ (誰が・何を聞き・何を根拠に・何を回答したか)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER,
+    username         TEXT    NOT NULL,
+    question         TEXT    NOT NULL,
+    -- JSON配列: [{"source_file", "score", "access_level"}, ...]
+    retrieved_chunks TEXT    NOT NULL DEFAULT '[]',
+    answer           TEXT,
+    error            TEXT,
+    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- 初期管理者ユーザー (パスワード: admin / 本番では必ず変更)

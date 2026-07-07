@@ -77,6 +77,7 @@ async def retrieve(question: str, user_access_level: int) -> list[dict]:
             "content": h.payload["content"],
             "source_file": h.payload.get("source_file", ""),
             "score": h.score,
+            "access_level": h.payload.get("access_level"),
         }
         for h in response.points
     ]

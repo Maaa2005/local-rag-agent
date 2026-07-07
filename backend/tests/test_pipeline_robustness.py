@@ -194,6 +194,7 @@ def test_watcher_does_not_duplicate_task_when_pending_exists(tmp_path):
                 status TEXT NOT NULL DEFAULT 'pending',
                 chunk_count INTEGER DEFAULT 0,
                 error_msg TEXT,
+                unclassified INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT,
                 updated_at TEXT
             );

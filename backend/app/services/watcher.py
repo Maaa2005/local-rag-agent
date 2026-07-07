@@ -79,10 +79,20 @@ def _get_access_level_for_path(path: str, db_sync: SyncDatabase) -> int | None:
     ]
     matched = match_folder(path, folders)
     if matched is None:
+        logger.warning("Unclassified path indexed at level 1: %s", path)
         return 1
     if not matched["is_active"]:
         return None
     return matched["access_level"]
+
+
+def _is_unclassified_path(path: str, db_sync: SyncDatabase) -> bool:
+    """path がどの監視フォルダにも一致しない (= fail-open で Lv1 になる) かどうか。"""
+    folders = [
+        dict(f)
+        for f in db_sync.fetchall("SELECT path, access_level, is_active FROM watch_folders")
+    ]
+    return match_folder(path, folders) is None
 
 
 class _Handler(FileSystemEventHandler):
@@ -109,13 +119,16 @@ class _Handler(FileSystemEventHandler):
             logger.info("Skip indexing (inactive folder): %s", path)
             return
 
+        unclassified = 1 if _is_unclassified_path(path, self._db) else 0
+
         if existing is None:
             doc_id = str(uuid.uuid4())
             self._db.execute_many_atomic([
                 (
                     "INSERT INTO documents (id, source_path, file_hash, access_level, file_type, "
-                    "status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
-                    (doc_id, path, file_hash, access_level, p.suffix.lower(), now, now),
+                    "status, unclassified, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)",
+                    (doc_id, path, file_hash, access_level, p.suffix.lower(), unclassified, now, now),
                 ),
                 (
                     "INSERT INTO tasks (document_id, status, created_at, updated_at) "
@@ -132,8 +145,8 @@ class _Handler(FileSystemEventHandler):
             statements = [
                 (
                     "UPDATE documents SET file_hash=?, status='pending', error_msg=NULL, "
-                    "updated_at=? WHERE id=?",
-                    (file_hash, now, doc_id),
+                    "unclassified=?, updated_at=? WHERE id=?",
+                    (file_hash, unclassified, now, doc_id),
                 ),
             ]
             if pending_task is None:

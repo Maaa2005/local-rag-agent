@@ -63,6 +63,15 @@
 
     <!-- Admin panel -->
     <section id="panel-admin" class="panel" hidden>
+      <div id="unclassified-warning" class="admin-card admin-card-warning" hidden>
+        <h2>⚠ 未分類文書（全員閲覧可になっています）</h2>
+        <p class="hint">どの監視フォルダにも一致せず、既定で Lv1（全員閲覧可）としてインデックスされています。監視フォルダを追加すると自動的に解消されます。</p>
+        <table id="unclassified-table">
+          <thead><tr><th>ファイル</th><th>種別</th><th>状態</th><th>更新日時</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
       <div class="admin-grid">
 
         <div class="admin-card">
@@ -114,10 +123,29 @@
           <p id="user-msg" class="msg-inline"></p>
         </div>
 
+        <div class="admin-card admin-card-wide">
+          <h2>監査ログ</h2>
+          <table id="audit-table">
+            <thead><tr><th>日時</th><th>ユーザー</th><th>質問</th><th>ヒット件数</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
       </div>
     </section>
   </main>
 </div>
+
+<!-- ───────────────────────── Audit log detail dialog ───────────────────────── -->
+<dialog id="audit-dialog">
+  <div class="audit-detail">
+    <h2>監査ログ詳細</h2>
+    <dl id="audit-detail-body" class="audit-detail-body"></dl>
+    <div class="dialog-actions">
+      <button type="button" id="audit-close-btn" class="btn-ghost">閉じる</button>
+    </div>
+  </div>
+</dialog>
 
 <!-- ───────────────────────── Password change dialog ───────────────────────── -->
 <dialog id="password-dialog">

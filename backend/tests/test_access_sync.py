@@ -76,6 +76,7 @@ def fake_async_db(tmp_path):
                 status TEXT NOT NULL DEFAULT 'pending',
                 chunk_count INTEGER DEFAULT 0,
                 error_msg TEXT,
+                unclassified INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT,
                 updated_at TEXT
             );
@@ -116,8 +117,12 @@ def _seed(db_path, folders=(), documents=()):
         for d in documents:
             conn.execute(
                 "INSERT INTO documents (id, source_path, file_hash, access_level, file_type, "
-                "status, created_at, updated_at) VALUES (?, ?, 'h', ?, '.txt', ?, 't', 't')",
-                (d["id"], d["source_path"], d["access_level"], d.get("status", "done")),
+                "status, unclassified, created_at, updated_at) "
+                "VALUES (?, ?, 'h', ?, '.txt', ?, ?, 't', 't')",
+                (
+                    d["id"], d["source_path"], d["access_level"],
+                    d.get("status", "done"), d.get("unclassified", 0),
+                ),
             )
         conn.commit()
 
@@ -212,6 +217,7 @@ def watch_sqlite(tmp_path):
                 status TEXT NOT NULL DEFAULT 'pending',
                 chunk_count INTEGER DEFAULT 0,
                 error_msg TEXT,
+                unclassified INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT,
                 updated_at TEXT
             );

@@ -37,7 +37,7 @@ async def resync_access_levels() -> dict:
         "SELECT path, access_level, is_active FROM watch_folders"
     )]
     documents = [dict(d) for d in await db.fetchall(
-        "SELECT id, source_path, access_level FROM documents "
+        "SELECT id, source_path, access_level, unclassified FROM documents "
         "WHERE status NOT IN ('deleted', 'purged')"
     )]
 
@@ -60,18 +60,28 @@ async def resync_access_levels() -> dict:
             continue
 
         desired_level = matched["access_level"] if matched is not None else 1
-        if desired_level != doc["access_level"]:
+        desired_unclassified = 1 if matched is None else 0
+        if matched is None:
+            logger.warning(
+                "Unclassified path indexed at level 1 (resync): %s", doc["source_path"]
+            )
+
+        if (
+            desired_level != doc["access_level"]
+            or desired_unclassified != doc.get("unclassified", 0)
+        ):
             await db.execute(
-                "UPDATE documents SET access_level=?, updated_at=? WHERE id=?",
-                (desired_level, now, doc_id),
+                "UPDATE documents SET access_level=?, unclassified=?, updated_at=? WHERE id=?",
+                (desired_level, desired_unclassified, now, doc_id),
             )
-            await get_client().set_payload(
-                collection_name=settings.qdrant_collection,
-                payload={"access_level": desired_level},
-                points=Filter(
-                    must=[FieldCondition(key="document_id", match=MatchValue(value=doc_id))]
-                ),
-            )
+            if desired_level != doc["access_level"]:
+                await get_client().set_payload(
+                    collection_name=settings.qdrant_collection,
+                    payload={"access_level": desired_level},
+                    points=Filter(
+                        must=[FieldCondition(key="document_id", match=MatchValue(value=doc_id))]
+                    ),
+                )
             updated += 1
             logger.info(
                 "Updated access_level for %s: %s -> %s",

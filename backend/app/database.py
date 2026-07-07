@@ -36,7 +36,21 @@ class Database:
         sql = MIGRATION_PATH.read_text(encoding="utf-8")
         await conn.executescript(sql)
         await conn.commit()
+        await self._migrate_legacy_columns(conn)
         self._conn = conn
+
+    @staticmethod
+    async def _migrate_legacy_columns(conn: aiosqlite.Connection) -> None:
+        """`CREATE TABLE IF NOT EXISTS` は既存テーブルへカラムを追加しないため、
+        init.sql に後から列を足した場合はここで ALTER TABLE を補う。
+        """
+        async with conn.execute("PRAGMA table_info(documents)") as cur:
+            columns = {row[1] async for row in cur}
+        if "unclassified" not in columns:
+            await conn.execute(
+                "ALTER TABLE documents ADD COLUMN unclassified INTEGER NOT NULL DEFAULT 0"
+            )
+            await conn.commit()
 
     async def close(self) -> None:
         if self._conn is not None:

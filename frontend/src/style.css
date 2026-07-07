@@ -281,6 +281,32 @@ dialog#password-dialog h2 {
 .msg-inline.err { color: var(--danger); }
 .delete-btn { color: var(--danger); font-size: 12px; padding: 2px 8px; }
 
+/* ── Unclassified warning / audit log ── */
+.admin-card-warning {
+  margin-bottom: 20px;
+  border-color: var(--warn);
+  background: rgba(245, 166, 35, 0.08);
+}
+.admin-card-warning h2 { color: var(--warn); }
+.admin-card-wide { grid-column: 1 / -1; }
+#audit-table tbody tr { cursor: pointer; }
+#audit-table tbody tr:hover { background: var(--surface2); }
+dialog#audit-dialog {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 560px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+dialog#audit-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+.audit-detail h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+.audit-detail-body dt { font-weight: 700; font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+.audit-detail-body dd { margin: 2px 0 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

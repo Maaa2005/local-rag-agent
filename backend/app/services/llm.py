@@ -8,6 +8,8 @@
 """
 from __future__ import annotations
 
+import ntpath
+import posixpath
 from typing import AsyncIterator
 
 from app.config import settings
@@ -19,10 +21,24 @@ SYSTEM_PROMPT = """あなたは社内情報専門のアシスタントです。
 回答は必ず日本語で行ってください。"""
 
 
+def _basename(path: str) -> str:
+    """フルパスからファイル名のみを取り出す。
+
+    LLM コンテキストに機密ディレクトリ構成 (組織名・部署名等を含む監視フォルダ
+    のフルパス) が漏れないよう、ここでファイル名だけに縮約する。SSE で UI に
+    返す sources 側は認証済みユーザー向けなので従来どおりフルパスのまま。
+    Windows 区切り (\\) / POSIX 区切り (/) のどちらでも対応する。
+    """
+    name = ntpath.basename(path)
+    return posixpath.basename(name)
+
+
 def _build_context(chunks: list[dict]) -> str:
     parts = []
     for i, c in enumerate(chunks, 1):
         source = c.get("source_file", "不明")
+        if source != "不明":
+            source = _basename(source)
         parts.append(f"[{i}] {source}\n{c['content']}")
     return "\n\n".join(parts)
 
