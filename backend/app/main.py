@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import auth, chat, admin
 from app.config import settings
 from app.database import DB_PATH, close_db, init_db
+from app.services.embedder import embed_query
 from app.services.indexer import ensure_collection
 from app.services.qdrant import close_client
 from app.services.task_processor import run_task_processor
@@ -19,12 +20,23 @@ logging.basicConfig(
 )
 
 
+async def _warmup_embedder() -> None:
+    try:
+        await embed_query("ウォームアップ")
+        logging.getLogger(__name__).info("Embedder warmed up")
+    except Exception:
+        logging.getLogger(__name__).exception("Embedder warmup failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     await ensure_collection()
     start_watcher(settings.watched_path, str(DB_PATH), use_polling=settings.use_polling_watcher)
     task = asyncio.create_task(run_task_processor())
+    # 初回チャットでのモデルロード待ちを避けるため、起動をブロックせずウォームアップする。
+    # 短命タスクなので shutdown 時の cancel は不要だが、GC 回収を防ぐため参照だけ保持。
+    _warmup_task = asyncio.create_task(_warmup_embedder())
     try:
         yield
     finally:

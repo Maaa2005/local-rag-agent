@@ -4,9 +4,11 @@
 """
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
+from app.config import settings
 from app.database import db
 from app.services.indexer import delete_document, index_document
 from app.services.parser import parse_file
@@ -40,7 +42,7 @@ async def chat_session():
 async def _claim_next_task() -> dict | None:
     """pending タスクを 1 件アトミックに processing へ遷移して返す。"""
     now = datetime.now(timezone.utc).isoformat()
-    row = await db.fetchone(
+    row = await db.fetchone_write(
         "UPDATE tasks SET status='processing', updated_at=? "
         "WHERE id = (SELECT id FROM tasks WHERE status='pending' "
         "            ORDER BY created_at LIMIT 1) "
@@ -57,6 +59,22 @@ async def _claim_next_task() -> dict | None:
     return claimed
 
 
+async def _recover_stale_processing() -> None:
+    """前回プロセスが processing 中に落ちた場合、tasks / documents を pending に戻す。"""
+    now = datetime.now(timezone.utc).isoformat()
+    stale = await db.fetchall("SELECT id FROM tasks WHERE status='processing'")
+    await db.execute(
+        "UPDATE tasks SET status='pending', updated_at=? WHERE status='processing'",
+        (now,),
+    )
+    await db.execute(
+        "UPDATE documents SET status='pending', updated_at=? WHERE status='processing'",
+        (now,),
+    )
+    if len(stale) > 0:
+        logger.info("Recovered %d stale processing tasks", len(stale))
+
+
 async def _process_task(task: dict) -> None:
     task_id = task["id"]
     doc_id = task["document_id"]
@@ -66,6 +84,22 @@ async def _process_task(task: dict) -> None:
     )
     if doc is None:
         raise ValueError(f"document {doc_id} not found")
+
+    mtime = os.path.getmtime(doc["source_path"])
+    now_ts = datetime.now(timezone.utc).timestamp()
+    if now_ts - mtime < settings.index_settle_seconds:
+        # コピー途中など書き込み中の可能性があるため、猶予時間を空けて再試行する。
+        now = datetime.now(timezone.utc).isoformat()
+        await db.execute(
+            "UPDATE tasks SET status='pending', updated_at=? WHERE id=?",
+            (now, task_id),
+        )
+        await db.execute(
+            "UPDATE documents SET status='pending', updated_at=? WHERE id=?",
+            (now, doc_id),
+        )
+        logger.info("File still being written, deferred: %s", doc["source_path"])
+        return
 
     text = await parse_file(doc["source_path"])
     chunk_count = await index_document(
@@ -106,6 +140,7 @@ async def _process_deleted() -> None:
 
 async def run_task_processor() -> None:
     logger.info("Task processor started")
+    await _recover_stale_processing()
     while True:
         await asyncio.sleep(_POLL_INTERVAL)
         if is_chat_active():

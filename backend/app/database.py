@@ -49,11 +49,19 @@ class Database:
         return self._conn
 
     async def fetchone(self, sql: str, params: tuple = ()) -> aiosqlite.Row | None:
+        """純粋な読み取り（SELECT）用。commit しない。"""
+        conn = self._require()
+        async with self._lock:
+            async with conn.execute(sql, params) as cur:
+                return await cur.fetchone()
+
+    async def fetchone_write(self, sql: str, params: tuple = ()) -> aiosqlite.Row | None:
+        """UPDATE/INSERT ... RETURNING 用。取得後に commit して永続化する。"""
         conn = self._require()
         async with self._lock:
             async with conn.execute(sql, params) as cur:
                 row = await cur.fetchone()
-            await conn.commit()  # UPDATE/INSERT/DELETE ... RETURNING でも安全に永続化
+            await conn.commit()
             return row
 
     async def fetchall(self, sql: str, params: tuple = ()) -> list[aiosqlite.Row]:

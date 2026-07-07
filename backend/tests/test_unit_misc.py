@@ -103,9 +103,14 @@ def test_unknown_path_defaults_to_1(sync_db):
 
 
 def test_inactive_folder_ignored(sync_db):
-    """is_active=0 の登録は無視されデフォルト 1 になる。"""
+    """is_active=0 のフォルダに一致した場合は None (インデックス対象外) を返す。
+
+    以前はデフォルト 1 (一般) にフォールバックしていたが、これは無効化した
+    フォルダ配下のファイルが更新されると全員閲覧可で再インデックスされてしまう
+    下方向リークだった。fail-closed にするため None を返す仕様に変更。
+    """
     lv = _get_access_level_for_path("/watched/inactive/file.txt", sync_db)
-    assert lv == 1
+    assert lv is None
 
 
 def test_sibling_dir_does_not_inherit_level(sync_db):

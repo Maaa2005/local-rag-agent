@@ -68,7 +68,9 @@ def _chunk_text(text: str, size: int, overlap: int) -> list[str]:
                     end = max(end - 30, start) + idx + len(sep)
                     break
         chunks.append(text[start:end].strip())
-        start = end - overlap
+        # 文末調整で end が後退した結果 end - overlap が start 以下になり得るため、
+        # 必ず 1 文字以上前進させて無限ループを防ぐ。
+        start = max(end - overlap, start + 1)
     return [c for c in chunks if c]
 
 
@@ -130,4 +132,16 @@ async def index_document(
         )
 
     await get_client().upsert(collection_name=settings.qdrant_collection, points=points)
+
+    # upsert 成功後にのみ旧チャンク (is_active=False) を物理削除する。
+    # upsert 前に消すと、途中で失敗した場合に旧チャンクでの検索継続すらできなくなる。
+    await get_client().delete(
+        collection_name=settings.qdrant_collection,
+        points_selector=Filter(
+            must=[
+                FieldCondition(key="document_id", match=MatchValue(value=document_id)),
+                FieldCondition(key="is_active", match=MatchValue(value=False)),
+            ]
+        ),
+    )
     return len(points)

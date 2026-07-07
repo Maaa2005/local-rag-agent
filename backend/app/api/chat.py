@@ -32,9 +32,9 @@ async def _event_stream(question: str, user_access_level: int):
             try:
                 async for token in stream_answer(question, chunks):
                     yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
-            except Exception as exc:
+            except Exception:
                 logger.exception("LLM stream failed")
-                err = f"回答生成でエラーが発生しました: {exc}"
+                err = "回答生成でエラーが発生しました。しばらくしてから再度お試しください。"
                 yield f"data: {json.dumps({'type': 'error', 'content': err}, ensure_ascii=False)}\n\n"
 
         yield "data: {\"type\": \"done\"}\n\n"

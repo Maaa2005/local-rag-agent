@@ -29,7 +29,10 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <span class="logo-sm">社内 RAG<span class="accent">.</span></span>
-      <button id="logout-btn" class="btn-ghost" title="ログアウト">⏏</button>
+      <div class="header-actions">
+        <button id="password-btn" class="btn-ghost" title="パスワード変更">🔑</button>
+        <button id="logout-btn" class="btn-ghost" title="ログアウト">⏏</button>
+      </div>
     </div>
     <div class="user-info">
       <span id="user-badge"></span>
@@ -115,6 +118,23 @@
     </section>
   </main>
 </div>
+
+<!-- ───────────────────────── Password change dialog ───────────────────────── -->
+<dialog id="password-dialog">
+  <form id="password-form" class="inline-form col">
+    <h2>パスワード変更</h2>
+    <p id="password-warning" class="hint" hidden>初期パスワードのままです。変更してください</p>
+    <label for="current-password">現在のパスワード</label>
+    <input id="current-password" type="password" autocomplete="current-password" required />
+    <label for="new-password-input">新しいパスワード</label>
+    <input id="new-password-input" type="password" autocomplete="new-password" required />
+    <p id="password-msg" class="msg-inline"></p>
+    <div class="dialog-actions">
+      <button type="button" id="password-cancel-btn" class="btn-ghost">キャンセル</button>
+      <button type="submit">変更する</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="app.js"></script>
 </body>

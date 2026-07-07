@@ -10,7 +10,17 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.database as db_module
+from app.api import auth as auth_module
+from app.config import Settings
 from app.core.security import hash_password
+
+
+@pytest.fixture(autouse=True)
+def _reset_failed_logins():
+    """テスト間でログイン失敗カウンタを持ち越さない。"""
+    auth_module._failed_logins.clear()
+    yield
+    auth_module._failed_logins.clear()
 
 
 # ─── DB を一時パスへ差し替え ──────────────────────────────
@@ -86,6 +96,64 @@ def test_login_unknown_user(client):
     assert r.status_code == 401
 
 
+# ─── ログイン失敗レート制限 ─────────────────────────────
+def test_login_lockout_after_repeated_failures(client):
+    for _ in range(5):
+        r = client.post(
+            "/api/auth/token",
+            data={"username": "admin", "password": "wrong"},
+        )
+        assert r.status_code == 401
+
+    # 6回目は正しいパスワードでもロックアウトされる
+    r = client.post(
+        "/api/auth/token",
+        data={"username": "admin", "password": "admin"},
+    )
+    assert r.status_code == 429
+
+
+def test_login_lockout_clears_after_cooldown(client, monkeypatch):
+    for _ in range(5):
+        r = client.post(
+            "/api/auth/token",
+            data={"username": "admin", "password": "wrong"},
+        )
+        assert r.status_code == 401
+
+    r = client.post(
+        "/api/auth/token",
+        data={"username": "admin", "password": "admin"},
+    )
+    assert r.status_code == 429
+
+    # 60秒経過したものとして扱う (実時間 sleep はしない)
+    failures, last_failed_at = auth_module._failed_logins["admin"]
+    auth_module._failed_logins["admin"] = (failures, last_failed_at - 61.0)
+
+    r = client.post(
+        "/api/auth/token",
+        data={"username": "admin", "password": "admin"},
+    )
+    assert r.status_code == 200
+
+
+def test_login_success_resets_failure_counter(client):
+    for _ in range(3):
+        r = client.post(
+            "/api/auth/token",
+            data={"username": "admin", "password": "wrong"},
+        )
+        assert r.status_code == 401
+
+    r = client.post(
+        "/api/auth/token",
+        data={"username": "admin", "password": "admin"},
+    )
+    assert r.status_code == 200
+    assert "admin" not in auth_module._failed_logins
+
+
 # ─── /api/auth/me ──────────────────────────────────────
 def _login(client, username: str = "admin", password: str = "admin") -> str:
     r = client.post(
@@ -137,11 +205,11 @@ def test_admin_can_create_user(client):
     r = client.post(
         "/api/auth/users",
         headers={"Authorization": f"Bearer {token}"},
-        json={"username": "alice", "password": "alicepw", "access_level": 2},
+        json={"username": "alice", "password": "alicepw1", "access_level": 2},
     )
     assert r.status_code == 200
 
-    token2 = _login(client, "alice", "alicepw")
+    token2 = _login(client, "alice", "alicepw1")
     r2 = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token2}"})
     assert r2.status_code == 200
     assert r2.json()["access_level"] == 2
@@ -155,6 +223,107 @@ def test_admin_rejects_invalid_access_level(client):
         json={"username": "x", "password": "y", "access_level": 99},
     )
     assert r.status_code == 400
+
+
+def test_admin_rejects_short_password(client):
+    token = _login(client)
+    r = client.post(
+        "/api/auth/users",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"username": "shorty", "password": "short", "access_level": 1},
+    )
+    assert r.status_code == 400
+
+
+def test_admin_rejects_password_same_as_username(client):
+    token = _login(client)
+    r = client.post(
+        "/api/auth/users",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"username": "sameuser", "password": "sameuser", "access_level": 1},
+    )
+    assert r.status_code == 400
+
+
+# ─── /api/auth/password ──────────────────────────────────
+def test_change_password_success(client):
+    token = _login(client)
+    r = client.post(
+        "/api/auth/users",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"username": "carol", "password": "carolpw1", "access_level": 1},
+    )
+    assert r.status_code == 200
+
+    token2 = _login(client, "carol", "carolpw1")
+    r2 = client.post(
+        "/api/auth/password",
+        headers={"Authorization": f"Bearer {token2}"},
+        json={"current_password": "carolpw1", "new_password": "carolpw2"},
+    )
+    assert r2.status_code == 200
+
+    r3 = client.post(
+        "/api/auth/token",
+        data={"username": "carol", "password": "carolpw2"},
+    )
+    assert r3.status_code == 200
+
+
+def test_change_password_wrong_current(client):
+    token = _login(client)
+    r = client.post(
+        "/api/auth/password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": "wrong", "new_password": "newpassword1"},
+    )
+    assert r.status_code == 400
+
+
+def test_change_password_rejects_weak_new_password(client):
+    token = _login(client)
+    r = client.post(
+        "/api/auth/password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": "admin", "new_password": "short"},
+    )
+    assert r.status_code == 400
+
+
+# ─── must_change_password フラグ ──────────────────────────
+def test_login_admin_default_password_flags_must_change(client):
+    r = client.post(
+        "/api/auth/token",
+        data={"username": "admin", "password": "admin"},
+    )
+    assert r.status_code == 200
+    assert r.json()["must_change_password"] is True
+
+
+def test_login_after_password_change_clears_flag(client):
+    token = _login(client)
+    r = client.post(
+        "/api/auth/password",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"current_password": "admin", "new_password": "newadminpw1"},
+    )
+    assert r.status_code == 200
+
+    r2 = client.post(
+        "/api/auth/token",
+        data={"username": "admin", "password": "newadminpw1"},
+    )
+    assert r2.status_code == 200
+    assert r2.json()["must_change_password"] is False
+
+
+# ─── config: SECRET_KEY 自動生成 ──────────────────────────
+def test_settings_generates_random_secret_key_when_empty():
+    s1 = Settings(secret_key="")
+    s2 = Settings(secret_key="")
+    assert s1.secret_key != ""
+    assert s1.secret_key != "change-me-in-production"
+    assert s1.secret_key != s2.secret_key
 
 
 # ─── /health ────────────────────────────────────────────

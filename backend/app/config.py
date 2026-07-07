@@ -1,8 +1,12 @@
 import json
+import logging
+import secrets
 from typing import Any
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -22,13 +26,29 @@ class Settings(BaseSettings):
     watched_path: str = "/watched"
     data_dir: str = "/app/data"
 
-    secret_key: str = "change-me-in-production"
+    secret_key: str = ""
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
+
+    @field_validator("secret_key", mode="before")
+    @classmethod
+    def _ensure_secret_key(cls, v: Any) -> Any:
+        if not v or v == "change-me-in-production":
+            logger.warning(
+                "SECRET_KEY が未設定のため一時キーを自動生成しました。"
+                "再起動すると全トークンが失効します。"
+                "本番では .env に SECRET_KEY を設定してください"
+            )
+            return secrets.token_hex(32)
+        return v
 
     chunk_size: int = 500
     chunk_overlap: int = 50
     retrieval_top_k: int = 5
+
+    # ファイルコピー途中の部分インデックスを防ぐための猶予秒数。
+    # mtime からこの秒数未満しか経過していないファイルは処理を先送りする。
+    index_settle_seconds: int = 10
 
     use_polling_watcher: bool = False
     smb_poll_interval: int = 300

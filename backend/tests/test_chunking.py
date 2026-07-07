@@ -43,3 +43,11 @@ def test_progress_each_iteration():
     chunks = _chunk_text(text, size=200, overlap=50)
     assert len(chunks) > 1
     assert sum(len(c) for c in chunks) >= len(text) - 200
+
+
+def test_dense_sentence_boundaries_do_not_infinite_loop():
+    """句点が密集し、文末調整で end が大きく後退しても必ず終了し全チャンクが非空。"""
+    text = "あ。" * 500
+    chunks = _chunk_text(text, size=40, overlap=35)
+    assert len(chunks) > 0
+    assert all(c.strip() for c in chunks)

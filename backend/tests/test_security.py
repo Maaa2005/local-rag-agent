@@ -2,7 +2,7 @@
 from datetime import timedelta
 
 import pytest
-from jose import jwt
+import jwt
 
 from app.config import settings
 from app.core.security import (

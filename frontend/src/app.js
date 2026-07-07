@@ -16,6 +16,12 @@ const messages        = document.getElementById('messages');
 const questionInput   = document.getElementById('question-input');
 const sendBtn         = document.getElementById('send-btn');
 const adminNavBtn     = document.getElementById('admin-nav-btn');
+const passwordBtn     = document.getElementById('password-btn');
+const passwordDialog  = document.getElementById('password-dialog');
+const passwordForm    = document.getElementById('password-form');
+const passwordWarning = document.getElementById('password-warning');
+const passwordMsg     = document.getElementById('password-msg');
+const passwordCancelBtn = document.getElementById('password-cancel-btn');
 
 // ── API helper ─────────────────────────────────────────────
 async function api(method, path, body) {
@@ -47,6 +53,9 @@ loginForm.addEventListener('submit', async (e) => {
   token = data.access_token;
   sessionStorage.setItem('token', token);
   await initChat();
+  if (data.must_change_password) {
+    openPasswordDialog(true);
+  }
 });
 
 logoutBtn.addEventListener('click', logout);
@@ -73,6 +82,39 @@ async function initChat() {
   chatScreen.hidden = false;
   questionInput.focus();
 }
+
+// ── Password change ──────────────────────────────────────────
+function openPasswordDialog(showWarning) {
+  passwordMsg.textContent = '';
+  passwordMsg.className = 'msg-inline';
+  passwordForm.reset();
+  passwordWarning.hidden = !showWarning;
+  passwordDialog.showModal();
+}
+
+passwordBtn.addEventListener('click', () => openPasswordDialog(false));
+
+passwordCancelBtn.addEventListener('click', () => {
+  passwordDialog.close();
+});
+
+passwordForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const current_password = document.getElementById('current-password').value;
+  const new_password = document.getElementById('new-password-input').value;
+  const res = await api('POST', '/api/auth/password', { current_password, new_password });
+  if (!res) return;
+  if (res.ok) {
+    passwordMsg.textContent = 'パスワードを変更しました';
+    passwordMsg.className = 'msg-inline ok';
+    passwordWarning.hidden = true;
+    setTimeout(() => passwordDialog.close(), 1200);
+  } else {
+    const err = await res.json().catch(() => ({}));
+    passwordMsg.textContent = err.detail || '変更に失敗しました';
+    passwordMsg.className = 'msg-inline err';
+  }
+});
 
 // ── Panel switching ────────────────────────────────────────
 document.querySelectorAll('.nav-item').forEach((btn) => {

@@ -11,6 +11,8 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.polling import PollingObserver
 
+from app.services.access import match_folder
+
 logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".xls", ".xlsm", ".txt", ".md"}
@@ -64,24 +66,23 @@ class SyncDatabase:
                 raise
 
 
-def _get_access_level_for_path(path: str, db_sync: SyncDatabase) -> int:
+def _get_access_level_for_path(path: str, db_sync: SyncDatabase) -> int | None:
     """ファイルパスが属する監視フォルダの access_level を返す (最長一致)。
 
-    一致はパス境界で判定する。`/watched/exec` の設定が `/watched/exec-public/...`
-    のような**兄弟ディレクトリ**へ誤って適用されるのを防ぐため、完全一致または
-    `フォルダパス + "/"` で始まる場合のみ一致とみなす。どの監視フォルダにも属さない
-    パスは既定 1 (一般)。
+    有効・無効を問わず全フォルダから最長一致を選び (match_folder に一本化)、
+    一致したフォルダが無効化されていれば None を返す (= インデックス対象外)。
+    どの監視フォルダにも属さないパスは既定 1 (一般)。
     """
-    folders = db_sync.fetchall(
-        "SELECT path, access_level FROM watch_folders WHERE is_active=1"
-    )
-    best_level, best_len = 1, -1
-    for folder in folders:
-        fp = folder["path"].rstrip("/")
-        if (path == fp or path.startswith(fp + "/")) and len(fp) > best_len:
-            best_len = len(fp)
-            best_level = folder["access_level"]
-    return best_level
+    folders = [
+        dict(f)
+        for f in db_sync.fetchall("SELECT path, access_level, is_active FROM watch_folders")
+    ]
+    matched = match_folder(path, folders)
+    if matched is None:
+        return 1
+    if not matched["is_active"]:
+        return None
+    return matched["access_level"]
 
 
 class _Handler(FileSystemEventHandler):
@@ -102,9 +103,14 @@ class _Handler(FileSystemEventHandler):
         )
         now = datetime.now(timezone.utc).isoformat()
 
+        access_level = _get_access_level_for_path(path, self._db)
+        if access_level is None:
+            # 無効化されたフォルダ配下 → インデックス対象外 (下方向リーク防止)
+            logger.info("Skip indexing (inactive folder): %s", path)
+            return
+
         if existing is None:
             doc_id = str(uuid.uuid4())
-            access_level = _get_access_level_for_path(path, self._db)
             self._db.execute_many_atomic([
                 (
                     "INSERT INTO documents (id, source_path, file_hash, access_level, file_type, "
@@ -120,18 +126,25 @@ class _Handler(FileSystemEventHandler):
             logger.info("New file queued: %s", path)
         elif existing["file_hash"] != file_hash:
             doc_id = existing["id"]
-            self._db.execute_many_atomic([
+            pending_task = self._db.fetchone(
+                "SELECT id FROM tasks WHERE document_id=? AND status='pending'", (doc_id,)
+            )
+            statements = [
                 (
                     "UPDATE documents SET file_hash=?, status='pending', error_msg=NULL, "
                     "updated_at=? WHERE id=?",
                     (file_hash, now, doc_id),
                 ),
-                (
-                    "INSERT INTO tasks (document_id, status, created_at, updated_at) "
-                    "VALUES (?, 'pending', ?, ?)",
-                    (doc_id, now, now),
-                ),
-            ])
+            ]
+            if pending_task is None:
+                statements.append(
+                    (
+                        "INSERT INTO tasks (document_id, status, created_at, updated_at) "
+                        "VALUES (?, 'pending', ?, ?)",
+                        (doc_id, now, now),
+                    )
+                )
+            self._db.execute_many_atomic(statements)
             logger.info("Updated file queued: %s", path)
 
     def _handle_delete(self, path: str) -> None:

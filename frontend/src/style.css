@@ -103,6 +103,41 @@ th { color: var(--text-muted); font-weight: 600; }
 }
 .btn-ghost:hover { background: var(--surface2); color: var(--text); }
 
+.header-actions { display: flex; gap: 4px; }
+
+/* ── Dialog ── */
+dialog#password-dialog {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 320px;
+  max-width: 90vw;
+}
+dialog#password-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+dialog#password-dialog h2 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.dialog-actions button[type="submit"] {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  border-radius: 8px;
+}
+.dialog-actions button[type="submit"]:hover { background: #5070e8; }
+
 /* ── Main Area ── */
 .main-area {
   flex: 1;

@@ -9,7 +9,8 @@ openpyxl==3.1.5
 pandas==2.2.3
 tabulate>=0.9.0
 watchdog==6.0.0
-python-jose[cryptography]==3.3.0
+# python-jose はメンテ停止・既知CVE(CVE-2024-33663/33664)のため PyJWT に置換
+PyJWT==2.10.1
 passlib[bcrypt]==1.7.4
 # passlib 1.7.4 は bcrypt 5.x と非互換 (__about__ 属性が無く起動時バグ検出が失敗)
 bcrypt==4.0.1

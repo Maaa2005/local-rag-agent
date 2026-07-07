@@ -86,6 +86,14 @@ def patched_db(tmp_path, monkeypatch):
                 await conn.commit()
                 return row
 
+        async def fetchone_write(self, sql, params=()):
+            async with aiosqlite.connect(str(db_path)) as conn:
+                conn.row_factory = aiosqlite.Row
+                async with conn.execute(sql, params) as cur:
+                    row = await cur.fetchone()
+                await conn.commit()
+                return row
+
         async def execute(self, sql, params=()):
             async with aiosqlite.connect(str(db_path)) as conn:
                 async with conn.execute(sql, params) as cur:
