@@ -28,6 +28,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "backend"))
 
+from app.config import settings  # noqa: E402
 from app.services.llm import stream_answer  # noqa: E402
 from app.services.providers import (  # noqa: E402
     get_meta,
@@ -150,6 +151,15 @@ async def main():
     parser.add_argument("--no-judge", action="store_true", help="LLM 採点をスキップし性能/構造系のみ計算")
     parser.add_argument("--report", help="report.md の出力先")
     parser.add_argument("--dataset", help="dataset.jsonl のパスを上書き")
+    parser.add_argument(
+        "--rerank",
+        choices=["on", "off", "both"],
+        default=None,
+        help=(
+            "Cross-Encoder リランクの有無を切り替えて評価する (既定: settings.rerank_enabled を尊重)。"
+            " 'both' は rerank on/off の両方を実行しレポートに並記する"
+        ),
+    )
     args = parser.parse_args()
 
     if args.dataset:
@@ -188,19 +198,40 @@ async def main():
     report_path = Path(args.report) if args.report else (out_dir / "report.md")
     raw_path = out_dir / "raw.jsonl"
 
+    # rerank A/B: on/off どちらで評価するかを決める。
+    # --rerank 未指定なら settings.rerank_enabled の現在値をそのまま尊重し、上書きしない。
+    if args.rerank is None:
+        rerank_modes: list[bool | None] = [None]
+    elif args.rerank == "both":
+        rerank_modes = [True, False]
+    else:
+        rerank_modes = [args.rerank == "on"]
+
+    original_rerank_enabled = settings.rerank_enabled
+
     # 実行
     all_results: dict[str, list[QuestionResult]] = {}
     with raw_path.open("w", encoding="utf-8") as f_raw:
-        for name in providers_to_run:
-            try:
-                await _resolve_provider(name)
-            except Exception as exc:
-                print(f"[skip] {name}: {exc}")
-                continue
-            rs = await evaluate_provider(name, dataset, judge_provider, not args.no_judge)
-            all_results[name] = rs
-            for r in rs:
-                f_raw.write(json.dumps(asdict(r), ensure_ascii=False) + "\n")
+        try:
+            for rerank_mode in rerank_modes:
+                if rerank_mode is not None:
+                    settings.rerank_enabled = rerank_mode
+                suffix = ""
+                if len(rerank_modes) > 1:
+                    suffix = "+rerank_on" if rerank_mode else "+rerank_off"
+                    print(f"\n--- rerank_enabled={settings.rerank_enabled} ---", flush=True)
+                for name in providers_to_run:
+                    try:
+                        await _resolve_provider(name)
+                    except Exception as exc:
+                        print(f"[skip] {name}: {exc}")
+                        continue
+                    rs = await evaluate_provider(name, dataset, judge_provider, not args.no_judge)
+                    all_results[f"{name}{suffix}"] = rs
+                    for r in rs:
+                        f_raw.write(json.dumps(asdict(r), ensure_ascii=False) + "\n")
+        finally:
+            settings.rerank_enabled = original_rerank_enabled
 
     # レポート生成
     from evaluation.reporter import render_report
