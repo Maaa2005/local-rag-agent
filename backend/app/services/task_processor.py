@@ -80,7 +80,7 @@ async def _process_task(task: dict) -> None:
     doc_id = task["document_id"]
 
     doc = await db.fetchone(
-        "SELECT source_path, access_level FROM documents WHERE id=?", (doc_id,)
+        "SELECT source_path, access_level, unclassified FROM documents WHERE id=?", (doc_id,)
     )
     if doc is None:
         raise ValueError(f"document {doc_id} not found")
@@ -107,6 +107,7 @@ async def _process_task(task: dict) -> None:
         text=text,
         source_file=doc["source_path"],
         access_level=doc["access_level"],
+        unclassified=bool(doc["unclassified"]) if "unclassified" in doc.keys() else False,
     )
 
     now = datetime.now(timezone.utc).isoformat()

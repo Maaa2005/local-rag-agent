@@ -88,7 +88,9 @@ def test_rerank_falls_back_on_inference_failure(monkeypatch):
 
 class _FakePoint:
     def __init__(self, content: str, score: float):
-        self.payload = {"content": content, "source_file": "f.txt"}
+        # document_id を持たせないと _revalidate_against_sqlite が fail-closed で
+        # 全件弾いてしまう (項目高8)。実際の Qdrant ペイロードには常に含まれる。
+        self.payload = {"content": content, "source_file": "f.txt", "document_id": content}
         self.score = score
 
 
@@ -105,6 +107,21 @@ class _FakeQdrantClient:
         return _FakeResponse(self._points)
 
 
+class _FakeRevalidateRow(dict):
+    """sqlite3.Row 風に ["key"] アクセスができる dict。"""
+
+
+class _FakeDb:
+    """_revalidate_against_sqlite が問い合わせる documents を、渡された全 id が
+    常に権限内・有効であるかのように装って返すスタブ。"""
+
+    async def fetchall(self, sql, params=()):
+        return [
+            _FakeRevalidateRow(id=doc_id, access_level=1, status="done", unclassified=0)
+            for doc_id in params
+        ]
+
+
 def _setup_retriever_stubs(monkeypatch, points):
     from app.services import retriever
 
@@ -114,6 +131,7 @@ def _setup_retriever_stubs(monkeypatch, points):
     monkeypatch.setattr(retriever, "embed_query", _fake_embed_query)
     monkeypatch.setattr(retriever, "build_sparse", lambda q: ([], []))
     monkeypatch.setattr(retriever, "get_client", lambda: _FakeQdrantClient(points))
+    monkeypatch.setattr(retriever, "db", _FakeDb())
     return retriever
 
 

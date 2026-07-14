@@ -76,9 +76,12 @@ async function initChat() {
   currentUser = await res.json();
 
   const levelLabel = { 1: 'Lv1 一般', 2: 'Lv2 管理職', 3: 'Lv3 役員' };
-  userBadge.textContent = `${currentUser.username}（${levelLabel[currentUser.access_level] ?? 'Lv?'}）`;
+  const adminSuffix = currentUser.is_admin ? ' / 管理者' : '';
+  userBadge.textContent =
+    `${currentUser.username}（${levelLabel[currentUser.access_level] ?? 'Lv?'}${adminSuffix}）`;
 
-  adminNavBtn.style.display = currentUser.access_level >= 3 ? '' : 'none';
+  // システム管理者権限 (is_admin) は文書アクセスレベルとは独立 (項目7)。
+  adminNavBtn.style.display = currentUser.is_admin ? '' : 'none';
 
   loginScreen.hidden = true;
   chatScreen.hidden = false;
@@ -171,6 +174,12 @@ function sourceBasename(source) {
   return (source.source_file || '').split('/').pop() || '(不明)';
 }
 
+// 引用元が現在参照できない (権限降格・削除後の redacted、または旧形式で本文を
+// 保存していない legacy) かどうか。この場合はクリック不可のタグ/チップにする。
+function isUnavailableSource(source) {
+  return !!(source && (source.redacted === true || source.legacy === true));
+}
+
 // ── Citation dialog ────────────────────────────────────────
 const citationDialog = document.getElementById('citation-dialog');
 const citationDialogBody = document.getElementById('citation-dialog-body');
@@ -195,9 +204,18 @@ function setSources(sourcesRow, sources) {
   sourcesRow.innerHTML = '';
   const seen = new Set();
   (sources || []).forEach((s) => {
-    const key = s.source_file || '';
+    const key = s.source_file || `id:${s.id}`;
     if (seen.has(key)) return;
     seen.add(key);
+
+    if (isUnavailableSource(s)) {
+      const tag = document.createElement('span');
+      tag.className = 'source-tag source-tag-disabled';
+      tag.textContent = '引用元は現在参照できません';
+      sourcesRow.appendChild(tag);
+      return;
+    }
+
     const tag = document.createElement('button');
     tag.type = 'button';
     tag.className = 'source-tag';
@@ -221,7 +239,13 @@ function renderAnswerWithCitations(bubble, text, sources) {
       bubble.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
     }
     const src = byId.get(match[1]);
-    if (src) {
+    if (src && isUnavailableSource(src)) {
+      const chip = document.createElement('span');
+      chip.className = 'citation-chip citation-chip-disabled';
+      chip.title = '引用元は現在参照できません';
+      chip.textContent = `[${match[1]}]`;
+      bubble.appendChild(chip);
+    } else if (src) {
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'citation-chip';
@@ -425,7 +449,18 @@ async function loadAdminData() {
     loadTasks(),
     loadUnclassified(),
     loadAuditLogs(),
+    loadAdminEvents(),
   ]);
+}
+
+// テーブル行を必ず createElement / textContent で組み立て、innerHTML へ生の
+// 文字列 (ファイル名・パス等の外部由来データを含む) を渡さない。
+// これにより悪意あるファイル名 (<img src=x onerror=...> 等) 経由の
+// stored XSS を防ぐ (項目4)。
+function tdText(text) {
+  const td = document.createElement('td');
+  td.textContent = text ?? '';
+  return td;
 }
 
 async function loadUnclassified() {
@@ -440,11 +475,14 @@ async function loadUnclassified() {
     const name = r.source_path.split('/').pop();
     const ts = r.updated_at ? r.updated_at.slice(0, 16).replace('T', ' ') : '-';
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td title="${r.source_path}">${name}</td>
-      <td>${r.file_type}</td>
-      <td class="status-${r.status}">${r.status}</td>
-      <td>${ts}</td>`;
+    const nameTd = tdText(name);
+    nameTd.title = r.source_path;
+    const statusTd = tdText(r.status);
+    statusTd.className = `status-${r.status}`;
+    tr.appendChild(nameTd);
+    tr.appendChild(tdText(r.file_type));
+    tr.appendChild(statusTd);
+    tr.appendChild(tdText(ts));
     tbody.appendChild(tr);
   });
 }
@@ -461,11 +499,10 @@ async function loadAuditLogs() {
     const ts = r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '-';
     const tr = document.createElement('tr');
     tr.dataset.idx = idx;
-    tr.innerHTML = `
-      <td>${ts}</td>
-      <td>${r.username}</td>
-      <td>${(r.question || '').slice(0, 40)}</td>
-      <td>${(r.retrieved_chunks || []).length}</td>`;
+    tr.appendChild(tdText(ts));
+    tr.appendChild(tdText(r.username));
+    tr.appendChild(tdText((r.question || '').slice(0, 40)));
+    tr.appendChild(tdText((r.retrieved_chunks || []).length));
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('tr').forEach((tr) => {
@@ -478,13 +515,18 @@ function openAuditDetail(entry) {
   const sources = (entry.retrieved_chunks || [])
     .map((c) => `${c.source_file ?? '不明'} (score=${c.score ?? '-'}, lv=${c.access_level ?? '-'})`)
     .join('\n') || 'なし';
+  // 項目高1: 回答本文は監査ログに保存されないため、文字数のみ表示する。
+  const answerLabel =
+    entry.answer_chars === null || entry.answer_chars === undefined
+      ? (entry.error ? '(エラーのため回答なし)' : '-')
+      : `回答本文は保存されません（${entry.answer_chars}文字）`;
   body.innerHTML = '';
   const fields = [
     ['日時', entry.created_at || '-'],
     ['ユーザー', entry.username || '-'],
     ['質問', entry.question || '-'],
     ['参照チャンク', sources],
-    ['回答', entry.answer || (entry.error ? '(エラーのため回答なし)' : '-')],
+    ['回答', answerLabel],
     ['エラー', entry.error || 'なし'],
   ];
   fields.forEach(([label, value]) => {
@@ -502,6 +544,29 @@ document.getElementById('audit-close-btn').addEventListener('click', () => {
   document.getElementById('audit-dialog').close();
 });
 
+// ── 管理操作の監査ログ (項目高4) ────────────────────────────
+async function loadAdminEvents() {
+  const res = await api('GET', '/api/admin/admin-events?limit=50&offset=0');
+  if (!res || !res.ok) return;
+  const rows = await res.json();
+  const tbody = document.querySelector('#admin-events-table tbody');
+  tbody.innerHTML = '';
+  rows.forEach((r) => {
+    const ts = r.created_at ? r.created_at.slice(0, 16).replace('T', ' ') : '-';
+    const detailSummary = r.detail
+      ? Object.entries(r.detail)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(', ')
+      : '-';
+    const tr = document.createElement('tr');
+    tr.appendChild(tdText(ts));
+    tr.appendChild(tdText(r.username));
+    tr.appendChild(tdText(r.action));
+    tr.appendChild(tdText(detailSummary));
+    tbody.appendChild(tr);
+  });
+}
+
 async function loadFolders() {
   const res = await api('GET', '/api/admin/folders');
   if (!res || !res.ok) return;
@@ -510,10 +575,18 @@ async function loadFolders() {
   tbody.innerHTML = '';
   rows.forEach((r) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td title="${r.path}">${r.path}</td>
-      <td>${r.access_level}</td>
-      <td><button class="delete-btn btn-ghost" data-id="${r.id}">削除</button></td>`;
+    const pathTd = tdText(r.path);
+    pathTd.title = r.path;
+    tr.appendChild(pathTd);
+    tr.appendChild(tdText(r.access_level));
+    const actionTd = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'delete-btn btn-ghost';
+    delBtn.dataset.id = String(r.id);
+    delBtn.textContent = '削除';
+    actionTd.appendChild(delBtn);
+    tr.appendChild(actionTd);
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('.delete-btn').forEach((btn) => {
@@ -534,12 +607,15 @@ async function loadDocuments() {
     const name = r.source_path.split('/').pop();
     const ts = r.updated_at ? r.updated_at.slice(0, 16).replace('T', ' ') : '-';
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td title="${r.source_path}">${name}</td>
-      <td>${r.file_type}</td>
-      <td class="status-${r.status}">${r.status}</td>
-      <td>${r.chunk_count ?? '-'}</td>
-      <td>${ts}</td>`;
+    const nameTd = tdText(name);
+    nameTd.title = r.source_path;
+    const statusTd = tdText(r.status);
+    statusTd.className = `status-${r.status}`;
+    tr.appendChild(nameTd);
+    tr.appendChild(tdText(r.file_type));
+    tr.appendChild(statusTd);
+    tr.appendChild(tdText(r.chunk_count ?? '-'));
+    tr.appendChild(tdText(ts));
     tbody.appendChild(tr);
   });
 }
@@ -554,11 +630,14 @@ async function loadTasks() {
     const name = (r.source_path || '').split('/').pop();
     const ts = r.updated_at ? r.updated_at.slice(0, 16).replace('T', ' ') : '-';
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td title="${r.source_path}">${name}</td>
-      <td class="status-${r.status}">${r.status}</td>
-      <td>${r.attempts}</td>
-      <td>${ts}</td>`;
+    const nameTd = tdText(name);
+    nameTd.title = r.source_path;
+    const statusTd = tdText(r.status);
+    statusTd.className = `status-${r.status}`;
+    tr.appendChild(nameTd);
+    tr.appendChild(statusTd);
+    tr.appendChild(tdText(r.attempts));
+    tr.appendChild(tdText(ts));
     tbody.appendChild(tr);
   });
 }
@@ -581,8 +660,9 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
   const username = document.getElementById('new-username').value.trim();
   const password = document.getElementById('new-password').value;
   const access_level = parseInt(document.getElementById('new-level').value);
+  const is_admin = document.getElementById('new-is-admin').checked;
   const msgEl = document.getElementById('user-msg');
-  const res = await api('POST', '/api/auth/users', { username, password, access_level });
+  const res = await api('POST', '/api/auth/users', { username, password, access_level, is_admin });
   if (!res) return;
   if (res.ok) {
     msgEl.textContent = `ユーザー "${username}" を作成しました`;

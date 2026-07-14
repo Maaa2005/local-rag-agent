@@ -66,18 +66,24 @@ async def resync_access_levels() -> dict:
                 "Unclassified path indexed at level 1 (resync): %s", doc["source_path"]
             )
 
-        if (
-            desired_level != doc["access_level"]
-            or desired_unclassified != doc.get("unclassified", 0)
-        ):
+        unclassified_changed = desired_unclassified != doc.get("unclassified", 0)
+        if desired_level != doc["access_level"] or unclassified_changed:
             await db.execute(
                 "UPDATE documents SET access_level=?, unclassified=?, updated_at=? WHERE id=?",
                 (desired_level, desired_unclassified, now, doc_id),
             )
+            qdrant_payload: dict = {}
             if desired_level != doc["access_level"]:
+                qdrant_payload["access_level"] = desired_level
+            if unclassified_changed:
+                # unclassified フラグも Qdrant のペイロードへ即時反映し、
+                # フォルダ登録により分類が完了した際に検索対象へ戻す
+                # (逆に未分類化された場合は検索対象から即時除外する、項目1)。
+                qdrant_payload["unclassified"] = bool(desired_unclassified)
+            if qdrant_payload:
                 await get_client().set_payload(
                     collection_name=settings.qdrant_collection,
-                    payload={"access_level": desired_level},
+                    payload=qdrant_payload,
                     points=Filter(
                         must=[FieldCondition(key="document_id", match=MatchValue(value=doc_id))]
                     ),

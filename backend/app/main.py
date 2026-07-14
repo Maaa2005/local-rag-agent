@@ -72,6 +72,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def _security_headers(request, call_next):
+    """項目中5: クリックジャッキング・MIME スニッフィング対策の基本ヘッダ。
+
+    HTML 配信 (frontend/nginx) 側は別途 CSP を付与する。ここでは API/静的
+    問わず全レスポンス共通で付けられる最小限のヘッダのみ扱う。
+    """
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(admin.router)

@@ -21,23 +21,31 @@ async def ensure_collection() -> None:
     client = get_client()
     existing = [c.name for c in (await client.get_collections()).collections]
 
+    needs_create = True
     if settings.qdrant_collection in existing:
         info = await client.get_collection(settings.qdrant_collection)
         vcfg = info.config.params.vectors
         if isinstance(vcfg, dict) and "dense" in vcfg:
-            return  # 正しいフォーマット（dense + sparse 名前付きベクトル）
-        # 旧フォーマット（無名ベクトル）→ 再作成
-        await client.delete_collection(settings.qdrant_collection)
+            needs_create = False  # 正しいフォーマット（dense + sparse 名前付きベクトル）
+        else:
+            # 旧フォーマット（無名ベクトル）→ 再作成
+            await client.delete_collection(settings.qdrant_collection)
 
-    await client.create_collection(
-        collection_name=settings.qdrant_collection,
-        vectors_config={"dense": VectorParams(size=settings.vector_size, distance=Distance.COSINE)},
-        sparse_vectors_config={"sparse": SparseVectorParams()},
-    )
+    if needs_create:
+        await client.create_collection(
+            collection_name=settings.qdrant_collection,
+            vectors_config={"dense": VectorParams(size=settings.vector_size, distance=Distance.COSINE)},
+            sparse_vectors_config={"sparse": SparseVectorParams()},
+        )
+
+    # 新規作成時だけでなく、既存コレクションに対しても不足しているインデックスを
+    # 補う (例: unclassified フィールドを後から追加した場合)。create_payload_index
+    # は同名フィールドに対して冪等なため無条件に呼んでよい。
     for field, schema in [
         ("access_level", "integer"),
         ("document_id", "keyword"),
         ("is_active", "bool"),
+        ("unclassified", "bool"),
     ]:
         await client.create_payload_index(
             collection_name=settings.qdrant_collection,
@@ -100,6 +108,7 @@ async def index_document(
     text: str,
     source_file: str,
     access_level: int,
+    unclassified: bool = False,
 ) -> int:
     # コレクションの存在チェックは lifespan で 1 度だけ。タスクごとには呼ばない。
     await deactivate_document(document_id)
@@ -127,6 +136,9 @@ async def index_document(
                     "source_file": source_file,
                     "access_level": access_level,
                     "is_active": True,
+                    # 未分類 (どの監視フォルダにも一致しない) 文書は検索対象外に
+                    # するため、常に払い出しペイロードに反映する (項目1)。
+                    "unclassified": bool(unclassified),
                 },
             )
         )

@@ -80,9 +80,10 @@ def test_event_stream_emits_meta_then_object_sources(monkeypatch, isolated_db):
     assert isinstance(conv_id, int)
 
     sources_ev = next(e for e in events if e["type"] == "sources")
+    # source_file はフルパス開示を避けるため basename 化される (項目中7)。
     assert sources_ev["sources"] == [
-        {"id": 1, "source_file": "/watched/a.txt", "content": "本文A", "score": 0.9},
-        {"id": 2, "source_file": "/watched/b.txt", "content": "本文B", "score": 0.7},
+        {"id": 1, "source_file": "a.txt", "content": "本文A", "score": 0.9},
+        {"id": 2, "source_file": "b.txt", "content": "本文B", "score": 0.7},
     ]
 
 
@@ -122,7 +123,7 @@ def test_event_stream_persists_messages(monkeypatch, isolated_db):
     assert rows[0]["content"] == "質問です"
     assert rows[1]["role"] == "assistant"
     assert rows[1]["content"] == "回答です"
-    assert json.loads(rows[1]["sources"])[0]["source_file"] == "/watched/a.txt"
+    assert json.loads(rows[1]["sources"])[0]["source_file"] == "a.txt"
     assert conv_row["title"] == "質問です"
 
 
@@ -186,7 +187,22 @@ def client(isolated_db, monkeypatch):
 
 def _login(client, username="admin", password="admin"):
     r = client.post("/api/auth/token", data={"username": username, "password": password})
-    return r.json()["access_token"]
+    token = r.json()["access_token"]
+    if username == "admin" and password == "admin":
+        # デフォルト資格情報 (admin/admin) のままだと must_change_password=1 のため
+        # /api/chat 等が 403 になる (項目6)。テストの前提として一度だけ変更する。
+        client.post(
+            "/api/auth/password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"current_password": "admin", "new_password": "adminpw12345"},
+        )
+        # 項目高3: パスワード変更で変更前に発行したトークンの iat が失効しうるため、
+        # 変更後の状態で確実に使えるトークンを取り直す。
+        r2 = client.post(
+            "/api/auth/token", data={"username": username, "password": "adminpw12345"}
+        )
+        token = r2.json()["access_token"]
+    return token
 
 
 def _create_second_user(isolated_db, username="bob", password="bobpw"):
@@ -326,3 +342,26 @@ def test_delete_unknown_conversation_returns_404(client):
     token = _login(client)
     r = client.delete("/api/conversations/9999", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 404
+
+
+def test_resolve_source_for_display_legacy_without_document_id():
+    """項目高2: document_id を持たない旧形式ソース (高2マイグレーションで
+    content を剥がされたもの、または移行漏れのもの) は本文を返さず、
+    legacy=True かつ content=None のクリック不可な形で返す。"""
+    from app.api.chat import _resolve_source_for_display
+
+    source = {
+        "id": "abc123",
+        "source_file": "/watched/legacy/old.txt",
+        "score": 0.42,
+    }
+
+    result = asyncio.run(_resolve_source_for_display(source, user_access_level=3, doc_map={}))
+
+    assert result == {
+        "id": "abc123",
+        "source_file": "old.txt",
+        "score": 0.42,
+        "content": None,
+        "legacy": True,
+    }

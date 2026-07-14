@@ -57,7 +57,8 @@ def _make_db(tmp_path):
                 id TEXT PRIMARY KEY, source_path TEXT, file_hash TEXT,
                 access_level INTEGER, file_type TEXT,
                 status TEXT, chunk_count INTEGER DEFAULT 0,
-                error_msg TEXT, created_at TEXT, updated_at TEXT
+                error_msg TEXT, unclassified INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT, updated_at TEXT
             );
             CREATE TABLE tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

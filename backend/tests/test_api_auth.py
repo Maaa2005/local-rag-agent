@@ -160,7 +160,23 @@ def _login(client, username: str = "admin", password: str = "admin") -> str:
         "/api/auth/token",
         data={"username": username, "password": password},
     )
-    return r.json()["access_token"]
+    token = r.json()["access_token"]
+    if username == "admin" and password == "admin":
+        # デフォルト資格情報 (admin/admin) のままだと must_change_password=1 のため
+        # 他の API が 403 になる (項目6)。テストで admin 権限のその他 API を叩く
+        # 前提として、ここで一度だけパスワードを変更しておく。
+        client.post(
+            "/api/auth/password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"current_password": "admin", "new_password": "adminpw12345"},
+        )
+        # 項目高3: パスワード変更で変更前に発行したトークンの iat が失効しうるため、
+        # 変更後の状態で確実に使えるトークンを取り直す。
+        r2 = client.post(
+            "/api/auth/token", data={"username": username, "password": "adminpw12345"}
+        )
+        token = r2.json()["access_token"]
+    return token
 
 
 def test_me_returns_user_info(client):
@@ -281,11 +297,13 @@ def test_change_password_wrong_current(client):
 
 
 def test_change_password_rejects_weak_new_password(client):
+    # _login はデフォルト資格情報だと admin のパスワードを adminpw12345 に変更する
+    # ため、正しい現在パスワードで新パスワードの強度チェックに到達させる。
     token = _login(client)
     r = client.post(
         "/api/auth/password",
         headers={"Authorization": f"Bearer {token}"},
-        json={"current_password": "admin", "new_password": "short"},
+        json={"current_password": "adminpw12345", "new_password": "short"},
     )
     assert r.status_code == 400
 
@@ -301,7 +319,11 @@ def test_login_admin_default_password_flags_must_change(client):
 
 
 def test_login_after_password_change_clears_flag(client):
-    token = _login(client)
+    # ここでは _login ヘルパー (デフォルト資格情報時に自動でパスワードを変える
+    # 副作用を持つ) を使わず、素の admin/admin でログインしてからパスワードを
+    # 変更する過程そのものを検証する。
+    r0 = client.post("/api/auth/token", data={"username": "admin", "password": "admin"})
+    token = r0.json()["access_token"]
     r = client.post(
         "/api/auth/password",
         headers={"Authorization": f"Bearer {token}"},

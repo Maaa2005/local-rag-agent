@@ -3,9 +3,10 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.core.security import get_current_user, require_admin
+from app.core.security import require_admin
 from app.database import db
 from app.services.access_sync import resync_access_levels
+from app.services.admin_events import record_admin_event
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -26,8 +27,8 @@ async def list_folders():
     return [dict(r) for r in rows]
 
 
-@router.post("/folders", dependencies=[Depends(require_admin)])
-async def add_folder(body: FolderCreate):
+@router.post("/folders")
+async def add_folder(body: FolderCreate, actor: dict = Depends(require_admin)):
     if body.access_level not in (1, 2, 3):
         raise HTTPException(400, "access_level は 1, 2, 3 のいずれかです")
     existing = await db.fetchone(
@@ -42,25 +43,31 @@ async def add_folder(body: FolderCreate):
             "UPDATE watch_folders SET is_active=1, access_level=? WHERE id=?",
             (body.access_level, existing["id"]),
         )
+        folder_id = existing["id"]
     else:
-        await db.execute(
+        folder_id = await db.execute(
             "INSERT INTO watch_folders (path, access_level) VALUES (?, ?)",
             (body.path, body.access_level),
         )
 
     result = await resync_access_levels()
+    await record_admin_event(
+        actor,
+        "add_folder",
+        {"path": body.path, "access_level": body.access_level, "folder_id": folder_id},
+    )
     return {
         "message": f"監視フォルダ {body.path} を追加しました (access_level={body.access_level})",
         **result,
     }
 
 
-@router.patch("/folders/{folder_id}", dependencies=[Depends(require_admin)])
-async def update_folder(folder_id: int, body: FolderUpdate):
+@router.patch("/folders/{folder_id}")
+async def update_folder(folder_id: int, body: FolderUpdate, actor: dict = Depends(require_admin)):
     if body.access_level not in (1, 2, 3):
         raise HTTPException(400, "access_level は 1, 2, 3 のいずれかです")
     row = await db.fetchone(
-        "SELECT id FROM watch_folders WHERE id=? AND is_active=1", (folder_id,)
+        "SELECT id, path FROM watch_folders WHERE id=? AND is_active=1", (folder_id,)
     )
     if not row:
         raise HTTPException(404, "フォルダが見つかりません")
@@ -69,29 +76,45 @@ async def update_folder(folder_id: int, body: FolderUpdate):
         (body.access_level, folder_id),
     )
     result = await resync_access_levels()
+    await record_admin_event(
+        actor,
+        "update_folder",
+        {"path": row["path"], "access_level": body.access_level, "folder_id": folder_id},
+    )
     return {
         "message": f"監視フォルダの access_level を {body.access_level} に更新しました",
         **result,
     }
 
 
-@router.delete("/folders/{folder_id}", dependencies=[Depends(require_admin)])
-async def remove_folder(folder_id: int):
-    row = await db.fetchone("SELECT id FROM watch_folders WHERE id=?", (folder_id,))
+@router.delete("/folders/{folder_id}")
+async def remove_folder(folder_id: int, actor: dict = Depends(require_admin)):
+    row = await db.fetchone("SELECT id, path, access_level FROM watch_folders WHERE id=?", (folder_id,))
     if not row:
         raise HTTPException(404, "フォルダが見つかりません")
     await db.execute("UPDATE watch_folders SET is_active=0 WHERE id=?", (folder_id,))
     result = await resync_access_levels()
+    await record_admin_event(
+        actor,
+        "remove_folder",
+        {"path": row["path"], "access_level": row["access_level"], "folder_id": folder_id},
+    )
     return {"message": "監視フォルダを無効化しました", **result}
 
 
 # ─── ドキュメント ─────────────────────────────────────────────
-@router.get("/documents")
-async def list_documents(user: dict = Depends(get_current_user)):
+@router.get("/documents", dependencies=[Depends(require_admin)])
+async def list_documents():
+    """全文書のメタデータ (パス・状態等) を一覧する (管理者限定, 項目中7)。
+
+    ここは管理者向けの運用管理画面用であり、access_level によるフィルタは
+    かけない (管理者は全文書のメタデータを把握できる)。ただし本文検索・
+    チャットでの引用は従来どおり retriever 側の access_level フィルタで
+    制限され、この API がそれを緩めるわけではない。
+    """
     rows = await db.fetchall(
         "SELECT id, source_path, file_type, status, chunk_count, access_level, created_at, updated_at "
-        "FROM documents WHERE access_level <= ? ORDER BY updated_at DESC",
-        (user["access_level"],),
+        "FROM documents ORDER BY updated_at DESC"
     )
     return [dict(r) for r in rows]
 
@@ -120,8 +143,9 @@ async def list_unclassified_documents():
 # ─── 監査ログ ────────────────────────────────────────────────
 @router.get("/audit-logs", dependencies=[Depends(require_admin)])
 async def list_audit_logs(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)):
+    """回答本文 (answer) は保存していないため返さない (項目高1)。桁数のみ返す。"""
     rows = await db.fetchall(
-        "SELECT id, user_id, username, question, retrieved_chunks, answer, error, created_at "
+        "SELECT id, user_id, username, question, retrieved_chunks, answer_chars, error, created_at "
         "FROM audit_logs ORDER BY id DESC LIMIT ? OFFSET ?",
         (limit, offset),
     )
@@ -132,5 +156,25 @@ async def list_audit_logs(limit: int = Query(50, ge=1, le=500), offset: int = Qu
             d["retrieved_chunks"] = json.loads(d["retrieved_chunks"])
         except (TypeError, ValueError):
             d["retrieved_chunks"] = []
+        results.append(d)
+    return results
+
+
+# ─── 管理操作の監査ログ ──────────────────────────────────────
+@router.get("/admin-events", dependencies=[Depends(require_admin)])
+async def list_admin_events(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0)):
+    """管理者操作 (ユーザー作成・フォルダ変更・パスワード変更) の監査ログ (項目高4)。"""
+    rows = await db.fetchall(
+        "SELECT id, user_id, username, action, detail, created_at "
+        "FROM admin_events ORDER BY id DESC LIMIT ? OFFSET ?",
+        (limit, offset),
+    )
+    results = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["detail"] = json.loads(d["detail"]) if d["detail"] else {}
+        except (TypeError, ValueError):
+            d["detail"] = {}
         results.append(d)
     return results

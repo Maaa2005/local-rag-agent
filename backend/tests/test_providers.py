@@ -113,7 +113,20 @@ def client(isolated_db, monkeypatch):
 
 def _login(client, user="admin", pw="admin"):
     r = client.post("/api/auth/token", data={"username": user, "password": pw})
-    return r.json()["access_token"]
+    token = r.json()["access_token"]
+    if user == "admin" and pw == "admin":
+        # デフォルト資格情報 (admin/admin) のままだと must_change_password=1 のため
+        # /api/chat 等が 403 になる (項目6)。テストの前提として一度だけ変更する。
+        client.post(
+            "/api/auth/password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"current_password": "admin", "new_password": "adminpw12345"},
+        )
+        # 項目高3: パスワード変更で変更前に発行したトークンの iat が失効しうるため、
+        # 変更後の状態で確実に使えるトークンを取り直す。
+        r2 = client.post("/api/auth/token", data={"username": user, "password": "adminpw12345"})
+        token = r2.json()["access_token"]
+    return token
 
 
 def _sse_events(raw: str) -> list[dict]:

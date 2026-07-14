@@ -281,7 +281,23 @@ def client(isolated_db, monkeypatch):
 
 def _login(client, username="admin", password="admin"):
     r = client.post("/api/auth/token", data={"username": username, "password": password})
-    return r.json()["access_token"]
+    token = r.json()["access_token"]
+    if username == "admin" and password == "admin":
+        # デフォルト資格情報のままだと must_change_password=1 のため他の admin API が
+        # 403 になる (項目6)。ここでは admin-gated API を叩くテストのため、
+        # 一度だけパスワードを変更しておく。
+        client.post(
+            "/api/auth/password",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"current_password": "admin", "new_password": "adminpw12345"},
+        )
+        # 項目高3: パスワード変更で変更前に発行したトークンの iat が失効しうるため、
+        # 変更後の状態で確実に使えるトークンを取り直す。
+        r2 = client.post(
+            "/api/auth/token", data={"username": username, "password": "adminpw12345"}
+        )
+        token = r2.json()["access_token"]
+    return token
 
 
 def test_admin_lists_unclassified_documents(client, isolated_db):
@@ -344,6 +360,9 @@ def test_admin_lists_audit_logs(client, isolated_db):
     assert len(body) == 1
     assert body[0]["question"] == "Q1"
     assert body[0]["retrieved_chunks"][0]["source_file"] == "a.txt"
+    # 項目高1: 回答本文はレスポンスに含まれない。
+    assert "answer" not in body[0]
+    assert "answer_chars" in body[0]
 
 
 def test_admin_audit_logs_requires_admin(client, isolated_db):
@@ -387,7 +406,8 @@ def test_chat_stream_records_audit_log(monkeypatch, isolated_db):
             events = [e async for e in chat_module._event_stream("質問です", user, None)]
             assert any('"type": "sources"' in e for e in events)
             row = await db.fetchone(
-                "SELECT username, question, answer, error, retrieved_chunks FROM audit_logs"
+                "SELECT username, question, answer, answer_chars, error, retrieved_chunks "
+                "FROM audit_logs"
             )
             return row
         finally:
@@ -397,10 +417,22 @@ def test_chat_stream_records_audit_log(monkeypatch, isolated_db):
     assert row is not None
     assert row["username"] == "admin"
     assert row["question"] == "質問です"
-    assert row["answer"] == "こんにちは"
+    # 項目高1: 回答本文はもう保存されず、文字数のみ記録される。
+    assert row["answer"] is None
+    assert row["answer_chars"] == len("こんにちは")
     assert row["error"] is None
     chunks = json.loads(row["retrieved_chunks"])
-    assert chunks == [{"source_file": "/watched/a.txt", "score": 0.8, "access_level": 1}]
+    # source_file はフルパス開示を避けるため basename 化され、document_id/chunk_index
+    # (未取得なら None) も含む (項目中7, 高1)。
+    assert chunks == [
+        {
+            "document_id": None,
+            "chunk_index": None,
+            "source_file": "a.txt",
+            "score": 0.8,
+            "access_level": 1,
+        }
+    ]
 
 
 def test_chat_stream_records_error_in_audit_log(monkeypatch, isolated_db):
