@@ -58,6 +58,7 @@ def _make_db(tmp_path):
                 access_level INTEGER, file_type TEXT,
                 status TEXT, chunk_count INTEGER DEFAULT 0,
                 error_msg TEXT, unclassified INTEGER NOT NULL DEFAULT 0,
+                index_version INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT, updated_at TEXT
             );
             CREATE TABLE tasks (
@@ -241,28 +242,92 @@ def test_watcher_does_not_duplicate_task_when_pending_exists(tmp_path):
         assert doc_hash != "oldhash"  # ハッシュ自体は更新される
 
 
-# ─── 修正4: 非アクティブ旧チャンクの物理削除 ──────────────────
-def test_index_document_deletes_inactive_chunks_after_upsert(monkeypatch):
+# ─── 項目8: 再インデックスの世代切替 ──────────────────
+def test_index_document_generation_switch_order(monkeypatch):
+    """成功時: 残骸削除 → upsert(is_active=False) → activate → 旧世代削除、の順で呼ばれる。"""
     mock_client = AsyncMock()
     monkeypatch.setattr(indexer, "get_client", lambda: mock_client)
 
     calls: list[str] = []
 
-    async def record_upsert(*args, **kwargs):
-        calls.append("upsert")
-        return None
-
     async def record_delete(*args, **kwargs):
         calls.append("delete")
         return None
 
-    mock_client.upsert.side_effect = record_upsert
-    mock_client.delete.side_effect = record_delete
-
-    async def fake_set_payload(*args, **kwargs):
+    async def record_upsert(*args, **kwargs):
+        calls.append("upsert")
         return None
 
-    mock_client.set_payload.side_effect = fake_set_payload
+    async def record_set_payload(*args, **kwargs):
+        calls.append("set_payload")
+        return None
+
+    mock_client.delete.side_effect = record_delete
+    mock_client.upsert.side_effect = record_upsert
+    mock_client.set_payload.side_effect = record_set_payload
+
+    chunk_count = asyncio.run(
+        indexer.index_document(
+            document_id="doc-1",
+            text="これはテスト文書です。" * 10,
+            source_file="/x/doc.txt",
+            access_level=1,
+            index_version=1,
+        )
+    )
+
+    assert chunk_count > 0
+    assert calls == ["delete", "upsert", "set_payload", "delete"]
+
+    # upsert された全ポイントは is_active=False + index_version=1
+    upsert_points = mock_client.upsert.await_args.kwargs["points"]
+    assert all(p.payload["is_active"] is False for p in upsert_points)
+    assert all(p.payload["index_version"] == 1 for p in upsert_points)
+
+    # activate (set_payload) は is_active=True をこの document_id/index_version に適用
+    set_payload_kwargs = mock_client.set_payload.await_args.kwargs
+    assert set_payload_kwargs["payload"] == {"is_active": True}
+    activate_conditions = set_payload_kwargs["points"].must
+    activate_keys = {c.key for c in activate_conditions}
+    assert activate_keys == {"document_id", "index_version"}
+
+    # 2回目の delete (旧世代削除) は index_version 不一致を対象にする
+    final_delete_kwargs = mock_client.delete.await_args.kwargs
+    filter_obj = final_delete_kwargs["points_selector"]
+    assert {c.key for c in filter_obj.must} == {"document_id"}
+    assert {c.key for c in filter_obj.must_not} == {"index_version"}
+
+
+def test_index_document_keeps_old_generation_active_when_upsert_fails(monkeypatch):
+    """upsert 失敗時: 旧世代の activate/物理削除に進まない (= 旧世代は is_active=True のまま残る)。"""
+    mock_client = AsyncMock()
+    monkeypatch.setattr(indexer, "get_client", lambda: mock_client)
+
+    mock_client.upsert.side_effect = RuntimeError("qdrant down")
+
+    try:
+        asyncio.run(
+            indexer.index_document(
+                document_id="doc-1",
+                text="これはテスト文書です。" * 10,
+                source_file="/x/doc.txt",
+                access_level=1,
+                index_version=1,
+            )
+        )
+    except RuntimeError:
+        pass
+
+    # activate も旧世代削除も呼ばれていない = 旧世代 (is_active=True) はそのまま残る
+    mock_client.set_payload.assert_not_called()
+    # delete は手順1 (残骸掃除) の1回のみ呼ばれ、旧世代削除 (手順4) には到達していない
+    assert mock_client.delete.await_count == 1
+
+
+def test_index_document_cleans_up_stale_inactive_points_on_next_run(monkeypatch):
+    """残骸 (is_active=False) ポイントは次回実行の冒頭で物理削除される。"""
+    mock_client = AsyncMock()
+    monkeypatch.setattr(indexer, "get_client", lambda: mock_client)
 
     asyncio.run(
         indexer.index_document(
@@ -270,19 +335,14 @@ def test_index_document_deletes_inactive_chunks_after_upsert(monkeypatch):
             text="これはテスト文書です。" * 10,
             source_file="/x/doc.txt",
             access_level=1,
+            index_version=2,
         )
     )
 
-    assert mock_client.upsert.await_count == 1
-    assert mock_client.delete.await_count == 1
-    # upsert が delete より先に呼ばれていること
-    assert calls.index("upsert") < calls.index("delete")
-
-    delete_kwargs = mock_client.delete.await_args.kwargs
-    filter_obj = delete_kwargs["points_selector"]
+    first_delete_kwargs = mock_client.delete.await_args_list[0].kwargs
+    filter_obj = first_delete_kwargs["points_selector"]
     conditions = filter_obj.must
     keys = {c.key for c in conditions}
-    assert "document_id" in keys
-    assert "is_active" in keys
+    assert keys == {"document_id", "is_active"}
     is_active_cond = next(c for c in conditions if c.key == "is_active")
     assert is_active_cond.match.value is False

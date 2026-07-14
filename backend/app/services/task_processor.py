@@ -80,7 +80,8 @@ async def _process_task(task: dict) -> None:
     doc_id = task["document_id"]
 
     doc = await db.fetchone(
-        "SELECT source_path, access_level, unclassified FROM documents WHERE id=?", (doc_id,)
+        "SELECT source_path, access_level, unclassified, index_version FROM documents WHERE id=?",
+        (doc_id,),
     )
     if doc is None:
         raise ValueError(f"document {doc_id} not found")
@@ -101,12 +102,16 @@ async def _process_task(task: dict) -> None:
         logger.info("File still being written, deferred: %s", doc["source_path"])
         return
 
+    current_version = doc["index_version"] if "index_version" in doc.keys() and doc["index_version"] is not None else 0
+    new_version = current_version + 1
+
     text = await parse_file(doc["source_path"])
     chunk_count = await index_document(
         document_id=doc_id,
         text=text,
         source_file=doc["source_path"],
         access_level=doc["access_level"],
+        index_version=new_version,
         unclassified=bool(doc["unclassified"]) if "unclassified" in doc.keys() else False,
     )
 
@@ -116,8 +121,8 @@ async def _process_task(task: dict) -> None:
         (now, task_id),
     )
     await db.execute(
-        "UPDATE documents SET status='done', chunk_count=?, updated_at=? WHERE id=?",
-        (chunk_count, now, doc_id),
+        "UPDATE documents SET status='done', chunk_count=?, index_version=?, updated_at=? WHERE id=?",
+        (chunk_count, new_version, now, doc_id),
     )
     logger.info("Indexed %s → %d chunks", doc["source_path"], chunk_count)
 

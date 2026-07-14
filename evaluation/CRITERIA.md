@@ -69,16 +69,23 @@
 
 ---
 
-## 3. プロバイダ間比較
+## 3. 評価対象と rerank A/B 比較
 
-8 プロバイダ (vllm, anthropic, openai, gemini, azure_openai, bedrock,
-claude_code, codex) を同じデータセットで横並びに評価し、以下の表を
-`report.md` に自動生成する。
+本アプリは社内機密 RAG 専用であり、LLM プロバイダはローカル vLLM 1 つに
+**固定**されている（`backend/app/services/providers/` には `vllm_provider`
+のみが登録されている）。外部送信を伴うフロンティアプロバイダ
+（Anthropic / OpenAI / Gemini / Bedrock 等）は社内文書の流出経路となるため
+本アプリのコードベースには存在せず、`evaluation/run_eval.py` からも選択
+できない（別アプリ `frontier-llm-agent` に分離済み）。
 
-| Provider | Recall@5 | MRR | Faithfulness | Answer Rel. | Correctness | Permission | Refusal | Latency p50 | 合否 |
+そのため「プロバイダ間比較」は行わず、代わりに Cross-Encoder リランクの
+on/off を同一データセットで横並びに評価する (`--rerank both`) 。
+`report.md` には以下の形式で結果を並記する。
+
+| 実行 | Recall@5 | MRR | Faithfulness | Answer Rel. | Correctness | Permission | Refusal | Latency p50 | 合否 |
 |---|---|---|---|---|---|---|---|---|---|
-| vllm | … | … | … | … | … | … | … | …s | ✓/✗ |
-| anthropic | … | … | … | … | … | … | … | …s | ✓/✗ |
+| vllm+rerank_on | … | … | … | … | … | … | … | …s | ✓/✗ |
+| vllm+rerank_off | … | … | … | … | … | … | … | …s | ✓/✗ |
 
 合否は「全メトリクスが合格基準を満たすか」で判定する。
 
@@ -107,36 +114,53 @@ claude_code, codex) を同じデータセットで横並びに評価し、以下
 
 ---
 
-## 5. ジャッジ LLM の独立性
+## 5. ジャッジ LLM について
 
-- 採点に使う LLM は、評価対象プロバイダとは **別** を既定とする (`--judge anthropic` を推奨)。
-- 同一プロバイダで採点する場合は「自己評価バイアス」が掛かるためレポートに警告マークを付ける。
+- `evaluation/judges.py` は `app.services.providers` レジストリからプロバイダを
+  取得する実装になっているが、レジストリには `vllm` しか登録されていないため、
+  実際に使えるジャッジは **ローカル vLLM のみ**である。
+- したがって「評価対象プロバイダとは別のジャッジで自己評価バイアスを避ける」
+  という一般的な RAGAS 流の理想は、このアプリの設計（社内文書を外部へ一切
+  送信しない）とは両立しない。ジャッジも自己評価バイアスを含むローカル LLM
+  であることを前提にスコアを解釈すること（特に M3〜M5 は参考値と位置づけ、
+  M1・M2・M6・M7・M8 の機械的メトリクスを一次判断材料とする）。
+- 外部 LLM（Anthropic 等）をジャッジに使う手順は実装上存在しない。将来的に
+  実データではなく本リポ同梱の架空コーパス（`evaluation/corpus/`、機密なし）
+  のみを対象に外部ジャッジを試す場合でも、実文書を扱う本番運用では絶対に
+  使用しないこと。
 
 ---
 
 ## 6. 実行手順
 
 ```bash
-# 単一プロバイダ評価
-python -m evaluation.run_eval --provider vllm --judge anthropic
+cd backend
 
-# 全プロバイダ比較 (利用可能なものすべて)
-python -m evaluation.run_eval --all --judge anthropic --report evaluation/results/2026-06-09/report.md
+# 現在の settings (rerank 含む) で評価
+.venv/bin/python ../evaluation/run_eval.py --provider vllm
 
-# 性能評価のみ (LLM-judge をスキップ)
-python -m evaluation.run_eval --provider vllm --no-judge
+# リランク on/off を A/B 比較
+.venv/bin/python ../evaluation/run_eval.py --provider vllm --rerank both
+
+# 性能・機械的メトリクスのみ (LLM-judge をスキップ)
+.venv/bin/python ../evaluation/run_eval.py --provider vllm --no-judge
 ```
+
+`--provider` には `vllm` 以外指定できない（他プロバイダはレジストリ未登録
+のため `Unknown provider` で失敗する）。`--all` も同様に `vllm` のみが
+評価対象になる。
 
 ---
 
 ## 7. リリース判定 (フェーズ 1)
 
-ローカル既定プロバイダ (vllm) で以下を全て満たしたときフェーズ 1 リリース可:
+ローカル vLLM で以下を全て満たしたときフェーズ 1 リリース可:
 
 1. **M7 = 1.00** (権限フィルタ違反ゼロ) — 必須
 2. **M4 ≥ 0.90** (Faithfulness) — 必須
 3. **M6 ≥ 0.80** (Correctness)
 4. **P1 ≤ 5.0s** (First Token Latency p50)
 
-クラウド/エージェントプロバイダはオプションだが、`report.md` に
-性能差を可視化することで運用判断材料とする。
+外部プロバイダとの比較は行わない（本アプリはローカル LLM 固定のため）。
+rerank on/off の差分は `report.md` に可視化し、運用時のデフォルト設定
+（`settings.rerank_enabled`）を決める判断材料とする。

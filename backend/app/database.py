@@ -68,6 +68,11 @@ class Database:
                 "ALTER TABLE documents ADD COLUMN unclassified INTEGER NOT NULL DEFAULT 0"
             )
             await conn.commit()
+        if "index_version" not in doc_columns:
+            await conn.execute(
+                "ALTER TABLE documents ADD COLUMN index_version INTEGER NOT NULL DEFAULT 0"
+            )
+            await conn.commit()
 
         async with conn.execute("PRAGMA table_info(users)") as cur:
             user_columns = {row[1] async for row in cur}

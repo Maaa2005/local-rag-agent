@@ -2,6 +2,8 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.12.4
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "127.0.0.1:6333:6333"  # 無認証のためLAN非公開
     volumes:
@@ -10,9 +12,14 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
 
   vllm:
-    image: vllm/vllm-openai:latest
+    # 項目10: latest は再現性・脆弱性追跡の観点で避け、具体バージョンに固定する。
+    image: vllm/vllm-openai:v0.25.1
     restart: unless-stopped
     runtime: nvidia
+    # GPU 利用 (nvidia runtime) とモデル/キャッシュ書込の都合上、
+    # read_only 化・cap_drop は行わずバージョン固定と no-new-privileges のみ適用する。
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "127.0.0.1:8001:8000"  # 権限フィルタ回避防止のためループバック限定
     volumes:
@@ -41,12 +48,20 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
+    # 項目10: 非root実行 (Dockerfile 側で USER app) + 最小権限化。
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     ports:
       - "8000:8000"
     volumes:
-      - ./volumes/watched:/watched
+      - ./volumes/watched:/watched:ro
       - sqlite_data:/app/data
-      - hf_cache:/root/.cache/huggingface
+      - hf_cache:/home/app/.cache/huggingface
     environment:
       - QDRANT_URL=http://qdrant:6333
       - VLLM_BASE_URL=http://vllm:8000/v1
@@ -65,8 +80,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
+    # 項目10: nginxinc/nginx-unprivileged (非root・非特権ポート8080) を使用。
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     ports:
-      - "3000:80"
+      - "3000:8080"
     depends_on:
       - backend
 

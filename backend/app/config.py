@@ -4,7 +4,7 @@ import secrets
 from typing import Any
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +78,7 @@ class Settings(BaseSettings):
             return [item.strip() for item in s.split(",") if item.strip()]
         return v
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env")
 
 
 settings = Settings()

@@ -46,6 +46,7 @@ async def ensure_collection() -> None:
         ("document_id", "keyword"),
         ("is_active", "bool"),
         ("unclassified", "bool"),
+        ("index_version", "integer"),
     ]:
         await client.create_payload_index(
             collection_name=settings.qdrant_collection,
@@ -108,10 +109,45 @@ async def index_document(
     text: str,
     source_file: str,
     access_level: int,
+    index_version: int,
     unclassified: bool = False,
 ) -> int:
-    # コレクションの存在チェックは lifespan で 1 度だけ。タスクごとには呼ばない。
-    await deactivate_document(document_id)
+    """世代切替方式でチャンクを再インデックスする (項目8)。
+
+    呼び出し元 (task_processor) は documents.index_version の現在値 + 1 を
+    `index_version` として渡す。手順:
+
+      1. この document_id の残骸 (is_active=False のポイント) を物理削除する。
+         これは「前回この関数が upsert 後・activate 前に失敗して残した
+         新世代の残骸」を次回実行の頭で掃除するためのもの。
+      2. 新チャンクを is_active=False + index_version=index_version で upsert。
+      3. upsert が全件成功した後にのみ、この世代のポイントを
+         set_payload で is_active=True へ切り替える。
+      4. 旧世代 (index_version が一致しない、または旧スキーマで未設定) の
+         ポイントを物理削除する。
+
+    途中失敗時の挙動 (検索結果を消さないことが目的):
+      - 手順2 (embed/upsert) で失敗 → 旧世代は is_active=True のまま残るため
+        検索は旧内容で継続できる。新世代の残骸は次回実行の手順1で掃除される。
+      - 手順3/4 で失敗 → 同様に旧世代は is_active=True のまま。新世代は
+        is_active=False のまま取り残されるが、次回実行の手順1で掃除される。
+
+    手順3 (activate) と手順4 (旧世代削除) の間の数msの窓では新旧両方の
+    チャンクが is_active=True で検索にヒットしうるが、設計判断として許容し
+    dedup は行わない。
+    """
+    client = get_client()
+
+    # 1. 前回実行が upsert 後・activate 前に失敗した場合の残骸を掃除する。
+    await client.delete(
+        collection_name=settings.qdrant_collection,
+        points_selector=Filter(
+            must=[
+                FieldCondition(key="document_id", match=MatchValue(value=document_id)),
+                FieldCondition(key="is_active", match=MatchValue(value=False)),
+            ]
+        ),
+    )
 
     chunks = _chunk_text(text, settings.chunk_size, settings.chunk_overlap)
     if not chunks:
@@ -135,7 +171,10 @@ async def index_document(
                     "content": chunk,
                     "source_file": source_file,
                     "access_level": access_level,
-                    "is_active": True,
+                    # 新世代はまず inactive で書き込み、全件成功後に一括で
+                    # activate する (途中失敗時に旧世代を検索し続けられるようにするため)。
+                    "is_active": False,
+                    "index_version": index_version,
                     # 未分類 (どの監視フォルダにも一致しない) 文書は検索対象外に
                     # するため、常に払い出しペイロードに反映する (項目1)。
                     "unclassified": bool(unclassified),
@@ -143,17 +182,26 @@ async def index_document(
             )
         )
 
-    await get_client().upsert(collection_name=settings.qdrant_collection, points=points)
+    await client.upsert(collection_name=settings.qdrant_collection, points=points)
 
-    # upsert 成功後にのみ旧チャンク (is_active=False) を物理削除する。
-    # upsert 前に消すと、途中で失敗した場合に旧チャンクでの検索継続すらできなくなる。
-    await get_client().delete(
+    # 3. 新世代を activate する。
+    await client.set_payload(
         collection_name=settings.qdrant_collection,
-        points_selector=Filter(
+        payload={"is_active": True},
+        points=Filter(
             must=[
                 FieldCondition(key="document_id", match=MatchValue(value=document_id)),
-                FieldCondition(key="is_active", match=MatchValue(value=False)),
+                FieldCondition(key="index_version", match=MatchValue(value=index_version)),
             ]
+        ),
+    )
+
+    # 4. 旧世代 (index_version 不一致、または旧スキーマで未設定) を物理削除する。
+    await client.delete(
+        collection_name=settings.qdrant_collection,
+        points_selector=Filter(
+            must=[FieldCondition(key="document_id", match=MatchValue(value=document_id))],
+            must_not=[FieldCondition(key="index_version", match=MatchValue(value=index_version))],
         ),
     )
     return len(points)

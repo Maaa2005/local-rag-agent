@@ -43,6 +43,10 @@ CREATE TABLE IF NOT EXISTS documents (
     -- どの監視フォルダにも一致せず既定 (Lv1=全員閲覧可) でインデックスされた場合 1。
     -- フォルダが追加されて一致するようになった resync 時に 0 へ戻る。
     unclassified INTEGER NOT NULL DEFAULT 0,
+    -- Qdrant 側の世代切替 (項目8) と対応する世代番号。index_document が
+    -- 新チャンクを is_active=False で upsert → 成功後に is_active=True へ
+    -- 切替 → 旧世代を物理削除、という手順を経て初めてここが更新される。
+    index_version INTEGER NOT NULL DEFAULT 0,
     created_at   TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
