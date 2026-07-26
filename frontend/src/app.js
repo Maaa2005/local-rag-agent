@@ -111,6 +111,9 @@ passwordForm.addEventListener('submit', async (e) => {
   const res = await api('POST', '/api/auth/password', { current_password, new_password });
   if (!res) return;
   if (res.ok) {
+    const data = await res.json();
+    token = data.access_token;
+    sessionStorage.setItem('token', token);
     passwordMsg.textContent = 'パスワードを変更しました';
     passwordMsg.className = 'msg-inline ok';
     passwordWarning.hidden = true;

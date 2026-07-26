@@ -109,7 +109,7 @@ class _Handler(FileSystemEventHandler):
             return
 
         existing = self._db.fetchone(
-            "SELECT id, file_hash FROM documents WHERE source_path=?", (path,)
+            "SELECT id, file_hash, status FROM documents WHERE source_path=?", (path,)
         )
         now = datetime.now(timezone.utc).isoformat()
 
@@ -137,16 +137,19 @@ class _Handler(FileSystemEventHandler):
                 ),
             ])
             logger.info("New file queued: %s", path)
-        elif existing["file_hash"] != file_hash:
+        elif (
+            existing["file_hash"] != file_hash
+            or existing["status"] in ("deleted", "purged", "failed")
+        ):
             doc_id = existing["id"]
             pending_task = self._db.fetchone(
                 "SELECT id FROM tasks WHERE document_id=? AND status='pending'", (doc_id,)
             )
             statements = [
                 (
-                    "UPDATE documents SET file_hash=?, status='pending', error_msg=NULL, "
-                    "unclassified=?, updated_at=? WHERE id=?",
-                    (file_hash, unclassified, now, doc_id),
+                    "UPDATE documents SET file_hash=?, access_level=?, status='pending', "
+                    "error_msg=NULL, unclassified=?, updated_at=? WHERE id=?",
+                    (file_hash, access_level, unclassified, now, doc_id),
                 ),
             ]
             if pending_task is None:
@@ -166,10 +169,17 @@ class _Handler(FileSystemEventHandler):
         )
         if existing:
             now = datetime.now(timezone.utc).isoformat()
-            self._db.execute(
-                "UPDATE documents SET status='deleted', updated_at=? WHERE id=?",
-                (now, existing["id"]),
-            )
+            self._db.execute_many_atomic([
+                (
+                    "UPDATE documents SET status='deleted', updated_at=? WHERE id=?",
+                    (now, existing["id"]),
+                ),
+                (
+                    "UPDATE tasks SET status='cancelled', updated_at=? "
+                    "WHERE document_id=? AND status='pending'",
+                    (now, existing["id"]),
+                ),
+            ])
             logger.info("File deleted: %s", path)
 
     def on_created(self, event: FileSystemEvent) -> None:

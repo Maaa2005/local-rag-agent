@@ -56,8 +56,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp
-    ports:
-      - "8000:8000"
+    # frontend のリバースプロキシ経由でのみ利用するため、ホストへは公開しない。
     volumes:
       - ./volumes/watched:/watched:ro
       - sqlite_data:/app/data

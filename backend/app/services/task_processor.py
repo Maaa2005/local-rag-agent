@@ -44,18 +44,28 @@ async def _claim_next_task() -> dict | None:
     now = datetime.now(timezone.utc).isoformat()
     row = await db.fetchone_write(
         "UPDATE tasks SET status='processing', updated_at=? "
-        "WHERE id = (SELECT id FROM tasks WHERE status='pending' "
-        "            ORDER BY created_at LIMIT 1) "
+        "WHERE id = (SELECT t.id FROM tasks t "
+        "            JOIN documents d ON d.id=t.document_id "
+        "            WHERE t.status='pending' "
+        "              AND d.status NOT IN ('deleted', 'purged') "
+        "            ORDER BY t.created_at LIMIT 1) "
         "RETURNING id, document_id, attempts",
         (now,),
     )
     if row is None:
         return None
     claimed = dict(row)
-    await db.execute(
-        "UPDATE documents SET status='processing', updated_at=? WHERE id=?",
+    claimed_doc = await db.fetchone_write(
+        "UPDATE documents SET status='processing', updated_at=? "
+        "WHERE id=? AND status NOT IN ('deleted', 'purged') RETURNING id",
         (now, claimed["document_id"]),
     )
+    if claimed_doc is None:
+        await db.execute(
+            "UPDATE tasks SET status='cancelled', updated_at=? WHERE id=?",
+            (now, claimed["id"]),
+        )
+        return None
     return claimed
 
 
@@ -71,6 +81,12 @@ async def _recover_stale_processing() -> None:
         "UPDATE documents SET status='pending', updated_at=? WHERE status='processing'",
         (now,),
     )
+    await db.execute(
+        "UPDATE tasks SET status='cancelled', updated_at=? "
+        "WHERE status='pending' AND document_id IN "
+        "(SELECT id FROM documents WHERE status IN ('deleted', 'purged'))",
+        (now,),
+    )
     if len(stale) > 0:
         logger.info("Recovered %d stale processing tasks", len(stale))
 
@@ -80,7 +96,8 @@ async def _process_task(task: dict) -> None:
     doc_id = task["document_id"]
 
     doc = await db.fetchone(
-        "SELECT source_path, access_level, unclassified, index_version FROM documents WHERE id=?",
+        "SELECT source_path, file_hash, access_level, unclassified, index_version "
+        "FROM documents WHERE id=?",
         (doc_id,),
     )
     if doc is None:
@@ -116,13 +133,25 @@ async def _process_task(task: dict) -> None:
     )
 
     now = datetime.now(timezone.utc).isoformat()
+    updated_doc = await db.fetchone_write(
+        "UPDATE documents SET status='done', chunk_count=?, index_version=?, updated_at=? "
+        "WHERE id=? AND status='processing' AND file_hash=? RETURNING id",
+        (chunk_count, new_version, now, doc_id, doc["file_hash"]),
+    )
+    # ファイル削除・再更新がインデックス処理中に起きていた場合は、その状態を
+    # done で上書きせず、今回生成したチャンクを破棄する。
+    if updated_doc is None:
+        await delete_document(doc_id)
+        await db.execute(
+            "UPDATE tasks SET status='cancelled', updated_at=? WHERE id=?",
+            (now, task_id),
+        )
+        logger.info("Discarded superseded index result: %s", doc["source_path"])
+        return
+
     await db.execute(
         "UPDATE tasks SET status='done', updated_at=? WHERE id=?",
         (now, task_id),
-    )
-    await db.execute(
-        "UPDATE documents SET status='done', chunk_count=?, index_version=?, updated_at=? WHERE id=?",
-        (chunk_count, new_version, now, doc_id),
     )
     logger.info("Indexed %s → %d chunks", doc["source_path"], chunk_count)
 
@@ -165,11 +194,13 @@ async def run_task_processor() -> None:
             now = datetime.now(timezone.utc).isoformat()
             attempts = task["attempts"] + 1
             status = "failed" if attempts >= 3 else "pending"
+            updated_doc = await db.fetchone_write(
+                "UPDATE documents SET status=?, error_msg=?, updated_at=? "
+                "WHERE id=? AND status='processing' RETURNING id",
+                (status, str(exc), now, task["document_id"]),
+            )
+            task_status = status if updated_doc is not None else "cancelled"
             await db.execute(
                 "UPDATE tasks SET status=?, attempts=?, error_msg=?, updated_at=? WHERE id=?",
-                (status, attempts, str(exc), now, task["id"]),
-            )
-            await db.execute(
-                "UPDATE documents SET status=?, error_msg=?, updated_at=? WHERE id=?",
-                (status, str(exc), now, task["document_id"]),
+                (task_status, attempts, str(exc), now, task["id"]),
             )

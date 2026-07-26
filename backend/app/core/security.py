@@ -26,19 +26,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     now = datetime.now(timezone.utc)
     expire = now + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
     to_encode["exp"] = expire
-    # 項目高3: パスワード変更で既存 JWT を失効させるための発行時刻。
-    # get_current_user 側で users.password_changed_at と突き合わせる。
     to_encode["iat"] = int(now.timestamp())
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
-
-
-def _password_changed_at_unix(value: str) -> int:
-    """password_changed_at (UTC ISO8601) を unix 秒 (int, 秒単位切り捨て) に変換する。
-
-    iat も秒単位の int で発行しているため、同一秒内の再ログインは許可し
-    (秒未満の誤差で不当に弾かない)、それより厳密に古いトークンのみ拒否する。
-    """
-    return int(datetime.fromisoformat(value).timestamp())
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
@@ -52,27 +41,22 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         username: str = payload.get("sub", "")
         if not username:
             raise credentials_exception
-        iat = payload.get("iat")
+        token_version = payload.get("ver")
     except jwt.PyJWTError:
         raise credentials_exception
 
     row = await db.fetchone(
         "SELECT id, username, access_level, is_admin, must_change_password, is_active, "
-        "password_changed_at FROM users WHERE username = ?",
+        "password_changed_at, token_version FROM users WHERE username = ?",
         (username,),
     )
     if row is None or not row["is_active"]:
         raise credentials_exception
 
-    password_changed_at = row["password_changed_at"]
-    if password_changed_at:
-        # パスワード変更以降に発行されたトークンのみ有効。iat が無い旧トークンは
-        # fail-closed で拒否する。
-        if iat is None:
-            raise credentials_exception
-        changed_at_unix = _password_changed_at_unix(password_changed_at)
-        if int(iat) < changed_at_unix:
-            raise credentials_exception
+    # パスワード変更前の JWT を時刻精度に依存せず即時失効させる。
+    # ver が無い旧トークンも fail-closed で拒否する。
+    if token_version is None or int(token_version) != row["token_version"]:
+        raise credentials_exception
 
     return dict(row)
 

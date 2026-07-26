@@ -92,6 +92,11 @@ class Database:
         if "password_changed_at" not in user_columns:
             await conn.execute("ALTER TABLE users ADD COLUMN password_changed_at TEXT")
             await conn.commit()
+        if "token_version" not in user_columns:
+            await conn.execute(
+                "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"
+            )
+            await conn.commit()
 
         async with conn.execute("PRAGMA table_info(audit_logs)") as cur:
             audit_columns = {row[1] async for row in cur}

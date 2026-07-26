@@ -46,6 +46,12 @@ class PasswordChange(BaseModel):
     new_password: str
 
 
+class PasswordChangeResponse(BaseModel):
+    message: str
+    access_token: str
+    token_type: str
+
+
 def _validate_password(username: str, password: str) -> None:
     if len(password) < 8:
         raise HTTPException(400, "パスワードは8文字以上にしてください")
@@ -66,7 +72,8 @@ async def login(form: OAuth2PasswordRequestForm = Depends()):
         _failed_logins.pop(form.username, None)
 
     row = await db.fetchone(
-        "SELECT password_hash, is_active, must_change_password FROM users WHERE username=?",
+        "SELECT password_hash, is_active, must_change_password, token_version "
+        "FROM users WHERE username=?",
         (form.username,),
     )
     if row is None or not row["is_active"] or not verify_password(form.password, row["password_hash"]):
@@ -78,7 +85,9 @@ async def login(form: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
     _failed_logins.pop(form.username, None)
-    token = create_access_token({"sub": form.username})
+    token = create_access_token(
+        {"sub": form.username, "ver": row["token_version"]}
+    )
     # DB に永続化されたフラグを単一の真実源とする (項目6)。ヒューリスティックな
     # 平文パスワード比較ではなく、実際にパスワードが変更されたかを追跡する。
     must_change_password = bool(row["must_change_password"])
@@ -122,7 +131,7 @@ async def create_user(body: UserCreate, actor: dict = Depends(require_admin)):
     return {"message": f"ユーザー {body.username} を作成しました"}
 
 
-@router.post("/password")
+@router.post("/password", response_model=PasswordChangeResponse)
 async def change_password(body: PasswordChange, user: dict = Depends(get_current_user)):
     row = await db.fetchone(
         "SELECT password_hash FROM users WHERE username=?",
@@ -132,12 +141,21 @@ async def change_password(body: PasswordChange, user: dict = Depends(get_current
         raise HTTPException(400, "現在のパスワードが正しくありません")
     _validate_password(user["username"], body.new_password)
     now = datetime.now(timezone.utc).isoformat()
-    # 項目高3: password_changed_at を更新し、これより古い iat を持つ既存 JWT を失効させる。
-    await db.execute(
-        "UPDATE users SET password_hash=?, must_change_password=0, password_changed_at=? "
-        "WHERE username=?",
+    # token_version を増分し、変更前の JWT を同一秒内でも即時失効させる。
+    updated = await db.fetchone_write(
+        "UPDATE users SET password_hash=?, must_change_password=0, password_changed_at=?, "
+        "token_version=token_version+1 WHERE username=? RETURNING token_version",
         (hash_password(body.new_password), now, user["username"]),
     )
+    if updated is None:
+        raise HTTPException(404, "ユーザーが見つかりません")
     # 項目高4: パスワード自体は絶対に記録せず、誰が変更したか (本人) のみ記録する。
     await record_admin_event(user, "change_password", {"username": user["username"]})
-    return {"message": "パスワードを変更しました"}
+    token = create_access_token(
+        {"sub": user["username"], "ver": updated["token_version"]}
+    )
+    return PasswordChangeResponse(
+        message="パスワードを変更しました",
+        access_token=token,
+        token_type="bearer",
+    )

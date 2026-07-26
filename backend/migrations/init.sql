@@ -14,10 +14,11 @@ CREATE TABLE IF NOT EXISTS users (
     -- 強制されている間は 1。/api/auth/password と /api/auth/me 以外の API を
     -- 403 でブロックする。
     must_change_password INTEGER NOT NULL DEFAULT 0,
-    -- パスワードを最後に変更した UTC ISO8601 時刻。change_password 成功時に更新する。
-    -- create_access_token が発行する iat (発行時刻) がこれより厳密に古いトークンは
-    -- get_current_user で無効化する (項目高3: パスワード変更で既存 JWT を失効)。
+    -- パスワードを最後に変更した UTC ISO8601 時刻（監査・表示用）。
     password_changed_at TEXT,
+    -- JWT に埋め込む世代番号。パスワード変更時に増分し、時刻精度に依存せず
+    -- 変更前の全トークンを即時失効させる。
+    token_version INTEGER NOT NULL DEFAULT 0,
     is_active    INTEGER NOT NULL DEFAULT 1,
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -54,7 +55,7 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE TABLE IF NOT EXISTS tasks (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id TEXT    NOT NULL REFERENCES documents(id),
-    -- pending | processing | done | failed
+    -- pending | processing | done | failed | cancelled
     status      TEXT    NOT NULL DEFAULT 'pending',
     attempts    INTEGER NOT NULL DEFAULT 0,
     error_msg   TEXT,

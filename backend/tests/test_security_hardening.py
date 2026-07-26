@@ -14,33 +14,12 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
-from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
 
-import app.api.auth as auth_module
-import app.core.security as security_module
 import app.database as db_module
 from app.core.security import hash_password
-
-
-def _freeze_datetime(monkeypatch):
-    """項目高3: iat と password_changed_at は秒単位で比較される。bcrypt の
-    ハッシュ計算に数百 ms かかるため、実時刻のままログイン→パスワード変更を
-    行うと秒境界をまたいで稀に flaky になる (同一トークンを使い回すテストのみ)。
-    その区間だけ時刻を固定し iat == password_changed_at (同一秒) を保証する。
-    設計上「同一秒は許可」なので、これはテストを安定させるための時間固定であり
-    セキュリティ判定のロジック自体は変更しない。"""
-    frozen = datetime.now(timezone.utc)
-
-    class _FrozenDatetime(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return frozen
-
-    monkeypatch.setattr(security_module, "datetime", _FrozenDatetime)
-    monkeypatch.setattr(auth_module, "datetime", _FrozenDatetime)
 
 
 @pytest.fixture()
@@ -114,20 +93,25 @@ def test_default_admin_blocked_from_other_apis_until_password_changed(client):
     assert r_docs.status_code == 403
 
 
-def test_apis_unblocked_after_admin_password_changed(client, monkeypatch):
-    _freeze_datetime(monkeypatch)
-    token = _token(client)
+def test_password_change_invalidates_old_token_and_returns_replacement(client):
+    old_token = _token(client)
     r = client.post(
         "/api/auth/password",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {old_token}"},
         json={"current_password": "admin", "new_password": "adminpw12345"},
     )
     assert r.status_code == 200
+    new_token = r.json()["access_token"]
 
-    r_docs = client.get(
-        "/api/admin/documents", headers={"Authorization": f"Bearer {token}"}
+    old_docs = client.get(
+        "/api/admin/documents", headers={"Authorization": f"Bearer {old_token}"}
     )
-    assert r_docs.status_code == 200
+    assert old_docs.status_code == 401
+
+    new_docs = client.get(
+        "/api/admin/documents", headers={"Authorization": f"Bearer {new_token}"}
+    )
+    assert new_docs.status_code == 200
 
 
 # ─── 項目7: is_admin と access_level の分離 ───────────────────────
@@ -169,8 +153,7 @@ def test_is_admin_independent_of_access_level(client, isolated_db):
 
 # ─── 項目5 / 3b: 会話履歴の本文最小化 + 表示時の権限再チェック ─────
 @pytest.fixture()
-def chat_ready_token(client, isolated_db, monkeypatch):
-    _freeze_datetime(monkeypatch)
+def chat_ready_token(client, isolated_db):
     token = _token(client)
     r = client.post(
         "/api/auth/password",
@@ -178,7 +161,7 @@ def chat_ready_token(client, isolated_db, monkeypatch):
         json={"current_password": "admin", "new_password": "adminpw12345"},
     )
     assert r.status_code == 200
-    return token
+    return r.json()["access_token"]
 
 
 def test_conversation_history_does_not_persist_chunk_content(

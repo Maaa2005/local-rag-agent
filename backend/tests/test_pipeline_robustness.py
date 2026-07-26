@@ -47,6 +47,16 @@ class _FakeAsyncDB:
                 await conn.commit()
                 return cur.lastrowid or 0
 
+    async def fetchone_write(self, sql, params=()):
+        import aiosqlite
+
+        async with aiosqlite.connect(self._path) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.execute(sql, params) as cur:
+                row = await cur.fetchone()
+            await conn.commit()
+            return row
+
 
 def _make_db(tmp_path):
     db_path = tmp_path / "pipeline.db"
@@ -174,6 +184,53 @@ def test_process_task_proceeds_when_file_settled(tmp_path, monkeypatch):
         assert doc_row[1] == 3
 
 
+def test_process_task_does_not_resurrect_document_deleted_during_index(
+    tmp_path, monkeypatch
+):
+    db_path = _make_db(tmp_path)
+    src = tmp_path / "deleted-during-index.txt"
+    src.write_text("hello")
+    old_time = os.path.getmtime(src) - 3600
+    os.utime(src, (old_time, old_time))
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO documents (id, source_path, file_hash, access_level, file_type,"
+            " status, created_at, updated_at) VALUES ('d1',?,'h',1,'.txt','processing','t','t')",
+            (str(src),),
+        )
+        conn.execute(
+            "INSERT INTO tasks (document_id, status, attempts, created_at, updated_at)"
+            " VALUES ('d1','processing',0,'t','t')"
+        )
+        conn.commit()
+
+    monkeypatch.setattr(task_processor, "db", _FakeAsyncDB(db_path))
+    monkeypatch.setattr(task_processor, "parse_file", AsyncMock(return_value="本文"))
+
+    async def index_then_delete(**kwargs):
+        with sqlite3.connect(db_path) as conn:
+            conn.execute("UPDATE documents SET status='deleted' WHERE id='d1'")
+            conn.commit()
+        return 3
+
+    delete_mock = AsyncMock()
+    monkeypatch.setattr(task_processor, "index_document", index_then_delete)
+    monkeypatch.setattr(task_processor, "delete_document", delete_mock)
+
+    task = {"id": 1, "document_id": "d1", "attempts": 0}
+    asyncio.run(task_processor._process_task(task))
+
+    delete_mock.assert_awaited_once_with("d1")
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT status FROM documents WHERE id='d1'"
+        ).fetchone()[0] == "deleted"
+        assert conn.execute(
+            "SELECT status FROM tasks WHERE id=1"
+        ).fetchone()[0] == "cancelled"
+
+
 # ─── 修正3(a): watcher の pending タスク重複抑止 ────────────────
 def test_watcher_does_not_duplicate_task_when_pending_exists(tmp_path):
     db_path = tmp_path / "watch.db"
@@ -240,6 +297,71 @@ def test_watcher_does_not_duplicate_task_when_pending_exists(tmp_path):
         assert count == 1  # 新規タスクは追加されない
         doc_hash = conn.execute("SELECT file_hash FROM documents WHERE id='d1'").fetchone()[0]
         assert doc_hash != "oldhash"  # ハッシュ自体は更新される
+
+
+def test_watcher_requeues_recreated_file_even_when_hash_is_unchanged(tmp_path):
+    db_path = tmp_path / "watch-recreate.db"
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE watch_folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                path TEXT UNIQUE NOT NULL,
+                access_level INTEGER NOT NULL DEFAULT 1,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT
+            );
+            CREATE TABLE documents (
+                id TEXT PRIMARY KEY,
+                source_path TEXT UNIQUE NOT NULL,
+                file_hash TEXT,
+                access_level INTEGER NOT NULL DEFAULT 1,
+                file_type TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                chunk_count INTEGER DEFAULT 0,
+                error_msg TEXT,
+                unclassified INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT,
+                updated_at TEXT
+            );
+            CREATE TABLE tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                attempts INTEGER NOT NULL DEFAULT 0,
+                error_msg TEXT,
+                created_at TEXT,
+                updated_at TEXT
+            );
+            """
+        )
+        conn.commit()
+
+    src = tmp_path / "recreated.txt"
+    src.write_text("同じ内容")
+    handler = _Handler(str(db_path))
+
+    import hashlib
+
+    digest = hashlib.sha256(src.read_bytes()).hexdigest()
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "INSERT INTO documents (id, source_path, file_hash, access_level, file_type,"
+            " status, created_at, updated_at) VALUES ('d1', ?, ?, 1, '.txt',"
+            " 'purged', 't', 't')",
+            (str(src), digest),
+        )
+        conn.commit()
+
+    handler._handle_file(str(src))
+
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute(
+            "SELECT status FROM documents WHERE id='d1'"
+        ).fetchone()[0] == "pending"
+        assert conn.execute(
+            "SELECT COUNT(*) FROM tasks WHERE document_id='d1' AND status='pending'"
+        ).fetchone()[0] == 1
 
 
 # ─── 項目8: 再インデックスの世代切替 ──────────────────
