@@ -43,13 +43,50 @@ def _replace_in_paragraph(paragraph, find: str, replacement: str) -> int:
     count = original.count(find)
     if count == 0:
         return 0
-    updated = original.replace(find, replacement)
-    if paragraph.runs:
-        paragraph.runs[0].text = updated
-        for run in paragraph.runs[1:]:
-            run.text = ''
-    else:
-        paragraph.add_run(updated)
+    if not paragraph.runs:
+        paragraph.add_run(original.replace(find, replacement))
+        return count
+
+    run_ranges = []
+    cursor = 0
+    for index, run in enumerate(paragraph.runs):
+        end = cursor + len(run.text)
+        run_ranges.append((index, cursor, end))
+        cursor = end
+
+    matches = []
+    start = 0
+    while True:
+        match_start = original.find(find, start)
+        if match_start < 0:
+            break
+        matches.append((match_start, match_start + len(find)))
+        start = match_start + len(find)
+
+    def locate(position: int) -> tuple[int, int]:
+        for index, range_start, range_end in run_ranges:
+            if range_start <= position < range_end:
+                return index, position - range_start
+        last_index, range_start, _ = run_ranges[-1]
+        return last_index, max(0, position - range_start)
+
+    # 後方から処理すると、先行する一致位置のオフセットを変えずに書式付きrunを保てる。
+    for match_start, match_end in reversed(matches):
+        start_run, start_offset = locate(match_start)
+        end_run, end_offset_last = locate(match_end - 1)
+        end_offset = end_offset_last + 1
+        if start_run == end_run:
+            text = paragraph.runs[start_run].text
+            paragraph.runs[start_run].text = (
+                text[:start_offset] + replacement + text[end_offset:]
+            )
+            continue
+        start_text = paragraph.runs[start_run].text
+        end_text = paragraph.runs[end_run].text
+        paragraph.runs[start_run].text = start_text[:start_offset] + replacement
+        for index in range(start_run + 1, end_run):
+            paragraph.runs[index].text = ''
+        paragraph.runs[end_run].text = end_text[end_offset:]
     return count
 
 

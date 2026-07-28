@@ -115,6 +115,30 @@ def test_edit_docx_rejects_invalid_or_no_match():
         edit_docx(make_docx(), [{'find': '存在しない', 'replacement': '値'}])
 
 
+def test_edit_docx_preserves_surrounding_run_formatting():
+    document = Document()
+    paragraph = document.add_paragraph()
+    prefix = paragraph.add_run('申請者: ')
+    prefix.bold = True
+    name_first = paragraph.add_run('山田 ')
+    name_first.italic = True
+    name_second = paragraph.add_run('太郎')
+    suffix = paragraph.add_run('（本人）')
+    suffix.underline = True
+    output = io.BytesIO()
+    document.save(output)
+
+    result = edit_docx(
+        output.getvalue(),
+        [{'find': '山田 太郎', 'replacement': '佐藤 花子'}],
+    )
+    edited = Document(io.BytesIO(result.content)).paragraphs[0]
+    assert edited.text == '申請者: 佐藤 花子（本人）'
+    assert edited.runs[0].bold is True
+    assert edited.runs[1].italic is True
+    assert edited.runs[-1].underline is True
+
+
 def test_docx_api_requires_preview_and_explicit_confirmation(client):
     headers = authenticated_headers(client)
     response = client.post(

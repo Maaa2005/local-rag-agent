@@ -7,11 +7,19 @@ This package runs the complete local stack with Docker Compose:
 - qdrant: local vector database
 - vllm: one quantized base model exposed as `local-llm`, plus the fine-tuned
   LoRA adapter exposed as `hr-orchestrator`
+- Word editing: authenticated DOCX find/replace drafts with explicit preview,
+  user confirmation, and one-time download
 
 The orchestrator runs before retrieval. It either asks for missing information,
 rejects unsafe or unauthorized requests, or permits the existing RAG pipeline to
 continue. Document access levels are still enforced in backend code; model output
 cannot raise a user permission level or disable retrieval filters.
+
+The Word workflow never overwrites the uploaded original and does not finalize,
+sign, or submit documents. Edited bytes remain in memory for up to 15 minutes and
+are returned only after the same user explicitly confirms the preview. The user is
+responsible for final review and submission. See `DEMO_GUIDE_20260728.md` for the
+demonstration flow and supported document scope.
 
 ## Model packaging
 
