@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>社内 RAG エージェント</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ───────────────────────── Login ───────────────────────── -->
+<div id="login-screen" class="screen">
+  <div class="login-card">
+    <h1 class="logo">社内 RAG<span class="accent">.</span></h1>
+    <p class="subtitle">社内ナレッジ検索エージェント</p>
+    <form id="login-form">
+      <label for="username">ユーザー名</label>
+      <input id="username" type="text" autocomplete="username" required placeholder="admin" />
+      <label for="password">パスワード</label>
+      <input id="password" type="password" autocomplete="current-password" required placeholder="••••••••" />
+      <button type="submit" id="login-btn">ログイン</button>
+      <p id="login-error" class="error-msg" hidden></p>
+    </form>
+  </div>
+</div>
+
+<!-- ───────────────────────── Chat ────────────────────────── -->
+<div id="chat-screen" class="screen" hidden>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-sm">社内 RAG<span class="accent">.</span></span>
+      <div class="header-actions">
+        <button id="password-btn" class="btn-ghost" title="パスワード変更">🔑</button>
+        <button id="logout-btn" class="btn-ghost" title="ログアウト">⏏</button>
+      </div>
+    </div>
+    <div class="user-info">
+      <span id="user-badge"></span>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-panel="chat">チャット</button>
+      <button class="nav-item" data-panel="admin" id="admin-nav-btn">管理</button>
+    </nav>
+    <div class="conversation-panel">
+      <button id="new-conversation-btn" class="btn-new-conv">＋ 新規会話</button>
+      <ul id="conversation-list" class="conversation-list" aria-label="会話一覧"></ul>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <!-- Chat panel -->
+    <section id="panel-chat" class="panel active">
+      <div class="chat-toolbar">
+        <span class="toolbar-label">社内ナレッジ（ローカル LLM）</span>
+      </div>
+      <div id="messages" class="messages" aria-live="polite" aria-label="会話履歴"></div>
+      <div class="input-bar">
+        <textarea
+          id="question-input"
+          rows="1"
+          placeholder="質問を入力… (Shift+Enter で改行、Enter で送信)"
+          aria-label="質問入力"
+        ></textarea>
+        <button id="send-btn" aria-label="送信">送信</button>
+      </div>
+    </section>
+
+    <!-- Admin panel -->
+    <section id="panel-admin" class="panel" hidden>
+      <div id="unclassified-warning" class="admin-card admin-card-warning" hidden>
+        <h2>⚠ 未分類文書（全員閲覧可になっています）</h2>
+        <p class="hint">どの監視フォルダにも一致せず、既定で Lv1（全員閲覧可）としてインデックスされています。監視フォルダを追加すると自動的に解消されます。</p>
+        <table id="unclassified-table">
+          <thead><tr><th>ファイル</th><th>種別</th><th>状態</th><th>更新日時</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="admin-grid">
+
+        <div class="admin-card">
+          <h2>監視フォルダ</h2>
+          <form id="folder-form" class="inline-form">
+            <input id="folder-path" type="text" placeholder="/watched/secret" required />
+            <select id="folder-level">
+              <option value="1">Lv1 一般</option>
+              <option value="2">Lv2 管理職</option>
+              <option value="3">Lv3 役員</option>
+            </select>
+            <button type="submit">追加</button>
+          </form>
+          <table id="folder-table">
+            <thead><tr><th>パス</th><th>Lv</th><th>操作</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="admin-card">
+          <h2>ドキュメント一覧</h2>
+          <table id="doc-table">
+            <thead><tr><th>ファイル</th><th>種別</th><th>状態</th><th>チャンク</th><th>更新日時</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="admin-card">
+          <h2>タスクキュー</h2>
+          <button id="refresh-tasks-btn" class="btn-ghost">更新</button>
+          <table id="task-table">
+            <thead><tr><th>ファイル</th><th>状態</th><th>試行</th><th>更新日時</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="admin-card">
+          <h2>ユーザー作成</h2>
+          <form id="user-form" class="inline-form col">
+            <input id="new-username" type="text" placeholder="ユーザー名" required />
+            <input id="new-password" type="password" placeholder="パスワード" required />
+            <select id="new-level">
+              <option value="1">Lv1 一般</option>
+              <option value="2">Lv2 管理職</option>
+              <option value="3">Lv3 役員</option>
+            </select>
+            <label class="checkbox-label">
+              <input id="new-is-admin" type="checkbox" />
+              システム管理者（ユーザー管理・設定。文書アクセスレベルとは別）
+            </label>
+            <button type="submit">作成</button>
+          </form>
+          <p id="user-msg" class="msg-inline"></p>
+        </div>
+
+        <div class="admin-card admin-card-wide">
+          <h2>監査ログ</h2>
+          <table id="audit-table">
+            <thead><tr><th>日時</th><th>ユーザー</th><th>質問</th><th>ヒット件数</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="admin-card admin-card-wide">
+          <h2>管理操作</h2>
+          <p class="hint">ユーザー作成・監視フォルダ変更・パスワード変更等の管理操作の履歴（自己昇格等の事後検知用）。</p>
+          <table id="admin-events-table">
+            <thead><tr><th>日時</th><th>ユーザー</th><th>操作</th><th>詳細</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ───────────────────────── Audit log detail dialog ───────────────────────── -->
+<dialog id="audit-dialog">
+  <div class="audit-detail">
+    <h2>監査ログ詳細</h2>
+    <dl id="audit-detail-body" class="audit-detail-body"></dl>
+    <div class="dialog-actions">
+      <button type="button" id="audit-close-btn" class="btn-ghost">閉じる</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ───────────────────────── Citation detail dialog ───────────────────────── -->
+<dialog id="citation-dialog">
+  <div class="citation-detail">
+    <h2>引用元</h2>
+    <div id="citation-dialog-body" class="citation-dialog-body"></div>
+    <div class="dialog-actions">
+      <button type="button" id="citation-close-btn" class="btn-ghost">閉じる</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- ───────────────────────── Password change dialog ───────────────────────── -->
+<dialog id="password-dialog">
+  <form id="password-form" class="inline-form col">
+    <h2>パスワード変更</h2>
+    <p id="password-warning" class="hint" hidden>初期パスワードのままです。変更してください</p>
+    <label for="current-password">現在のパスワード</label>
+    <input id="current-password" type="password" autocomplete="current-password" required />
+    <label for="new-password-input">新しいパスワード</label>
+    <input id="new-password-input" type="password" autocomplete="new-password" required />
+    <p id="password-msg" class="msg-inline"></p>
+    <div class="dialog-actions">
+      <button type="button" id="password-cancel-btn" class="btn-ghost">キャンセル</button>
+      <button type="submit">変更する</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

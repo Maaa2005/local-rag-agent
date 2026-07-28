@@ -1,0 +1,95 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:6333:6333"  # 無認証のためLAN非公開
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+
+  vllm:
+    # 項目10: latest は再現性・脆弱性追跡の観点で避け、具体バージョンに固定する。
+    image: vllm/vllm-openai:v0.25.1
+    restart: unless-stopped
+    runtime: nvidia
+    # GPU 利用 (nvidia runtime) とモデル/キャッシュ書込の都合上、
+    # read_only 化・cap_drop は行わずバージョン固定と no-new-privileges のみ適用する。
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "127.0.0.1:8001:8000"  # 権限フィルタ回避防止のためループバック限定
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    # 6GB VRAM 向け: Gemma 4-E2B AWQ-INT4 (~2.5GB重み) gpu-memory-utilization=0.6
+    # embedding は CPU 動作のため VRAM 専有なし
+    command: >
+      --model ${LLM_MODEL:-cyankiwi/gemma-4-E2B-it-AWQ-INT4}
+      --quantization awq
+      --dtype auto
+      --max-model-len 4096
+      --gpu-memory-utilization 0.6
+      --served-model-name local-llm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # 項目10: 非root実行 (Dockerfile 側で USER app) + 最小権限化。
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    # frontend のリバースプロキシ経由でのみ利用するため、ホストへは公開しない。
+    volumes:
+      - ./volumes/watched:/watched:ro
+      - sqlite_data:/app/data
+      - hf_cache:/home/app/.cache/huggingface
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - LLM_MODEL=${LLM_MODEL:-local-llm}
+      - EMBED_MODEL=${EMBED_MODEL:-intfloat/multilingual-e5-large}
+      - WATCHED_PATH=/watched
+      - DATA_DIR=/app/data
+      - SECRET_KEY=${SECRET_KEY:-}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+    depends_on:
+      - qdrant
+      - vllm
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # 項目10: nginxinc/nginx-unprivileged (非root・非特権ポート8080) を使用。
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "3000:8080"
+    depends_on:
+      - backend
+
+volumes:
+  qdrant_data:
+  sqlite_data:
+  hf_cache:
