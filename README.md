@@ -76,6 +76,8 @@ cp .env.example .env      # SECRET_KEY を openssl rand -hex 32 で埋める
 docker compose up -d
 ```
 
+モデルの重みはリポジトリに含めていません。LLM・埋め込み・リランカーはいずれも初回起動時にHuggingFaceから取得し、Dockerボリューム `hf_cache` に載ります。閉域網へ持ち込む場合は、インターネットに繋がる環境で一度起動してキャッシュを作るか、重みを先に配って `hf_cache` へマウントしてください。閉域で完結するのは運用時の推論と検索であって、セットアップまでオフラインというわけではありません。
+
 UIは `http://localhost:3000`。backend / Qdrant / vLLM はホストへ公開せず、frontendのリバースプロキシ経由でだけ触れます。無認証のQdrantを直接叩かれると権限フィルタを丸ごとバイパスできるため、ポートを開けない構成そのものが権限管理の一部になっています。
 
 監視対象フォルダは `volumes/watched/` にマウントし、管理画面でフォルダごとに access_level を設定します。
