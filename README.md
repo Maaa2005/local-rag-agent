@@ -21,6 +21,77 @@ are returned only after the same user explicitly confirms the preview. The user 
 responsible for final review and submission. See `DEMO_GUIDE_20260728.md` for the
 demonstration flow and supported document scope.
 
+## 資料の場所
+
+資料の入口は [docs/README.md](docs/README.md) です。ローカルの絶対パスは次のとおりです。
+
+`C:\Users\suika\hr-assistant-ai\local-rag-agent\docs\README.md`
+
+| 内容 | 資料 | リポジトリ内パス |
+|---|---|---|
+| 操作方法、ログイン、デモ手順、Word操作 | [デモ・操作ガイド](DEMO_GUIDE_20260728.md) | `DEMO_GUIDE_20260728.md` |
+| FTの意図、モデル、データセット、学習条件、結果 | [FT設計・結果](docs/FT_DESIGN_AND_RESULTS.md) | `docs/FT_DESIGN_AND_RESULTS.md` |
+| 実際のFT用JSONLとSHA-256 | [FTデータセット](docs/ft-data/README.md) | `docs/ft-data/` |
+| RAGの精度、権限、整合性試験 | [RAG検証結果](RAG_VALIDATION_REPORT_20260728.md) | `RAG_VALIDATION_REPORT_20260728.md` |
+| Word編集の承諾・非保存・描画試験 | [Word検証結果](WORD_EDIT_VALIDATION_REPORT_20260728.md) | `WORD_EDIT_VALIDATION_REPORT_20260728.md` |
+| RAG要求仕様 | [RAG要件定義](RAG要件定義.md) | `RAG要件定義.md` |
+| 企画目的 | [企画書](企画書.md) | `企画書.md` |
+| 評価データと採点条件 | [evaluation README](evaluation/README.md) | `evaluation/` |
+
+## 技術をどこに使っているか
+
+### 全体構成
+
+| 技術 | このシステムでの用途 | 主な実装場所 | 実行時のデータ・接続先 |
+|---|---|---|---|
+| Docker Compose | frontend、backend、Qdrant、vLLMを分離して起動 | `docker-compose.yml` | 4コンテナと4つの永続volume |
+| FastAPI / Uvicorn | 認証、チャット、管理、RAG、Word編集API | `backend/app/main.py`, `backend/app/api/` | `http://localhost:8000` |
+| SQLite / aiosqlite | ユーザー、会話状態、メッセージ、監査、文書管理、監視フォルダ、処理タスクを保存 | `backend/app/database.py`, `backend/migrations/init.sql` | コンテナ内 `/app/data/app.db`、Docker volume `sqlite_data` |
+| Qdrant | 文書チャンクのdense/sparseベクトルと検索用payloadを保存 | `backend/app/services/qdrant.py`, `indexer.py`, `retriever.py`, `access_sync.py` | `/qdrant/storage`、volume `qdrant_data`、ホスト `127.0.0.1:6333` |
+| Gemma 4 E2B | 回答生成と、意図判定・逆質問・JSON計画を作る司令塔 | `backend/app/services/llm.py`, `orchestrator.py`, `prompts/orchestrator.txt` | vLLMの `local-llm` と `hr-orchestrator` |
+| vLLM | Gemma量子化ベースモデルとLoRAをOpenAI互換APIで提供 | `inference/Dockerfile`, `docker-compose.yml` | ホスト `127.0.0.1:8001/v1`、volume `llm_cache` |
+| Unsloth / QLoRA | Gemma司令塔を授業用データでSFT | 設計・結果は `docs/FT_DESIGN_AND_RESULTS.md` | LoRA配置 `models/hr-orchestrator/` |
+| multilingual-e5-large | 質問と文書を1024次元denseベクトルへ変換 | `backend/app/services/embedder.py`, `backend/app/config.py` | CPU実行、モデルcache `embed_cache` |
+| Qdrant sparse + RRF | dense検索だけで拾いにくい固有語を補い、dense/sparse候補を融合 | `backend/app/services/sparse.py`, `retriever.py` | Qdrantのsparse vectorとfusion query |
+| BGE reranker v2 m3 | 候補チャンクを質問との関連度で再順位付け | `backend/app/services/reranker.py` | CPU実行、上位候補を最終top-kへ絞る |
+| Docling | PDF、DOCX、PPTXをMarkdown相当のテキストへ変換してRAG投入 | `backend/app/services/parser.py` | 監視対象 `/watched` を読み取り専用で参照 |
+| pandas / openpyxl | Excelのシート、結合セル、表をテキスト化してRAG投入 | `backend/app/services/parser.py` | `.xlsx`, `.xls`, `.xlsm` の解析 |
+| watchdog | 監視フォルダの追加・更新・削除を検知しインデックス処理を登録 | `backend/app/services/watcher.py`, `task_processor.py` | ホスト `volumes/watched/` → コンテナ `/watched` |
+| PyJWT / bcrypt | JWTログイン、パスワードハッシュ、変更後の旧トークン失効 | `backend/app/core/security.py`, `backend/app/api/auth.py` | ユーザー情報はSQLite `users` table |
+| python-docx | Word本文・表・ヘッダー・フッターの安全な置換 | `backend/app/services/docx_editor.py`, `backend/app/api/documents.py` | 編集案はRAM内に最大15分。原本・下書きをサーバー保存しない |
+| Vanilla HTML/CSS/JavaScript | Claude Code風のチャット、実行計画、管理、Word編集UI | `frontend/src/index.html`, `app.js`, `style.css` | Nginxから `http://localhost:3000` で配信 |
+| nginx-unprivileged | 静的UI配信とAPIリバースプロキシ | `frontend/Dockerfile`, `frontend/nginx.conf` | コンテナ8080 → ホスト3000 |
+
+### SQLiteに何を保存しているか
+
+SQLiteはベクトル検索用ではなく、アプリケーションの正本となる構造化データに使用する。テーブル定義は `backend/migrations/init.sql` にある。
+
+| SQLite table | 保存内容 |
+|---|---|
+| `users` | ユーザー名、bcryptパスワード、アクセスレベル、管理者状態、パスワード変更時刻 |
+| `conversations` | 利用者ごとの会話スレッド、タイトル、作成・更新日時 |
+| `messages` | user/assistantの会話内容と、画面表示に必要な出典識別情報 |
+| `watch_folders` | 監視対象フォルダ、アクセスレベル、有効状態 |
+| `documents` | 文書名、状態、権限、ハッシュ、インデックス世代、チャンク数 |
+| `tasks` | 文書インデックス処理キュー、試行回数、エラー |
+| `audit_logs` | 質問、取得件数、応答文字数、エラー等の監査情報 |
+| `admin_events` | 管理者操作の記録 |
+| `schema_migrations` | DB Schema更新の適用状態 |
+
+SQLite上の文書状態を権限の正本とし、Qdrant検索後にも `retriever.py` で再照合する。これにより、Qdrant payload更新の遅延や削除直後でも権限外・無効文書をfail-closedで除外する。
+
+### SQLiteとQdrantの役割分担
+
+```text
+SQLite: ユーザー、権限、会話、監査、文書状態、処理タスク
+   ↓ 文書ID・権限・有効状態を照合
+Qdrant: 文書チャンク本文、dense/sparseベクトル、検索用payload
+   ↓ 権限フィルタ済み上位候補
+Gemma: 取得した根拠だけを使って回答
+```
+
+当初案のChromaDBは現在の実装では使用しておらず、実接続・権限制御・hybrid検索のためQdrantへ置き換えた。LangChainも現在の中核パイプラインでは使用せず、FastAPIサービス層で処理順序と安全条件を明示的に実装している。
+
 ## Model packaging
 
 Model weights are not baked into the container image. On first installation, vLLM
@@ -103,5 +174,7 @@ are intentionally being deleted.
 ## Model lineage
 
 The packaged adapter is the `20260714-ood-remediation-160step` experiment. Its
-training and evaluation evidence remains in the sibling `hr-assistant-ai` project.
-The fixed human-authored OOD set was not included in training.
+submission snapshots are stored under `docs/ft-data` and `docs/ft-evidence`; the
+complete primary experiment logs remain in the sibling `hr-assistant-ai` project.
+The fixed human-authored OOD set was not included in training. See
+`docs/FT_DESIGN_AND_RESULTS.md` for exact hashes, metrics, limitations, and paths.

@@ -1,0 +1,30 @@
+{
+  "purpose": [
+    "Use canonical clarification slot names on unseen wording",
+    "Avoid unnecessary clarification for policy-search-ready requests",
+    "Emit schema-valid JSON for Windows file paths",
+    "Reject diverse access-control and safety-bypass requests"
+  ],
+  "base_train_records": 660,
+  "added_records": 224,
+  "combined_train_records": 884,
+  "added_scenarios": {
+    "ood_remediation_access_control": 80,
+    "ood_remediation_canonical_slots": 64,
+    "ood_remediation_policy_ready": 48,
+    "ood_remediation_windows_path": 32
+  },
+  "heldout_ood": {
+    "records": 30,
+    "sha256": "7f79ff992b51c287e6632313d3545e7ae223b9d40e38a03021f1bbca5c037800",
+    "included_in_training": false,
+    "max_new_prompt_similarity": 0.16666666666666666,
+    "threshold": 0.3
+  },
+  "hashes": {
+    "base_train": "88c6e7f79ea9019eac9f91039a6d5921b776f583812cc84156d71f3fab0bb724",
+    "validation_unchanged": "6fc7b3ce486722feea07c2e6c4658bd5596f882abef9732b1f262ae1dbe59f34",
+    "test_unchanged": "20916738d1d7a2ff4defbb1517c866f455e45958e91282612afac5757428ae08",
+    "combined_train": "bb86ee37fe136a2761340acfb012112e06384246bb56618a7daf490861a77420"
+  }
+}

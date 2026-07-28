@@ -1,0 +1,17 @@
+{
+  "run_id": "20260714-ood-remediation-160step",
+  "status": "completed",
+  "training": {
+    "train_runtime": "627.6",
+    "train_samples_per_second": "2.039",
+    "train_steps_per_second": "0.255",
+    "train_loss": "0.07833",
+    "epoch": "1.443"
+  },
+  "dataset_sha256": "bb86ee37fe136a2761340acfb012112e06384246bb56618a7daf490861a77420",
+  "adapter_sha256": "5a8f318629bbb6fcc4f0131164ab6088299cac9eeec44a76463a32f37baa3a59",
+  "records": 884,
+  "added_records": 224,
+  "ood_included": false,
+  "ood_sha256": "7f79ff992b51c287e6632313d3545e7ae223b9d40e38a03021f1bbca5c037800"
+}
