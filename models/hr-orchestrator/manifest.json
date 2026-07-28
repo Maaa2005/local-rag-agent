@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "run_id": "20260714-ood-remediation-160step",
   "purpose": "Pre-RAG JSON orchestration for clarification, safe rejection, and retrieval planning without changing backend access controls.",
   "training_base_model": "unsloth/gemma-4-e2b-it-unsloth-bnb-4bit",
@@ -10,6 +10,16 @@
     "sha256": "885a2ae0052e12854671bfea0a595f525e3ef40f2d4742414714ef6329bdc22c"
   },
   "adapter_sha256": "5a8f318629bbb6fcc4f0131164ab6088299cac9eeec44a76463a32f37baa3a59",
+  "adapter_distribution": {
+    "provider": "huggingface_hub",
+    "repository_env": "ADAPTER_HF_REPO",
+    "revision_env": "ADAPTER_HF_REVISION",
+    "local_directory": "models/hr-orchestrator",
+    "required_files": [
+      "adapter_config.json",
+      "adapter_model.safetensors"
+    ]
+  },
   "training_dataset": {
     "examples": 884,
     "ood_remediation_examples_added": 224,

@@ -24,7 +24,7 @@ FTの目的は、社内規程をモデルへ暗記させることではなく、
 | vLLM公開名 | ベース `local-llm`、LoRA `hr-orchestrator` |
 | 最終run | `20260714-ood-remediation-160step` |
 
-モデル系譜の機械可読な記録は `models/hr-orchestrator/manifest.json` にある。LoRAアダプター一式はGit LFSを含むGit管理対象とし、約7.58GBのベースモデル本体は容量と配布条件のためGit対象外とする。
+モデル系譜の機械可読な記録は `models/hr-orchestrator/manifest.json` にある。LoRAアダプター重みはHugging Face Hubで配布し、Git管理対象外とする。取得後は承認済みSHA-256を検証する。約7.58GBのベースモデル本体も容量と配布条件のためGit対象外とする。配布手順は `docs/ADAPTER_DISTRIBUTION.md` に記録する。
 
 ## 3. データセット
 

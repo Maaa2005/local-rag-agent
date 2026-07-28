@@ -39,4 +39,4 @@
 - `models/hr-orchestrator/manifest.json`: ベースモデル、アダプター、データセットの系譜とSHA-256
 - `training/`: データ生成、Schema検証、Unsloth学習、OOD評価の再現コード
 
-LoRAアダプターは `models/hr-orchestrator/` に置き、`adapter_model.safetensors` はGit LFSで管理する。約7.58GBのGemmaベースモデルはGitへ保存せず、vLLM初回起動時にHugging Face cacheへ取得する。必要ファイルと期待ハッシュは同ディレクトリのREADMEとmanifestに記載する。
+LoRAアダプター重みはHugging Face Hubで配布し、インストーラーが `models/hr-orchestrator/` へ取得してSHA-256を検証する。Gitには重みを含めない。約7.58GBのGemmaベースモデルもGitへ保存せず、vLLM初回起動時にHugging Face cacheへ取得する。詳細は [アダプター配布方針](ADAPTER_DISTRIBUTION.md) と同ディレクトリのREADME・manifestに記載する。

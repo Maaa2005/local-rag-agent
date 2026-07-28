@@ -42,7 +42,6 @@ models/hr-orchestrator/*
 !models/hr-orchestrator/README.md
 !models/hr-orchestrator/manifest.json
 !models/hr-orchestrator/adapter_config.json
-!models/hr-orchestrator/adapter_model.safetensors
 !models/hr-orchestrator/chat_template.jinja
 !models/hr-orchestrator/processor_config.json
 !models/hr-orchestrator/tokenizer.json

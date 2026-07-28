@@ -95,7 +95,7 @@ Gemma: 取得した根拠だけを使って回答
 ### アダプターと再学習コード
 
 - LoRAアダプター一式: `models/hr-orchestrator/`
-- アダプター重み: `models/hr-orchestrator/adapter_model.safetensors`（Git LFS）
+- アダプター重み: HF Hubから `models/hr-orchestrator/adapter_model.safetensors` へ取得（Git対象外）
 - tokenizer: `models/hr-orchestrator/tokenizer.json`
 - モデル・データ系譜: `models/hr-orchestrator/manifest.json`
 - 再学習・評価手順: `training/README.md`
@@ -103,7 +103,7 @@ Gemma: 取得した根拠だけを使って回答
 - 実験証跡収集: `training/run_remote_experiment.sh`
 - JSON Schema: `training/src/hr_assistant/schema.py`
 
-Git clone後は `git lfs pull` を実行してアダプター重みを取得する。約7.58GBのGemmaベースモデルはGitへ含めず、vLLMの `llm_cache` にダウンロードする。
+Git clone後は `.env` に `ADAPTER_HF_REPO`を設定し、インストーラーでアダプター重みを取得・検証する。約7.58GBのGemmaベースモデルはGitへ含めず、vLLMの `llm_cache` にダウンロードする。
 
 ## Model packaging
 
@@ -111,8 +111,10 @@ Model weights are not baked into the container image. On first installation, vLL
 downloads the base model into the persistent `llm_cache` Docker volume. Embedding
 weights use a separate `embed_cache` volume so the non-root backend can own its
 cache safely. The approved
-LoRA adapter is stored under `models/hr-orchestrator`. After the first successful
-startup, the same installation can restart without downloading weights again.
+LoRA adapter metadata is stored under `models/hr-orchestrator`. The safetensors
+weight is distributed from the Hugging Face Hub repository configured by
+`ADAPTER_HF_REPO`; it is downloaded before Docker starts and kept locally for
+subsequent restarts.
 
 This keeps application images small and makes model upgrades auditable. It also avoids
 redistributing gated model weights without the model owner's terms being accepted.
@@ -134,7 +136,19 @@ more VRAM is recommended.
 
 ## Install
 
-Copy the approved adapter files into `models/hr-orchestrator`, then run one of:
+Set the adapter repository in `.env` before the first clean installation:
+
+```dotenv
+ADAPTER_HF_REPO=your-organization/hr-orchestrator
+ADAPTER_HF_REVISION=main
+# HF_TOKEN=...  # only for a private or gated repository
+```
+
+Use a commit hash or immutable tag for `ADAPTER_HF_REVISION` in a shared release.
+Distribution rationale, failure behavior, and the collaborator handoff are documented
+in [docs/ADAPTER_DISTRIBUTION.md](docs/ADAPTER_DISTRIBUTION.md).
+
+Then run one of:
 
 Windows PowerShell:
 
@@ -148,9 +162,10 @@ Linux or WSL:
 bash install.sh
 ```
 
-The installer verifies the adapter SHA-256, creates `.env` with a random application
-secret, pulls/builds the containers, and starts the first model download. Monitor it
-with:
+If the adapter weight is absent, the installer downloads it with the Hugging Face
+CLI (or the compatible Python library fallback), verifies the approved SHA-256,
+creates `.env` with a random application secret, and only then pulls/builds and
+starts the containers. Monitor the base-model download with:
 
 ```bash
 docker compose logs -f vllm
