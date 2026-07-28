@@ -1,0 +1,5 @@
+install.sh text eol=lf
+verify-install.sh text eol=lf
+docker-compose.yml text eol=lf
+.env.example text eol=lf
+*.ps1 text eol=crlf

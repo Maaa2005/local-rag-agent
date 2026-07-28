@@ -6,13 +6,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.config import settings
 from app.core.security import require_password_changed
 from app.database import db
 from app.services.llm import stream_answer
+from app.services.orchestrator import orchestrate, terminal_message
 from app.services.retriever import basename_source, get_chunk_content, retrieve
 from app.services.task_processor import chat_session
 
 logger = logging.getLogger(__name__)
+
+
+def _sse(payload: dict) -> str:
+    return f'data: {json.dumps(payload, ensure_ascii=False)}\n\n'
 
 # 会話履歴 (messages.content) の設計判断について (項目高2):
 # 回答本文そのものは「本人がその時点で権限を持っていた会話記録」として扱い、
@@ -62,6 +68,27 @@ async def _save_message(
     )
 
 
+async def _get_orchestrator_history(conversation_id: int) -> list[dict[str, str]]:
+    rows = await db.fetchall(
+        "SELECT role, content FROM ("
+        "SELECT id, role, content FROM messages WHERE conversation_id = ? "
+        "ORDER BY id DESC LIMIT 2"
+        ") ORDER BY id ASC",
+        (conversation_id,),
+    )
+    history: list[dict[str, str]] = []
+    remaining_chars = 2000
+    for row in rows:
+        role = str(row['role'])
+        content = str(row['content'])
+        if role not in {'user', 'assistant'} or not content or remaining_chars <= 0:
+            continue
+        content = content[:remaining_chars]
+        remaining_chars -= len(content)
+        history.append({'role': role, 'content': content})
+    return history
+
+
 async def _record_audit_log(
     user: dict, question: str, chunks: list[dict], answer: str, error: str | None
 ) -> None:
@@ -107,6 +134,8 @@ async def _event_stream(question: str, user: dict, conversation_id: int | None):
     answer_parts: list[str] = []
     error_msg: str | None = None
     conv_id = conversation_id
+    rag_question = question
+    retrieval_query = question
 
     async with chat_session():
         try:
@@ -121,7 +150,37 @@ async def _event_stream(question: str, user: dict, conversation_id: int | None):
 
             # このアプリはローカル LLM 固定の社内機密 RAG 専用。常に社内文書を検索する。
             try:
-                chunks = await retrieve(question, user_access_level)
+                history = await _get_orchestrator_history(conv_id)
+                decision = await orchestrate(question, history)
+            except Exception:
+                logger.exception('Orchestrator failed')
+                if settings.orchestrator_required:
+                    error_msg = '依頼内容の安全確認に失敗しました。しばらくしてから再度お試しください。'
+                    yield _sse({'type': 'error', 'content': error_msg})
+                    yield _sse({'type': 'done'})
+                    return
+                decision = None
+
+            if decision is not None:
+                yield _sse({'type': 'orchestration', 'decision': decision})
+                direct_message = terminal_message(decision)
+                if direct_message is not None:
+                    answer_parts.append(direct_message)
+                    yield _sse({'type': 'token', 'content': direct_message})
+                    yield _sse({'type': 'done'})
+                    return
+                # Only use model-generated text for query formulation. Access level,
+                # document filters, and authorization remain backend-enforced below.
+                rag_question = decision['intent']['summary']
+                # The FT model's search query is retained in the orchestration event
+                # for inspection, but retrieval uses the history-aware intent summary.
+                # Evaluation showed generated query expansion could dilute exact HR
+                # terms, while the summary preserved multi-turn context and achieved
+                # perfect source ranking on the demo corpus.
+                retrieval_query = rag_question
+
+            try:
+                chunks = await retrieve(retrieval_query, user_access_level)
             except Exception:
                 logger.exception("Retrieval failed")
                 error_msg = "検索処理でエラーが発生しました。しばらくしてから再度お試しください。"
@@ -161,7 +220,7 @@ async def _event_stream(question: str, user: dict, conversation_id: int | None):
                 yield f"data: {json.dumps({'type': 'token', 'content': no_hit_msg}, ensure_ascii=False)}\n\n"
             else:
                 try:
-                    async for token in stream_answer(question, chunks):
+                    async for token in stream_answer(rag_question, chunks):
                         answer_parts.append(token)
                         yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
                 except Exception:

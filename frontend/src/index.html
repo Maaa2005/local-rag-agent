@@ -39,6 +39,7 @@
     </div>
     <nav class="sidebar-nav">
       <button class="nav-item active" data-panel="chat">チャット</button>
+      <button class='nav-item' data-panel='word'>Word編集</button>
       <button class="nav-item" data-panel="admin" id="admin-nav-btn">管理</button>
     </nav>
     <div class="conversation-panel">
@@ -50,18 +51,69 @@
   <main class="main-area">
     <!-- Chat panel -->
     <section id="panel-chat" class="panel active">
-      <div class="chat-toolbar">
-        <span class="toolbar-label">社内ナレッジ（ローカル LLM）</span>
+      <div class='chat-toolbar'>
+        <div class='toolbar-product'><span class='status-dot'></span><strong>HR Agent</strong><span class='toolbar-label'>Gemma 4 E2B · Local</span></div>
+        <div class='toolbar-badges'><span class='system-badge'>Qdrant connected</span><span class='system-badge secure'>Local only</span></div>
       </div>
-      <div id="messages" class="messages" aria-live="polite" aria-label="会話履歴"></div>
-      <div class="input-bar">
-        <textarea
-          id="question-input"
-          rows="1"
-          placeholder="質問を入力… (Shift+Enter で改行、Enter で送信)"
-          aria-label="質問入力"
-        ></textarea>
-        <button id="send-btn" aria-label="送信">送信</button>
+      <div class='workspace-shell'>
+        <div class='chat-column'>
+          <div id='messages' class='messages' aria-live='polite' aria-label='会話履歴'></div>
+          <div class='composer-wrap'>
+            <div class='input-bar'>
+              <textarea id='question-input' rows='1' placeholder='社内規程について質問…' aria-label='質問入力'></textarea>
+              <button id='send-btn' aria-label='送信'>送信</button>
+            </div>
+            <p class='composer-note'>回答は社内資料に基づきます。最終的な法的判断は専門家へ確認してください。</p>
+          </div>
+        </div>
+        <aside class='activity-panel' aria-label='エージェント実行状況'>
+          <div class='activity-header'><div><p class='eyebrow'>AGENT TRACE</p><h2>実行プラン</h2></div><span id='plan-status' class='plan-status idle'>待機中</span></div>
+          <div id='plan-content' class='plan-content'><div class='empty-trace'><span class='trace-icon'>⌘</span><p>質問を送信すると、意図判定・逆質問・検索手順を表示します。</p></div></div>
+          <div class='agent-stack'>
+            <p class='eyebrow'>RUNTIME</p>
+            <div class='stack-row'><span>司令塔</span><strong>Gemma 4 E2B + LoRA</strong></div>
+            <div class='stack-row'><span>検索</span><strong>multilingual-e5 + Qdrant</strong></div>
+            <div class='stack-row'><span>権限</span><strong>Backend enforced</strong></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Word editing panel -->
+    <section id='panel-word' class='panel word-panel' hidden>
+      <div class='document-workspace'>
+        <div class='document-heading'>
+          <p class='eyebrow'>DOCUMENT WORKSPACE</p>
+          <h1>Wordファイル編集</h1>
+          <p>原本を上書きせず、編集案を確認してから別名ファイルとして保存します。</p>
+        </div>
+        <div class='document-grid'>
+          <form id='docx-edit-form' class='document-card'>
+            <div class='document-step'><span>1</span><div><strong>原本を選択</strong><small>.docx / 最大10MB</small></div></div>
+            <label class='file-drop' for='docx-file'>
+              <input id='docx-file' type='file' accept='.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document' required />
+              <span id='docx-file-label'>Wordファイルを選択</span>
+            </label>
+            <div class='document-step'><span>2</span><div><strong>編集内容を指定</strong><small>検索文字を置換します</small></div></div>
+            <div id='docx-operations' class='docx-operations'></div>
+            <button type='button' id='add-docx-operation' class='btn-secondary'>＋ 置換を追加</button>
+            <button type='submit' id='create-docx-draft' class='btn-primary'>編集案を作成</button>
+            <p id='docx-error' class='inline-error' hidden></p>
+          </form>
+          <section id='docx-preview' class='document-card preview-card' hidden>
+            <div class='document-step'><span>3</span><div><strong>変更内容を確認</strong><small>この時点では保存されていません</small></div></div>
+            <div id='docx-change-summary' class='change-summary'></div>
+            <div class='consent-box'>
+              <label><input id='docx-consent' type='checkbox' /> 表示された変更内容を確認し、編集済みファイルの保存を承諾します。</label>
+              <p>システムは確定・提出・原本上書きを行いません。ダウンロード後の確認と提出は本人が行ってください。</p>
+            </div>
+            <div class='preview-actions'>
+              <button type='button' id='cancel-docx-draft' class='btn-secondary'>破棄</button>
+              <button type='button' id='save-docx-draft' class='btn-primary' disabled>承諾して保存</button>
+            </div>
+            <p id='docx-success' class='msg-inline ok'></p>
+          </section>
+        </div>
       </div>
     </section>
 

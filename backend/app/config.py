@@ -18,8 +18,12 @@ class Settings(BaseSettings):
     llm_provider: str = "vllm"
     vllm_base_url: str = "http://localhost:8001/v1"
     llm_model: str = "local-llm"
-    llm_max_tokens: int = 1024
+    llm_max_tokens: int = 160
     llm_temperature: float = 0.1
+    orchestrator_enabled: bool = False
+    orchestrator_model: str = 'hr-orchestrator'
+    orchestrator_max_tokens: int = 255
+    orchestrator_required: bool = True
 
     embed_model: str = "intfloat/multilingual-e5-large"
     # e5 系は query/passage で異なる prefix が必要。Ruri 系など方式が異なる
@@ -78,7 +82,9 @@ class Settings(BaseSettings):
             return [item.strip() for item in s.split(",") if item.strip()]
         return v
 
-    model_config = SettingsConfigDict(env_file=".env")
+    # The project-level .env is also consumed by Docker Compose and therefore
+    # contains vLLM-only variables that are not backend settings.
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

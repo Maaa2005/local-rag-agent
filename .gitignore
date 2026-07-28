@@ -38,6 +38,15 @@ volumes/
 
 # Models / caches
 hf_cache/
+models/hr-orchestrator/*
+!models/hr-orchestrator/README.md
+!models/hr-orchestrator/manifest.json
+
+# Local Docker build/pull diagnostics
+.build-*.log
+.pull-*.log
+.model-*.log
+.install-*.log
 
 # Build / dist
 dist/

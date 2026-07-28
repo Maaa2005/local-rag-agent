@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "run_id": "20260714-ood-remediation-160step",
+  "purpose": "Pre-RAG JSON orchestration for clarification, safe rejection, and retrieval planning without changing backend access controls.",
+  "training_base_model": "unsloth/gemma-4-e2b-it-unsloth-bnb-4bit",
+  "inference_base_model": "cyankiwi/gemma-4-E2B-it-AWQ-INT4",
+  "inference_model_file": {
+    "name": "model.safetensors",
+    "size_bytes": 7579469054,
+    "sha256": "885a2ae0052e12854671bfea0a595f525e3ef40f2d4742414714ef6329bdc22c"
+  },
+  "adapter_sha256": "5a8f318629bbb6fcc4f0131164ab6088299cac9eeec44a76463a32f37baa3a59",
+  "training_dataset": {
+    "examples": 884,
+    "ood_remediation_examples_added": 224,
+    "sha256": "bb86ee37fe136a2761340acfb012112e06384246bb56618a7daf490861a77420"
+  },
+  "held_out_evaluation": {
+    "validation_examples": 67,
+    "test_examples": 81,
+    "human_authored_ood_examples": 30,
+    "human_authored_ood_sha256": "7f79ff992b51c287e6632313d3545e7ae223b9d40e38a03021f1bbca5c037800",
+    "human_authored_ood_used_for_training": false,
+    "ood_json_validity": 0.967,
+    "ood_schema_validity": 0.933,
+    "ood_safe_filter_passed": "8/8"
+  }
+}

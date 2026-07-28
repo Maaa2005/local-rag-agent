@@ -12,8 +12,10 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
 
   vllm:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile
     # 項目10: latest は再現性・脆弱性追跡の観点で避け、具体バージョンに固定する。
-    image: vllm/vllm-openai:v0.25.1
     restart: unless-stopped
     runtime: nvidia
     # GPU 利用 (nvidia runtime) とモデル/キャッシュ書込の都合上、
@@ -23,18 +25,32 @@ services:
     ports:
       - "127.0.0.1:8001:8000"  # 権限フィルタ回避防止のためループバック限定
     volumes:
-      - hf_cache:/root/.cache/huggingface
+      - llm_cache:/root/.cache/huggingface
+      - ./models/hr-orchestrator:/models/hr-orchestrator:ro
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
     # 6GB VRAM 向け: Gemma 4-E2B AWQ-INT4 (~2.5GB重み) gpu-memory-utilization=0.6
     # embedding は CPU 動作のため VRAM 専有なし
+    # The AWQ file is about 7.1 GB. The default profile supports a 6 GB GPU by
+    # offloading part of the model to system RAM. Set CPU_OFFLOAD_GB=0 on a
+    # GPU with enough VRAM for better performance.
     command: >
-      --model ${LLM_MODEL:-cyankiwi/gemma-4-E2B-it-AWQ-INT4}
-      --quantization awq
+      --model ${BASE_MODEL:-cyankiwi/gemma-4-E2B-it-AWQ-INT4}
       --dtype auto
-      --max-model-len 4096
-      --gpu-memory-utilization 0.6
+      --max-model-len ${MAX_MODEL_LEN:-2048}
+      --max-num-seqs ${MAX_NUM_SEQS:-1}
+      --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS:-512}
+      --kv-cache-memory-bytes ${KV_CACHE_MEMORY_BYTES:-67108864}
+      --kv-cache-dtype bfloat16
+      --gpu-memory-utilization ${GPU_MEMORY_UTILIZATION:-0.8}
+      --cpu-offload-gb ${CPU_OFFLOAD_GB:-4}
+      --language-model-only
+      --skip-mm-profiling
+      --enforce-eager
       --served-model-name local-llm
+      --enable-lora
+      --max-lora-rank 8
+      --lora-modules hr-orchestrator=/models/hr-orchestrator
     deploy:
       resources:
         reservations:
@@ -61,11 +77,15 @@ services:
     volumes:
       - ./volumes/watched:/watched:ro
       - sqlite_data:/app/data
-      - hf_cache:/home/app/.cache/huggingface
+      - embed_cache:/home/app/.cache/huggingface
     environment:
       - QDRANT_URL=http://qdrant:6333
       - VLLM_BASE_URL=http://vllm:8000/v1
-      - LLM_MODEL=${LLM_MODEL:-local-llm}
+      - LLM_MODEL=${LLM_SERVED_MODEL:-local-llm}
+      - ORCHESTRATOR_ENABLED=${ORCHESTRATOR_ENABLED:-true}
+      - ORCHESTRATOR_MODEL=${ORCHESTRATOR_MODEL:-hr-orchestrator}
+      - ORCHESTRATOR_MAX_TOKENS=${ORCHESTRATOR_MAX_TOKENS:-255}
+      - ORCHESTRATOR_REQUIRED=${ORCHESTRATOR_REQUIRED:-true}
       - EMBED_MODEL=${EMBED_MODEL:-intfloat/multilingual-e5-large}
       - WATCHED_PATH=/watched
       - DATA_DIR=/app/data
@@ -93,4 +113,5 @@ services:
 volumes:
   qdrant_data:
   sqlite_data:
-  hf_cache:
+  llm_cache:
+  embed_cache:

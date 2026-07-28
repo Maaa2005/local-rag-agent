@@ -7,6 +7,13 @@ watcher (ファイル監視時) と access_sync (フォルダ変更の波及) �
 """
 from __future__ import annotations
 
+from pathlib import Path
+
+
+def _normalized_path(value: str) -> str:
+    """Return an absolute, case-normalized path with platform-neutral separators."""
+    return Path(value).resolve(strict=False).as_posix().rstrip("/").casefold()
+
 
 def match_folder(path: str, folders: list[dict]) -> dict | None:
     """path に最も長く一致する監視フォルダを返す (有効・無効を問わない)。
@@ -23,9 +30,12 @@ def match_folder(path: str, folders: list[dict]) -> dict | None:
     """
     best: dict | None = None
     best_len = -1
+    normalized_path = _normalized_path(path)
     for folder in folders:
-        fp = folder["path"].rstrip("/")
-        if (path == fp or path.startswith(fp + "/")) and len(fp) > best_len:
+        fp = _normalized_path(folder["path"])
+        if (
+            normalized_path == fp or normalized_path.startswith(fp + "/")
+        ) and len(fp) > best_len:
             best_len = len(fp)
             best = folder
     return best

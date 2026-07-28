@@ -34,9 +34,9 @@ def _load_dataset() -> list[dict]:
 
 def _source_to_corpus_path(source: str) -> Path:
     """/watched/<category>/<file>.md -> evaluation/corpus/<category>/<file>.md"""
-    parts = Path(source).parts
-    # ("/", "watched", "general", "xxx.md") 等
-    rel_parts = [p for p in parts if p not in ("/", "watched")]
+    # Parse this logical container path independently of the host OS.
+    parts = source.replace("\\", "/").split("/")
+    rel_parts = [part for part in parts if part and part != "watched"]
     return CORPUS_ROOT.joinpath(*rel_parts)
 
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from app.services.llm import _build_context, SYSTEM_PROMPT
+from app.services.llm import _build_context, _relevant_excerpt, SYSTEM_PROMPT
 from app.services.parser import _parse_text
 from app.services.watcher import SyncDatabase, _get_access_level_for_path
 
@@ -48,6 +48,25 @@ def test_system_prompt_forbids_external_knowledge():
     assert "参考情報" in SYSTEM_PROMPT
     assert "資料には含まれていません" in SYSTEM_PROMPT
     assert "日本語" in SYSTEM_PROMPT
+
+
+def test_relevant_excerpt_selects_paid_leave_rule_beyond_document_start():
+    content = (
+        '総則では会社の基本事項を定める。\n'
+        '所定労働時間は9時から18時までとする。\n'
+        '入社日から6か月勤務し8割以上出勤した従業員には10日を付与する。'
+    )
+    excerpt = _relevant_excerpt('入社半年後の有給休暇は何日ですか', content)
+    assert '10日' in excerpt
+
+
+def test_relevant_excerpt_selects_incident_rule():
+    content = (
+        '会社PCの持ち出しは台帳へ登録する。\n'
+        '紛失時は発見後30分以内にIT緊急窓口へ連絡する。'
+    )
+    excerpt = _relevant_excerpt('会社PCを紛失した場合の連絡期限は', content)
+    assert '30分以内' in excerpt
 
 
 # ─── テキストパース ──────────────────────────────────────

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, chat, admin
+from app.api import auth, chat, admin, documents
 from app.config import settings
 from app.database import DB_PATH, close_db, init_db
 from app.services.embedder import embed_query
@@ -89,6 +89,7 @@ async def _security_headers(request, call_next):
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(admin.router)
+app.include_router(documents.router)
 
 
 @app.get("/health")
