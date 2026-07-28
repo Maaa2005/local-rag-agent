@@ -39,6 +39,20 @@ volumes/
 # Models / caches
 hf_cache/
 
+# ファインチューニング済みアダプターの重み。
+# 本リポジトリは公開のため重みは含めない。配布は Hugging Face Hub 側で行う。
+models/
+*.safetensors
+*.gguf
+*.bin
+adapter_model.*
+
+# デモ環境の資材。デモ用アカウントの平文パスワードを含むため公開しない。
+# 資格情報を書かない形に整理してからでなければコミットしないこと。
+DEMO_GUIDE*.md
+demo/**/credentials*
+
+
 # Build / dist
 dist/
 build/
