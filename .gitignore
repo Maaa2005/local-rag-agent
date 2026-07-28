@@ -41,6 +41,13 @@ hf_cache/
 models/hr-orchestrator/*
 !models/hr-orchestrator/README.md
 !models/hr-orchestrator/manifest.json
+!models/hr-orchestrator/adapter_config.json
+!models/hr-orchestrator/adapter_model.safetensors
+!models/hr-orchestrator/chat_template.jinja
+!models/hr-orchestrator/processor_config.json
+!models/hr-orchestrator/tokenizer.json
+!models/hr-orchestrator/tokenizer_config.json
+!models/hr-orchestrator/training_summary.json
 
 # Local Docker build/pull diagnostics
 .build-*.log
@@ -51,6 +58,8 @@ models/hr-orchestrator/*
 # Build / dist
 dist/
 build/
+outputs/
+training/generated/
 
 # Evaluation outputs
 evaluation/results/

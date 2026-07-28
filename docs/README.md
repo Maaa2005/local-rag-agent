@@ -37,5 +37,6 @@
 - `docs/ft-evidence/training-summary.json`: 最終160 step学習の集計
 - `docs/ft-evidence/ood-comparison.md`: 改修前後のOOD比較
 - `models/hr-orchestrator/manifest.json`: ベースモデル、アダプター、データセットの系譜とSHA-256
+- `training/`: データ生成、Schema検証、Unsloth学習、OOD評価の再現コード
 
-モデル重みはGitへ保存しない。ローカル配置場所は `models/hr-orchestrator/` であり、必要なファイルと期待ハッシュは同ディレクトリのREADMEとmanifestに記載する。
+LoRAアダプターは `models/hr-orchestrator/` に置き、`adapter_model.safetensors` はGit LFSで管理する。約7.58GBのGemmaベースモデルはGitへ保存せず、vLLM初回起動時にHugging Face cacheへ取得する。必要ファイルと期待ハッシュは同ディレクトリのREADMEとmanifestに記載する。

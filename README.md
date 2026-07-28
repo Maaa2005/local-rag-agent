@@ -92,6 +92,19 @@ Gemma: 取得した根拠だけを使って回答
 
 当初案のChromaDBは現在の実装では使用しておらず、実接続・権限制御・hybrid検索のためQdrantへ置き換えた。LangChainも現在の中核パイプラインでは使用せず、FastAPIサービス層で処理順序と安全条件を明示的に実装している。
 
+### アダプターと再学習コード
+
+- LoRAアダプター一式: `models/hr-orchestrator/`
+- アダプター重み: `models/hr-orchestrator/adapter_model.safetensors`（Git LFS）
+- tokenizer: `models/hr-orchestrator/tokenizer.json`
+- モデル・データ系譜: `models/hr-orchestrator/manifest.json`
+- 再学習・評価手順: `training/README.md`
+- Unsloth学習: `training/train_unsloth.py`
+- 実験証跡収集: `training/run_remote_experiment.sh`
+- JSON Schema: `training/src/hr_assistant/schema.py`
+
+Git clone後は `git lfs pull` を実行してアダプター重みを取得する。約7.58GBのGemmaベースモデルはGitへ含めず、vLLMの `llm_cache` にダウンロードする。
+
 ## Model packaging
 
 Model weights are not baked into the container image. On first installation, vLLM

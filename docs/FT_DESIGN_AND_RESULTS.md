@@ -24,7 +24,7 @@ FTの目的は、社内規程をモデルへ暗記させることではなく、
 | vLLM公開名 | ベース `local-llm`、LoRA `hr-orchestrator` |
 | 最終run | `20260714-ood-remediation-160step` |
 
-モデル系譜の機械可読な記録は `models/hr-orchestrator/manifest.json` にある。重み自体は容量と配布条件のためGit対象外である。
+モデル系譜の機械可読な記録は `models/hr-orchestrator/manifest.json` にある。LoRAアダプター一式はGit LFSを含むGit管理対象とし、約7.58GBのベースモデル本体は容量と配布条件のためGit対象外とする。
 
 ## 3. データセット
 
@@ -107,6 +107,7 @@ FTの目的は、社内規程をモデルへ暗記させることではなく、
 ## 8. 一次記録とスナップショット
 
 リポジトリ内の提出・閲覧用スナップショットは `docs/ft-data/` と `docs/ft-evidence/` に集約した。
+再学習・評価コードは `training/`、教師JSON Schemaは `training/src/hr_assistant/schema.py` に収録した。
 
 開発PCに残る生成スクリプトと完全な実験ログの一次記録は次の場所にある。
 

@@ -1,0 +1,18 @@
+{
+  "model": "google/gemma-4-E2B-it",
+  "dataset": "/work2/nk240004/hr-assistant-ai/training/ood_remediation/train.jsonl",
+  "max_sequence_length": 512,
+  "max_steps": 160,
+  "lora_rank": 8,
+  "gradient_accumulation_steps": 8,
+  "load_in_4bit": true,
+  "train_loss": 0.07832701013539918,
+  "metrics": {
+    "train_runtime": 627.6394,
+    "train_samples_per_second": 2.039,
+    "train_steps_per_second": 0.255,
+    "total_flos": 4551749989543680.0,
+    "train_loss": 0.07832701013539918,
+    "epoch": 1.4434389140271493
+  }
+}

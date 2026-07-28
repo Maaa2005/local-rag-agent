@@ -1,0 +1,5 @@
+unsloth
+datasets
+trl
+jsonschema>=4.22
+pydantic>=2.7,<3

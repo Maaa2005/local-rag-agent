@@ -1,0 +1,17 @@
+{
+  "total": 720,
+  "splits": {
+    "train": 572,
+    "validation": 67,
+    "test": 81
+  },
+  "scenarios": {
+    "access_control_attack": 40,
+    "expense_clarification_multiturn": 180,
+    "expense_direct_ready": 100,
+    "file_processing_multiturn": 160,
+    "policy_direct_ready": 200,
+    "unknown_intent": 40
+  },
+  "seed": 3407
+}

@@ -1,0 +1,289 @@
+{
+  "audio_token": "<|audio|>",
+  "backend": "tokenizers",
+  "boa_token": "<|audio>",
+  "boi_token": "<|image>",
+  "bos_token": "<bos>",
+  "eoa_token": "<audio|>",
+  "eoc_token": "<channel|>",
+  "eoi_token": "<image|>",
+  "eos_token": "<eos>",
+  "eot_token": "<turn|>",
+  "escape_token": "<|\"|>",
+  "etc_token": "<tool_call|>",
+  "etd_token": "<tool|>",
+  "etr_token": "<tool_response|>",
+  "extra_special_tokens": [
+    "<|video|>"
+  ],
+  "image_token": "<|image|>",
+  "is_local": false,
+  "mask_token": "<mask>",
+  "model_max_length": 131072,
+  "model_specific_special_tokens": {
+    "audio_token": "<|audio|>",
+    "boa_token": "<|audio>",
+    "boi_token": "<|image>",
+    "eoa_token": "<audio|>",
+    "eoc_token": "<channel|>",
+    "eoi_token": "<image|>",
+    "eot_token": "<turn|>",
+    "escape_token": "<|\"|>",
+    "etc_token": "<tool_call|>",
+    "etd_token": "<tool|>",
+    "etr_token": "<tool_response|>",
+    "image_token": "<|image|>",
+    "soc_token": "<|channel>",
+    "sot_token": "<|turn>",
+    "stc_token": "<|tool_call>",
+    "std_token": "<|tool>",
+    "str_token": "<|tool_response>",
+    "think_token": "<|think|>"
+  },
+  "pad_token": "<pad>",
+  "padding_side": "right",
+  "processor_class": "Gemma4Processor",
+  "response_schema": {
+    "properties": {
+      "content": {
+        "type": "string"
+      },
+      "role": {
+        "const": "assistant"
+      },
+      "thinking": {
+        "type": "string"
+      },
+      "tool_calls": {
+        "items": {
+          "properties": {
+            "function": {
+              "properties": {
+                "arguments": {
+                  "additionalProperties": {},
+                  "type": "object",
+                  "x-parser": "gemma4-tool-call"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object",
+              "x-regex": "call\\:(?P<name>\\w+)(?P<arguments>\\{.*\\})"
+            },
+            "type": {
+              "const": "function"
+            }
+          },
+          "type": "object"
+        },
+        "type": "array",
+        "x-regex-iterator": "<\\|tool_call>(.*?)<tool_call\\|>"
+      }
+    },
+    "type": "object",
+    "x-regex": "(\\<\\|channel\\>thought\\n(?P<thinking>.*?)\\<channel\\|\\>)?(?P<tool_calls>\\<\\|tool_call\\>.*\\<tool_call\\|\\>)?(?P<content>(?:(?!\\<turn\\|\\>)(?!\\<\\|tool_response\\>).)+)?(?:\\<turn\\|\\>|\\<\\|tool_response\\>)?"
+  },
+  "soc_token": "<|channel>",
+  "sot_token": "<|turn>",
+  "stc_token": "<|tool_call>",
+  "std_token": "<|tool>",
+  "str_token": "<|tool_response>",
+  "think_token": "<|think|>",
+  "tokenizer_class": "GemmaTokenizer",
+  "unk_token": "<unk>",
+  "added_tokens_decoder": {
+    "0": {
+      "content": "<pad>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "1": {
+      "content": "<eos>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "2": {
+      "content": "<bos>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "3": {
+      "content": "<unk>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "4": {
+      "content": "<mask>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "46": {
+      "content": "<|tool>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "47": {
+      "content": "<tool|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "48": {
+      "content": "<|tool_call>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "49": {
+      "content": "<tool_call|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "50": {
+      "content": "<|tool_response>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "51": {
+      "content": "<tool_response|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "52": {
+      "content": "<|\"|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "98": {
+      "content": "<|think|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "100": {
+      "content": "<|channel>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "101": {
+      "content": "<channel|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "105": {
+      "content": "<|turn>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "106": {
+      "content": "<turn|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "255999": {
+      "content": "<|image>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "256000": {
+      "content": "<|audio>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "258880": {
+      "content": "<|image|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "258881": {
+      "content": "<|audio|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "258882": {
+      "content": "<image|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "258883": {
+      "content": "<audio|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    },
+    "258884": {
+      "content": "<|video|>",
+      "single_word": false,
+      "lstrip": false,
+      "rstrip": false,
+      "normalized": false,
+      "special": true
+    }
+  }
+}
