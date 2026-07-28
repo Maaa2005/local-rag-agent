@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang='ja'>
+<head>
+  <meta charset='UTF-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <title>ログイン | 社内 RAG エージェント</title>
+  <link rel='stylesheet' href='style.css' />
+</head>
+<body>
+  <main id='login-screen' class='screen'>
+    <div class='login-card'>
+      <h1 class='logo'>社内 RAG<span class='accent'>.</span></h1>
+      <p class='subtitle'>社内ナレッジ検索エージェント</p>
+      <form id='login-form'>
+        <label for='username'>ユーザー名</label>
+        <input id='username' type='text' autocomplete='username' required autofocus />
+        <label for='password'>パスワード</label>
+        <input id='password' type='password' autocomplete='current-password' required />
+        <button type='submit' id='login-btn'>ログイン</button>
+        <p id='login-error' class='error-msg' role='alert' hidden></p>
+      </form>
+    </div>
+  </main>
+  <script src='login.js'></script>
+</body>
+</html>

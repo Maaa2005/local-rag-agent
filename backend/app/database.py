@@ -84,6 +84,11 @@ class Database:
             # 移行時点で access_level=3 のユーザーには is_admin=1 を引き継ぐ。
             await conn.execute("UPDATE users SET is_admin=1 WHERE access_level>=3")
             await conn.commit()
+        if "token_version" not in user_columns:
+            await conn.execute(
+                "ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0"
+            )
+            await conn.commit()
         if "must_change_password" not in user_columns:
             await conn.execute(
                 "ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"

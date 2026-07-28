@@ -7,12 +7,10 @@ let isStreaming = false;
 let currentConversationId = null;
 let currentDocxDraftId = null;
 let currentDocxFilename = '';
+let currentChatController = null;
 
 // ── DOM refs ───────────────────────────────────────────────
-const loginScreen     = document.getElementById('login-screen');
 const chatScreen      = document.getElementById('chat-screen');
-const loginForm       = document.getElementById('login-form');
-const loginError      = document.getElementById('login-error');
 const logoutBtn       = document.getElementById('logout-btn');
 const userBadge       = document.getElementById('user-badge');
 const messages        = document.getElementById('messages');
@@ -111,48 +109,58 @@ function renderDecision(decision) {
 // ── API helper ─────────────────────────────────────────────
 async function api(method, path, body) {
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = 'Bearer ' + token;
-  const res = await fetch(path, {
+  return authenticatedFetch(path, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401) { logout(); return null; }
-  return res;
 }
 
 // ── Auth ───────────────────────────────────────────────────
-loginForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  loginError.hidden = true;
-  const form = new FormData();
-  form.append('username', document.getElementById('username').value);
-  form.append('password', document.getElementById('password').value);
-  const res = await fetch('/api/auth/token', { method: 'POST', body: form });
-  if (!res.ok) {
-    loginError.textContent = 'ユーザー名またはパスワードが正しくありません';
-    loginError.hidden = false;
-    return;
-  }
-  const data = await res.json();
-  token = data.access_token;
-  sessionStorage.setItem('token', token);
-  await initChat();
-  if (data.must_change_password) {
-    openPasswordDialog(true);
-  }
-});
-
-logoutBtn.addEventListener('click', logout);
-
-function logout() {
+function clearSessionAndRedirect(reason = '') {
+  currentChatController?.abort();
+  currentChatController = null;
   token = '';
   currentUser = null;
   currentConversationId = null;
+  currentDocxDraftId = null;
+  currentDocxFilename = '';
+  isStreaming = false;
   sessionStorage.removeItem('token');
-  chatScreen.hidden = true;
-  loginScreen.hidden = false;
+  sessionStorage.removeItem('must_change_password');
+  const query = reason ? `?reason=${encodeURIComponent(reason)}` : '';
+  window.location.replace('/login.html' + query);
 }
+
+async function authenticatedFetch(path, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', 'Bearer ' + token);
+  const response = await fetch(path, { ...options, headers });
+  if (response.status === 401) {
+    clearSessionAndRedirect('session_expired');
+    return null;
+  }
+  return response;
+}
+
+async function logout() {
+  const logoutToken = token;
+  logoutBtn.disabled = true;
+  try {
+    if (logoutToken) {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + logoutToken },
+      });
+    }
+  } catch (_) {
+    // サーバーへ到達できなくてもブラウザ側tokenは必ず破棄する。
+  } finally {
+    clearSessionAndRedirect();
+  }
+}
+
+logoutBtn.addEventListener('click', () => logout());
 
 async function initChat() {
   const res = await api('GET', '/api/auth/me');
@@ -167,10 +175,11 @@ async function initChat() {
   // システム管理者権限 (is_admin) は文書アクセスレベルとは独立 (項目7)。
   adminNavBtn.style.display = currentUser.is_admin ? '' : 'none';
 
-  loginScreen.hidden = true;
-  chatScreen.hidden = false;
   questionInput.focus();
   loadConversations();
+  if (sessionStorage.getItem('must_change_password') === '1' || currentUser.must_change_password) {
+    openPasswordDialog(true);
+  }
 }
 
 // ── Password change ──────────────────────────────────────────
@@ -195,6 +204,12 @@ passwordForm.addEventListener('submit', async (e) => {
   const res = await api('POST', '/api/auth/password', { current_password, new_password });
   if (!res) return;
   if (res.ok) {
+    const data = await res.json();
+    if (data.access_token) {
+      token = data.access_token;
+      sessionStorage.setItem('token', token);
+    }
+    sessionStorage.removeItem('must_change_password');
     passwordMsg.textContent = 'パスワードを変更しました';
     passwordMsg.className = 'msg-inline ok';
     passwordWarning.hidden = true;
@@ -449,14 +464,16 @@ async function sendQuestion() {
   let hadError = false;
 
   try {
-    const res = await fetch('/api/chat', {
+    currentChatController = new AbortController();
+    const res = await authenticatedFetch('/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token,
       },
       body: JSON.stringify({ question: q, conversation_id: currentConversationId }),
+      signal: currentChatController.signal,
     });
+    if (!res) return;
 
     if (!res.ok) {
       bubble.textContent = 'エラーが発生しました。再度お試しください。';
@@ -520,6 +537,7 @@ async function sendQuestion() {
     bubble.textContent = 'ネットワークエラーが発生しました。';
     cursor.remove();
   } finally {
+    currentChatController = null;
     isStreaming = false;
     sendBtn.disabled = false;
     questionInput.focus();
@@ -610,9 +628,8 @@ function renderDocxPreview(data) {
 
 async function discardDocxDraft() {
   if (currentDocxDraftId) {
-    await fetch(`/api/documents/docx/drafts/${currentDocxDraftId}`, {
+    await authenticatedFetch(`/api/documents/docx/drafts/${currentDocxDraftId}`, {
       method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + token },
     }).catch(() => null);
   }
   currentDocxDraftId = null;
@@ -648,11 +665,11 @@ document.getElementById('docx-edit-form').addEventListener('submit', async (even
   button.disabled = true;
   button.textContent = '編集案を作成中…';
   try {
-    const response = await fetch('/api/documents/docx/drafts', {
+    const response = await authenticatedFetch('/api/documents/docx/drafts', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
       body: form,
     });
+    if (!response) return;
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || '編集案を作成できませんでした');
     currentDocxDraftId = data.draft_id;
@@ -677,14 +694,14 @@ saveDocxDraftBtn.addEventListener('click', async () => {
   if (!currentDocxDraftId || !docxConsent.checked) return;
   saveDocxDraftBtn.disabled = true;
   try {
-    const response = await fetch(`/api/documents/docx/drafts/${currentDocxDraftId}/confirm`, {
+    const response = await authenticatedFetch(`/api/documents/docx/drafts/${currentDocxDraftId}/confirm`, {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer ' + token,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ confirmed: true }),
     });
+    if (!response) return;
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       throw new Error(data.detail || '保存できませんでした');
@@ -944,6 +961,8 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
 });
 
 // ── Boot ───────────────────────────────────────────────────
-if (token) {
+if (!token) {
+  window.location.replace('/login.html');
+} else {
   initChat();
 }

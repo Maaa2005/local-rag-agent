@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
     -- create_access_token が発行する iat (発行時刻) がこれより厳密に古いトークンは
     -- get_current_user で無効化する (項目高3: パスワード変更で既存 JWT を失効)。
     password_changed_at TEXT,
+    -- ログアウト時にインクリメントするJWT世代。同じ利用者の発行済みtokenを
+    -- サーバー側で即時失効させる。
+    token_version INTEGER NOT NULL DEFAULT 0,
     is_active    INTEGER NOT NULL DEFAULT 1,
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );

@@ -1,7 +1,7 @@
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
@@ -66,7 +66,8 @@ async def login(form: OAuth2PasswordRequestForm = Depends()):
         _failed_logins.pop(form.username, None)
 
     row = await db.fetchone(
-        "SELECT password_hash, is_active, must_change_password FROM users WHERE username=?",
+        "SELECT password_hash, is_active, must_change_password, token_version "
+        "FROM users WHERE username=?",
         (form.username,),
     )
     if row is None or not row["is_active"] or not verify_password(form.password, row["password_hash"]):
@@ -78,7 +79,9 @@ async def login(form: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
     _failed_logins.pop(form.username, None)
-    token = create_access_token({"sub": form.username})
+    token = create_access_token(
+        {"sub": form.username, "ver": int(row["token_version"])}
+    )
     # DB に永続化されたフラグを単一の真実源とする (項目6)。ヒューリスティックな
     # 平文パスワード比較ではなく、実際にパスワードが変更されたかを追跡する。
     must_change_password = bool(row["must_change_password"])
@@ -93,6 +96,20 @@ async def me(user: dict = Depends(get_current_user)):
         "is_admin": bool(user.get("is_admin")),
         "must_change_password": bool(user.get("must_change_password")),
     }
+
+
+@router.post("/logout", status_code=204)
+async def logout(user: dict = Depends(get_current_user)):
+    """現在のJWT世代を失効させる。
+
+    token_version方式のため同じ利用者の他端末tokenも失効する。ローカル社内向け
+    プロトタイプでは、ログアウト後にtokenを確実に再利用不可にすることを優先する。
+    """
+    await db.execute(
+        "UPDATE users SET token_version = token_version + 1 WHERE id = ?",
+        (user["id"],),
+    )
+    return Response(status_code=204)
 
 
 @router.post("/users")
@@ -134,10 +151,22 @@ async def change_password(body: PasswordChange, user: dict = Depends(get_current
     now = datetime.now(timezone.utc).isoformat()
     # 項目高3: password_changed_at を更新し、これより古い iat を持つ既存 JWT を失効させる。
     await db.execute(
-        "UPDATE users SET password_hash=?, must_change_password=0, password_changed_at=? "
+        "UPDATE users SET password_hash=?, must_change_password=0, password_changed_at=?, "
+        "token_version=token_version + 1 "
         "WHERE username=?",
         (hash_password(body.new_password), now, user["username"]),
     )
     # 項目高4: パスワード自体は絶対に記録せず、誰が変更したか (本人) のみ記録する。
     await record_admin_event(user, "change_password", {"username": user["username"]})
-    return {"message": "パスワードを変更しました"}
+    row = await db.fetchone(
+        "SELECT token_version FROM users WHERE username=?", (user["username"],)
+    )
+    token = create_access_token(
+        {"sub": user["username"], "ver": int(row["token_version"])}
+    )
+    return {
+        "message": "パスワードを変更しました",
+        "access_token": token,
+        "token_type": "bearer",
+        "must_change_password": False,
+    }

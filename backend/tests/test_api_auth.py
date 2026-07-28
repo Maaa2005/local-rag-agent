@@ -198,6 +198,25 @@ def test_me_rejects_bogus_token(client):
     assert r.status_code == 401
 
 
+def test_logout_invalidates_token_and_allows_fresh_login(client):
+    token = client.post(
+        '/api/auth/token', data={'username': 'admin', 'password': 'admin'}
+    ).json()['access_token']
+    headers = {'Authorization': f'Bearer {token}'}
+    assert client.get('/api/auth/me', headers=headers).status_code == 200
+
+    logged_out = client.post('/api/auth/logout', headers=headers)
+    assert logged_out.status_code == 204
+    assert client.get('/api/auth/me', headers=headers).status_code == 401
+
+    fresh = client.post(
+        '/api/auth/token', data={'username': 'admin', 'password': 'admin'}
+    )
+    assert fresh.status_code == 200
+    fresh_headers = {'Authorization': 'Bearer ' + fresh.json()['access_token']}
+    assert client.get('/api/auth/me', headers=fresh_headers).status_code == 200
+
+
 # ─── /api/auth/users (admin only) ────────────────────────
 def test_create_user_requires_admin(client, isolated_db):
     with sqlite3.connect(isolated_db) as conn:
@@ -330,6 +349,14 @@ def test_login_after_password_change_clears_flag(client):
         json={"current_password": "admin", "new_password": "newadminpw1"},
     )
     assert r.status_code == 200
+    assert r.json()['access_token']
+    assert client.get(
+        '/api/auth/me', headers={'Authorization': 'Bearer ' + token}
+    ).status_code == 401
+    assert client.get(
+        '/api/auth/me',
+        headers={'Authorization': 'Bearer ' + r.json()['access_token']},
+    ).status_code == 200
 
     r2 = client.post(
         "/api/auth/token",

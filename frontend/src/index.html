@@ -8,24 +8,8 @@
 </head>
 <body>
 
-<!-- ───────────────────────── Login ───────────────────────── -->
-<div id="login-screen" class="screen">
-  <div class="login-card">
-    <h1 class="logo">社内 RAG<span class="accent">.</span></h1>
-    <p class="subtitle">社内ナレッジ検索エージェント</p>
-    <form id="login-form">
-      <label for="username">ユーザー名</label>
-      <input id="username" type="text" autocomplete="username" required placeholder="admin" />
-      <label for="password">パスワード</label>
-      <input id="password" type="password" autocomplete="current-password" required placeholder="••••••••" />
-      <button type="submit" id="login-btn">ログイン</button>
-      <p id="login-error" class="error-msg" hidden></p>
-    </form>
-  </div>
-</div>
-
 <!-- ───────────────────────── Chat ────────────────────────── -->
-<div id="chat-screen" class="screen" hidden>
+<div id="chat-screen" class="screen">
   <aside class="sidebar">
     <div class="sidebar-header">
       <span class="logo-sm">社内 RAG<span class="accent">.</span></span>

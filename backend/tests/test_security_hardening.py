@@ -123,6 +123,7 @@ def test_apis_unblocked_after_admin_password_changed(client, monkeypatch):
         json={"current_password": "admin", "new_password": "adminpw12345"},
     )
     assert r.status_code == 200
+    token = r.json()['access_token']
 
     r_docs = client.get(
         "/api/admin/documents", headers={"Authorization": f"Bearer {token}"}
@@ -178,7 +179,7 @@ def chat_ready_token(client, isolated_db, monkeypatch):
         json={"current_password": "admin", "new_password": "adminpw12345"},
     )
     assert r.status_code == 200
-    return token
+    return r.json()['access_token']
 
 
 def test_conversation_history_does_not_persist_chunk_content(

@@ -53,15 +53,18 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         if not username:
             raise credentials_exception
         iat = payload.get("iat")
-    except jwt.PyJWTError:
+        token_version = int(payload.get("ver", 0))
+    except (jwt.PyJWTError, TypeError, ValueError):
         raise credentials_exception
 
     row = await db.fetchone(
         "SELECT id, username, access_level, is_admin, must_change_password, is_active, "
-        "password_changed_at FROM users WHERE username = ?",
+        "password_changed_at, token_version FROM users WHERE username = ?",
         (username,),
     )
     if row is None or not row["is_active"]:
+        raise credentials_exception
+    if token_version != int(row["token_version"]):
         raise credentials_exception
 
     password_changed_at = row["password_changed_at"]
