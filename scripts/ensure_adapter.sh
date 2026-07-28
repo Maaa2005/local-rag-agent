@@ -59,7 +59,9 @@ sha256_file() {
 }
 
 if [ ! -f "${ADAPTER_DIR}/adapter_config.json" ] ||
-   [ ! -f "${ADAPTER_DIR}/adapter_model.safetensors" ]; then
+   [ ! -f "${ADAPTER_DIR}/adapter_model.safetensors" ] ||
+   [ ! -f "${ADAPTER_DIR}/LICENSE" ] ||
+   [ ! -f "${ADAPTER_DIR}/NOTICE" ]; then
   download_adapter
 fi
 
@@ -67,6 +69,10 @@ fi
   fail 'adapter_config.json is still missing after the Hugging Face download.'
 [ -f "${ADAPTER_DIR}/adapter_model.safetensors" ] ||
   fail 'adapter_model.safetensors is still missing after the Hugging Face download.'
+[ -f "${ADAPTER_DIR}/LICENSE" ] ||
+  fail 'LICENSE is still missing after the Hugging Face download.'
+[ -f "${ADAPTER_DIR}/NOTICE" ] ||
+  fail 'NOTICE is still missing after the Hugging Face download.'
 
 ACTUAL_ADAPTER_SHA=$(sha256_file "${ADAPTER_DIR}/adapter_model.safetensors")
 if [ "${ACTUAL_ADAPTER_SHA}" != "${EXPECTED_ADAPTER_SHA}" ]; then

@@ -15,15 +15,15 @@ HF Hub配布へ変更することと実際のHubリポジトリを伝えるこ�
 クリーンインストール前に `.env`へ次を設定する。
 
 ```dotenv
-ADAPTER_HF_REPO=your-organization/hr-orchestrator
-ADAPTER_HF_REVISION=main
-# 非公開またはgated repositoryの場合のみ
+ADAPTER_HF_REPO=yuu0617/hr-orchestrator
+ADAPTER_HF_REVISION=26e5631a7750c3c27d032d8fa375dc3f77917b1d
+# 将来privateまたはgatedへ変更した場合のみ
 HF_TOKEN=
 ```
 
-共有リリースでは `ADAPTER_HF_REVISION`をHubのcommit hashまたは変更しないtagへ
-固定する。実際のHubリポジトリIDは配布先の作成後に設定し、推測したIDをコードへ
-埋め込まない。
+承認済み配布先はpublic repository `yuu0617/hr-orchestrator`、固定revisionは
+`26e5631a7750c3c27d032d8fa375dc3f77917b1d`である。面接・授業デモの
+クリーンインストールでは `HF_TOKEN`を要求しない。
 
 ## インストール順序
 

@@ -13,8 +13,13 @@ if (-not $AdapterDir) {
 
 $adapterConfig = Join-Path $AdapterDir 'adapter_config.json'
 $adapterModel = Join-Path $AdapterDir 'adapter_model.safetensors'
+$adapterLicense = Join-Path $AdapterDir 'LICENSE'
+$adapterNotice = Join-Path $AdapterDir 'NOTICE'
 
-if (-not (Test-Path $adapterConfig) -or -not (Test-Path $adapterModel)) {
+if (-not (Test-Path $adapterConfig) -or
+    -not (Test-Path $adapterModel) -or
+    -not (Test-Path $adapterLicense) -or
+    -not (Test-Path $adapterNotice)) {
     if (-not $Repository) {
         throw 'The LoRA adapter is missing. Set ADAPTER_HF_REPO in .env to its Hugging Face Hub repository (for example, organization/model-name).'
     }
@@ -71,6 +76,12 @@ if (-not (Test-Path $adapterConfig)) {
 }
 if (-not (Test-Path $adapterModel)) {
     throw "adapter_model.safetensors is still missing after the Hugging Face download: $adapterModel"
+}
+if (-not (Test-Path $adapterLicense)) {
+    throw "LICENSE is still missing after the Hugging Face download: $adapterLicense"
+}
+if (-not (Test-Path $adapterNotice)) {
+    throw "NOTICE is still missing after the Hugging Face download: $adapterNotice"
 }
 
 $actualSha = (Get-FileHash -Algorithm SHA256 $adapterModel).Hash.ToLowerInvariant()

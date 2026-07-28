@@ -139,9 +139,9 @@ more VRAM is recommended.
 Set the adapter repository in `.env` before the first clean installation:
 
 ```dotenv
-ADAPTER_HF_REPO=your-organization/hr-orchestrator
-ADAPTER_HF_REVISION=main
-# HF_TOKEN=...  # only for a private or gated repository
+ADAPTER_HF_REPO=yuu0617/hr-orchestrator
+ADAPTER_HF_REVISION=26e5631a7750c3c27d032d8fa375dc3f77917b1d
+# HF_TOKEN=...  # not required for the public adapter repository
 ```
 
 Use a commit hash or immutable tag for `ADAPTER_HF_REVISION` in a shared release.

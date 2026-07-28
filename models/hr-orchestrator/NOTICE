@@ -1,0 +1,18 @@
+HR Orchestrator LoRA Adapter
+Copyright 2026 the HR Orchestrator project contributors
+
+This distribution contains a LoRA adapter produced by modifying model behavior
+through QLoRA fine-tuning. The adapter was created from
+unsloth/gemma-4-E2B-it-unsloth-bnb-4bit, which is derived from
+google/gemma-4-E2B-it by Google DeepMind.
+
+The adapter was tested for inference with
+cyankiwi/gemma-4-E2B-it-AWQ-INT4. The upstream base-model and quantized-model
+weights are not included in this adapter repository.
+
+Gemma is a trademark of Google LLC. This project is not endorsed by or affiliated
+with Google, Unsloth AI, cyankiwi, or Hugging Face.
+
+Modification notice: the project contributors added Japanese HR orchestration
+behavior for clarification, rejection, and JSON planning using a synthetic
+instruction dataset. Backend authorization controls are separate from the model.

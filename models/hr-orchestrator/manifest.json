@@ -12,12 +12,15 @@
   "adapter_sha256": "5a8f318629bbb6fcc4f0131164ab6088299cac9eeec44a76463a32f37baa3a59",
   "adapter_distribution": {
     "provider": "huggingface_hub",
+    "repository": "yuu0617/hr-orchestrator",
     "repository_env": "ADAPTER_HF_REPO",
     "revision_env": "ADAPTER_HF_REVISION",
     "local_directory": "models/hr-orchestrator",
     "required_files": [
       "adapter_config.json",
-      "adapter_model.safetensors"
+      "adapter_model.safetensors",
+      "LICENSE",
+      "NOTICE"
     ]
   },
   "training_dataset": {

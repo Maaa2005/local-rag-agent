@@ -16,11 +16,14 @@ def test_adapter_distribution_metadata_is_consistent():
 
     assert manifest['adapter_sha256'] == EXPECTED_SHA
     assert distribution['provider'] == 'huggingface_hub'
+    assert distribution['repository'] == 'yuu0617/hr-orchestrator'
     assert distribution['repository_env'] == 'ADAPTER_HF_REPO'
     assert distribution['revision_env'] == 'ADAPTER_HF_REVISION'
     assert set(distribution['required_files']) == {
         'adapter_config.json',
         'adapter_model.safetensors',
+        'LICENSE',
+        'NOTICE',
     }
 
 
@@ -32,7 +35,22 @@ def test_installers_download_and_verify_before_docker_start():
     assert linux.index('scripts/ensure_adapter.sh') < linux.index('docker compose pull')
     assert windows.index('scripts\\Ensure-Adapter.ps1') < windows.index('compose pull')
     assert 'ADAPTER_HF_REPO=' in env_example
-    assert 'ADAPTER_HF_REVISION=main' in env_example
+    assert 'ADAPTER_HF_REPO=yuu0617/hr-orchestrator' in env_example
+    assert 'ADAPTER_HF_REVISION=26e5631a7750c3c27d032d8fa375dc3f77917b1d' in env_example
+
+
+def test_public_adapter_has_license_and_attribution_files():
+    model_dir = ROOT / 'models/hr-orchestrator'
+    card = (model_dir / 'README.md').read_text(encoding='utf-8')
+    license_text = (model_dir / 'LICENSE').read_text(encoding='utf-8')
+    notice = (model_dir / 'NOTICE').read_text(encoding='utf-8')
+
+    assert 'license: apache-2.0' in card
+    assert 'base_model: unsloth/gemma-4-E2B-it-unsloth-bnb-4bit' in card
+    assert 'Apache License' in license_text
+    assert 'Version 2.0, January 2004' in license_text
+    assert 'google/gemma-4-E2B-it' in notice
+    assert 'Modification notice:' in notice
 
 
 def test_checked_in_adapter_matches_approved_hash_when_present():

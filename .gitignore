@@ -40,6 +40,8 @@ volumes/
 hf_cache/
 models/hr-orchestrator/*
 !models/hr-orchestrator/README.md
+!models/hr-orchestrator/LICENSE
+!models/hr-orchestrator/NOTICE
 !models/hr-orchestrator/manifest.json
 !models/hr-orchestrator/adapter_config.json
 !models/hr-orchestrator/chat_template.jinja
