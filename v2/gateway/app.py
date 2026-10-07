@@ -13,10 +13,18 @@
 複数ワーカー（別プロセス）で動かすと、後から起動したワーカーが他ワーカーの送信中の行を
 不明扱いにしてしまう。そのため main() は uvicorn を workers=1 で固定して起動する。
 並列度はワーカー内のスレッドプールで確保し、二重送信は claim_attempt の条件付き UPDATE で防ぐ。
+
+外から `uvicorn --workers N` で起動されたり、同じ DB volume を複数コンテナで共有されたりしても
+前提が崩れないよう、lifespan の開始時（recover_on_startup より前）に DB と同じディレクトリの
+ロックファイル（<DB>.lock）へ fcntl.flock(LOCK_EX|LOCK_NB) を取る。取れなければ GatewayAlreadyRunning で
+起動を失敗させる。ロックは lifespan の終了まで（= サーバプロセスの生存中）保持し、プロセスが落ちれば
+カーネルが解放する。ロックファイル自体は消さない（消すと別プロセスが新しい inode を作ってロックが二重化する）。
+flock はローカルファイルシステム（Docker の local volume を含む）前提。NFS 等の共有 FS では効かない。
 """
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -60,6 +68,37 @@ def _http_error(e: GatewayError) -> HTTPException:
     return HTTPException(status_code=code, detail=type(e).__name__)
 
 
+class GatewayAlreadyRunning(RuntimeError):
+    """同じ DB を使う Gateway が既に動いている（単一ワーカー前提の違反）。"""
+
+
+def lock_path_for(db_path: str) -> str:
+    return f"{db_path}.lock"
+
+
+def acquire_single_worker_lock(db_path: str) -> int:
+    """<db_path>.lock に排他ロックを取り、保持中の fd を返す。取れなければ GatewayAlreadyRunning。
+
+    解放は os.close(fd)（またはプロセス終了）。fd は O_CLOEXEC で exec 先に引き継がない。
+    flock はファイル記述ごとのロックなので、同一プロセス内でも別に open すれば競合として検出される。
+    """
+    lock_path = lock_path_for(db_path)
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise GatewayAlreadyRunning(
+            f"Gateway の DB は別のプロセスが使用中です（ロック {lock_path} を取得できない）。"
+            "Gateway は単一ワーカー前提のため、uvicorn --workers 2 以上や、同じ DB を共有する"
+            "複数コンテナ／複数プロセスでは起動できません。"
+        ) from None
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd
+
+
 def create_app(service: GatewayService, purge_interval: float | None = None) -> FastAPI:
     """purge_interval: 定期 purge の間隔（秒）。None なら環境変数から読む。"""
     interval = purge_interval_from_env() if purge_interval is None else purge_interval
@@ -68,6 +107,16 @@ def create_app(service: GatewayService, purge_interval: float | None = None) -> 
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        # 単一ワーカー前提の強制（モジュール docstring）。recover_on_startup より前に取る。
+        lock_fd = acquire_single_worker_lock(service.store.path)
+        try:
+            async with _serve(_app):
+                yield
+        finally:
+            os.close(lock_fd)
+
+    @asynccontextmanager
+    async def _serve(_app: FastAPI):
         # 先に ATTEMPTING→unknown（updated_at=起動時刻）にしてから保持期限の削除を行う。
         service.recover_on_startup()
         try:

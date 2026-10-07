@@ -92,7 +92,7 @@ def test_guard_truncated_allow_keeps_gate_question_version():
 def test_question_version_tracks_spec():
     assert question_version("x@1", [1, 2]) == question_version("x@1", [1, 2])
     assert question_version("x@1", [1, 2]) != question_version("x@1", [1, 3])
-    assert RuleC1Router().route("u", "q", None).question_version.startswith("rules-c1@2#")
+    assert RuleC1Router().route("u", "q", None).question_version.startswith("rules-c1@3#")
     assert RuleC2Gate().check(payload()).question_version.startswith("rules-c2@1#")
 
 
@@ -156,12 +156,12 @@ def test_rules_c2_allows_contract_example():
 
 def test_rules_c1_contracts_and_free():
     r = RuleC1Router()
-    d = r.route("u_general", "FAQにして", {"contract": "A-faq-format@1"})
+    d = r.route("u_general", "FAQにして", {"contract": "A-faq-format@1", "explanation": "expl-keihi-001@1"})
     assert (d.route, d.destination) == ("A", "claude")
     # hint は参考情報。宛先は契約の唯一の宛先（A→claude）で、hint では変わらない
-    d = r.route("u_exec", "x", {"contract": "A-faq-format@1", "destination_hint": "codex"})
+    d = r.route("u_exec", "x", {"contract": "A-faq-format@1", "explanation": "expl-keihi-001@1", "destination_hint": "codex"})
     assert d.destination == "claude" and "hint codex is reference only" in d.reason
-    d = r.route("u_manager", "x", {"contract": "B-csv-codegen@1"})
+    d = r.route("u_manager", "x", {"contract": "B-csv-codegen@1", "spec": "spec-csv-001@1"})
     assert (d.route, d.destination) == ("B", "codex")
     assert r.route("u", "x", {"contract": "Z-unknown@1"}).route == "human"
     # 旧版・未知の版は前方一致で読み替えない
@@ -254,9 +254,11 @@ def test_harness_cli_and_merge(tmp_path):
 # ---- C1 宛先選択（hint をそのまま返さない回帰） ----
 def test_rules_c1_destination_not_echo_hint():
     r = RuleC1Router()
-    assert r.route("u_manager", "x", {"contract": "B-csv-codegen@1"}).destination == "codex"
-    assert r.route("u_manager", "x", {"contract": "B-csv-codegen@1", "destination_hint": "claude"}).destination == "codex"
-    assert r.route("u_general", "x", {"contract": "A-faq-format@1", "destination_hint": "bogus"}).destination == "claude"
+    b = {"contract": "B-csv-codegen@1", "spec": "spec-csv-001@1"}
+    a = {"contract": "A-faq-format@1", "explanation": "expl-keihi-001@1"}
+    assert r.route("u_manager", "x", b).destination == "codex"
+    assert r.route("u_manager", "x", {**b, "destination_hint": "claude"}).destination == "codex"
+    assert r.route("u_general", "x", {**a, "destination_hint": "bogus"}).destination == "claude"
 
 
 def test_eval_destination_accuracy():

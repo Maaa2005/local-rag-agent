@@ -41,11 +41,16 @@ services:
       VLLM_BASE_URL: http://vllm:8000/v1
       JUDGE_BASE_URL: http://judge:8080
       INTERNAL_DB: /internal-data/internal.db
+      # 監査 DB（orchestrator.audit_store）。既定パスは持たないので必ず指定する（未指定なら起動時エラー）。
+      # 保持期限削除は deploy/audit-purge.cron からこのコンテナ内で python -m orchestrator.purge を 1 日 1 回実行。
+      ORCHESTRATOR_AUDIT_DB: /audit-data/audit.db
       MODELS_DIR: /models
       HOME: /tmp
     volumes:
       - docs:/docs:ro
       - internal-data:/internal-data
+      # 監査 DB 専用（internal-app だけがマウントする。gateway には渡さない）
+      - audit-data:/audit-data
       - models:/models:ro
       - gateway-sock:/run/gateway
     tmpfs:
@@ -201,6 +206,7 @@ networks:
 volumes:
   docs:
   internal-data:
+  audit-data:
   models:
   qdrant-data:
   gateway-data:

@@ -59,9 +59,41 @@ def test_cli_missing_db_does_not_create(tmp_path, capsys):
     assert not path.exists()
 
 
-def test_cli_requires_db():
-    with pytest.raises(SystemExit):
-        purge_cli.main([])
+def test_cli_requires_db_or_env(monkeypatch, capsys):
+    monkeypatch.delenv("ORCHESTRATOR_AUDIT_DB", raising=False)
+    assert purge_cli.main([]) == 1
+    assert json.loads(capsys.readouterr().err) == {"error": "AuditDbNotConfigured"}
+
+
+def test_cli_uses_env_when_db_omitted(db, monkeypatch, capsys):
+    monkeypatch.setenv("ORCHESTRATOR_AUDIT_DB", str(db))
+    assert purge_cli.main(["--dry-run"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"dry_run": True, "runs": 2, "events": 4}
+    assert purge_cli.main([]) == 0
+    assert json.loads(capsys.readouterr().out) == {"runs": 2, "events": 4}
+    assert _counts(db) == (2, 4)
+
+
+def test_cli_db_flag_overrides_env(db, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("ORCHESTRATOR_AUDIT_DB", str(tmp_path / "other.db"))
+    assert purge_cli.main(["--db", str(db), "--dry-run"]) == 0
+    assert json.loads(capsys.readouterr().out)["runs"] == 2
+    assert not (tmp_path / "other.db").exists()
+
+
+@pytest.mark.parametrize("value", ["", "   ", "relative/audit.db"])
+def test_cli_rejects_blank_or_relative_env(value, monkeypatch, capsys):
+    monkeypatch.setenv("ORCHESTRATOR_AUDIT_DB", value)
+    assert purge_cli.main([]) == 1
+    assert json.loads(capsys.readouterr().err) == {"error": "AuditDbNotConfigured"}
+
+
+def test_cli_env_missing_file_does_not_create(tmp_path, monkeypatch, capsys):
+    path = tmp_path / "nope.db"
+    monkeypatch.setenv("ORCHESTRATOR_AUDIT_DB", str(path))
+    assert purge_cli.main([]) == 1
+    assert json.loads(capsys.readouterr().err) == {"error": "DatabaseNotFound"}
+    assert not path.exists()
 
 
 def test_cli_db_error_returns_1(tmp_path, capsys):

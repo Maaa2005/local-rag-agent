@@ -13,7 +13,7 @@ from typing import Any
 
 from common.schemas import SendPayload
 from judge.base import C1Decision, C2Verdict, question_version
-from judge.destination import lookup_contract
+from judge.destination import RAW_SOURCE_KEY, contract_input_problem, lookup_contract
 
 MODEL = "rules"
 REVISION = "rules-v1"
@@ -28,8 +28,11 @@ _C1_HUMAN = re.compile(r"(人事|評価|処分|例外|判断して|相談|承認
 _C1_CODE = re.compile(r"(計算|合計|集計|何日|日数|件数|平均|変換)")
 # ルールベースは判断モデルに質問しないので、「質問の版」= 判定規則そのものの版（F9）。
 # 規則の定義から計算するので、規則を変えれば版も変わる
-C1_QUESTION_VERSION = question_version("rules-c1@2", {
+C1_QUESTION_VERSION = question_version("rules-c1@3", {
     "contract": "exact key -> contracts.json route + sole destination",
+    "contract_input": (f"{RAW_SOURCE_KEY} (raw source reference) -> reject; keys outside "
+                       "{contract, input_kind, options, destination_hint, free_text if contract.free_text} "
+                       "or input_kind missing/empty/non-string -> human"),
     "reject": _C1_REJECT.pattern, "human": _C1_HUMAN.pattern, "code": _C1_CODE.pattern,
 })
 
@@ -43,6 +46,15 @@ class RuleC1Router:
             c, why = lookup_contract(key)
             if c is None:
                 return C1Decision(route="human", reason=f"contract not usable: {why}", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
+            # 契約入力の中身を見る。元資料の直接指定は契約の外（承認済みテキストを通らない持ち出し）なので拒否、
+            # それ以外の形の崩れ（許容外キー・入力種別の欠落/空/非文字列）は人の判断へ
+            if input.get(RAW_SOURCE_KEY) is not None:
+                return C1Decision(route="reject", reason=f"contract {key}: raw source reference is not accepted ({RAW_SOURCE_KEY})",
+                                  model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
+            problem = contract_input_problem(c, input)
+            if problem is not None:
+                return C1Decision(route="human", reason=f"contract input not usable: {problem}",
+                                  model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
             hint = input.get("destination_hint")
             note = f"; hint {hint} is reference only" if hint is not None else ""
             # 権限は C1 では与えない（送信資格で別に検査する）。契約の経路と唯一の宛先を返すだけ

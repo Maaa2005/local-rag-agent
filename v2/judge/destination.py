@@ -11,6 +11,7 @@ Orchestrator の送信資格の検査も同じ orchestrator.policy.load_contract
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -48,3 +49,33 @@ def resolve_destination(route: str, contract_key: Any, path: Path | str = CONTRA
     if route != c.route:
         return None, f"route {route} does not match contract {contract_key} (route {c.route})"
     return c.destinations[0], f"contract {contract_key} sole destination"
+
+
+# 元資料の直接指定を表す入力キー。契約入力は承認済みテキストの参照だけを取り、元資料は受け付けない
+RAW_SOURCE_KEY = "source"
+
+
+def allowed_input_keys(contract: Contract) -> frozenset[str]:
+    """契約入力に許すキー。契約キー・入力種別（A=explanation / B=spec）・選択値・宛先の希望、
+    ＋ 依頼文（free_text）を取る契約だけ free_text。"""
+    keys = {"contract", contract.input_kind, "options", "destination_hint"}
+    if contract.free_text_max is not None:
+        keys.add("free_text")
+    return frozenset(keys)
+
+
+def contract_input_problem(contract: Contract, input: Any) -> str | None:
+    """契約入力が契約の形に合わなければ理由を返す（合えば None）。
+
+    許容外のキー（元資料 source を含む）、入力種別キーの欠落・None・空・非文字列を問題とする。
+    元資料の直接指定を reject に倒すかは呼び出し側が RAW_SOURCE_KEY で判断する。
+    """
+    if not isinstance(input, Mapping):
+        return f"contract input is not a mapping: {type(input).__name__}"
+    extra = sorted(str(k) for k in set(input) - allowed_input_keys(contract))
+    if extra:
+        return f"input keys not allowed by {contract.key}: {extra}"
+    v = input.get(contract.input_kind)
+    if not isinstance(v, str) or not v.strip():
+        return f"input {contract.input_kind} missing/empty/non-string for {contract.key}: {v!r}"
+    return None

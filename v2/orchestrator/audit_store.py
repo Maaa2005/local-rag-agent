@@ -10,6 +10,7 @@
 - 保持期限: ここに残すのはメタデータだけ（本文は持たない）なので N7 の「本文 30 日」は対象外。
   purge(now) が recorded_at から 90 日を過ぎた runs と、その events を 1 トランザクションで消す。
   定期実行は CLI（python -m orchestrator.purge）を外部 cron 等から呼ぶ（Orchestrator の常駐プロセスは未実装）。
+  cron 定義例は deploy/audit-purge.cron。
 - 改ざん検知（HMAC 等）は未実装。recorded_at を過去に偽って書けば早く消せるが、書き込めるのは
   Orchestrator 自身で、侵害された Orchestrator は設計書の対象外。
 - 質問の版（F9）: c1_question_version / c2_question_version に判断モデルへ渡した質問の版を残す。
@@ -19,18 +20,24 @@
 - 旧版の DB は起動時に移行する（不足列の追加と、無条件 DELETE 禁止トリガーの置き換え）。
 - 1 実行 = 1 run_id。runs 1 行 + events n 行を 1 トランザクションで書く。
 - 書き込み失敗は送信判断に影響させない。persist_run は例外を上げず結果に印を付けるだけ。
+- 置き場所: 環境変数 ORCHESTRATOR_AUDIT_DB（絶対パス）で指定し、Orchestrator の入口は
+  open_audit_store_from_env() でストアを開く。未指定・相対パスは AuditDbNotConfigured で起動時に止める
+  （既定パスは持たない。勝手な場所に書くと purge の cron や保全の対象から漏れ、相対パスは cwd 次第で
+  アプリと cron が別の DB を見るため）。run_contract(audit_sink=None) は「監査しない」意味のままで、
+  テスト・評価用。本番の入口は必ず from_env を経由する。purge CLI も --db 省略時はこの変数を使う。
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Protocol, Sequence
 
 if TYPE_CHECKING:
     from orchestrator.pipeline import RunResult
@@ -230,6 +237,32 @@ def persist_run(
     result.audit_persisted = True
     result.audit_run_id = rec.run_id
     return result
+
+
+AUDIT_DB_ENV = "ORCHESTRATOR_AUDIT_DB"
+
+
+class AuditDbNotConfigured(RuntimeError):
+    """ORCHESTRATOR_AUDIT_DB が未指定・空・相対パス。"""
+
+
+def audit_db_path_from_env(environ: Mapping[str, str] | None = None) -> str:
+    """ORCHESTRATOR_AUDIT_DB を読む。未指定・空白のみ・相対パスなら AuditDbNotConfigured。"""
+    env = os.environ if environ is None else environ
+    value = env.get(AUDIT_DB_ENV, "").strip()
+    if not value:
+        raise AuditDbNotConfigured(f"{AUDIT_DB_ENV} が未設定（監査 DB の既定パスは持たない）")
+    if not os.path.isabs(value):
+        raise AuditDbNotConfigured(f"{AUDIT_DB_ENV} は絶対パスで指定する")
+    return value
+
+
+def open_audit_store_from_env(environ: Mapping[str, str] | None = None) -> "AuditStore":
+    """Orchestrator の入口用。ORCHESTRATOR_AUDIT_DB の場所で AuditStore を開く（無ければ DB を作る）。
+
+    親ディレクトリは作らない（volume の付け忘れを sqlite3.OperationalError で起動時に検出する）。
+    """
+    return AuditStore(audit_db_path_from_env(environ))
 
 
 class AuditStore:

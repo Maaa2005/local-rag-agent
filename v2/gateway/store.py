@@ -107,6 +107,11 @@ class SendStore:
             conn.execute(_HISTORY_SCHEMA)
             conn.execute(_HISTORY_INDEX)
 
+    @property
+    def path(self) -> str:
+        """DB ファイルのパス（gateway.app の単一ワーカーロックがロックファイルの置き場所に使う）。"""
+        return self._path
+
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._path, timeout=30, isolation_level=None)
         conn.execute("PRAGMA synchronous=FULL")

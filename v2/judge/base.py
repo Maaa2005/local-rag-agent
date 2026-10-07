@@ -149,8 +149,10 @@ def guarded_c1(
     外部経路（A/B）の判定は、入力の契約キーを社内の契約定義から完全一致で引き直し、
     経路が契約と一致し、宛先がその契約の唯一の許可宛先と一致するときだけ通す。
     未知の版・無効契約・経路と契約の不整合・宛先の欠落や不一致・設定異常・切り捨ては human。
+    さらに契約入力が契約の許容キー外を含む（元資料 source など）／入力種別キー（explanation / spec）が
+    欠落・空・非文字列なら、判定モデルの答えに関わらず human（judge.destination.contract_input_problem）。
     """
-    from judge.destination import CONTRACTS_PATH, resolve_destination
+    from judge.destination import CONTRACTS_PATH, contract_input_problem, lookup_contract, resolve_destination
 
     n = len(request) + (len(str(input)) if input else 0)
     if n > max_input_chars:
@@ -181,4 +183,12 @@ def guarded_c1(
             return _human(f"C1 external route not backed by contract: {why}" + judged)
         if dec.destination != expected:
             return _human(f"C1 destination {dec.destination} is not the sole destination {expected} of {key}" + judged)
+        # 契約入力の中身も判定モデルと独立に照合する。許容外キー（元資料 source を含む）や入力種別の
+        # 欠落・空・非文字列があれば、判定モデルが外部経路を選んでも通さない
+        contract, why = lookup_contract(key, contracts_path or CONTRACTS_PATH)
+        if contract is None:
+            return _human(f"C1 external route not backed by contract: {why}" + judged)
+        problem = contract_input_problem(contract, input)
+        if problem is not None:
+            return _human(f"C1 external route with unusable contract input: {problem}" + judged)
     return dec

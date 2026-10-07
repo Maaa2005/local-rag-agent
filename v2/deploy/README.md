@@ -23,7 +23,7 @@
 
 | ゾーン | サービス | ネットワーク | volume |
 |---|---|---|---|
-| 社内 | internal-app（Orchestrator・本体未実装のプレースホルダ） | internal | docs(ro), internal-data, models(ro), gateway-sock |
+| 社内 | internal-app（Orchestrator・本体未実装のプレースホルダ） | internal | docs(ro), internal-data, audit-data, models(ro), gateway-sock |
 | 社内 | qdrant | internal | qdrant-data |
 | 社内 | vllm（profile laya） | internal | models(ro) |
 | 社内 | judge-laya（profile laya・プレースホルダ）/ judge-clef（profile clef） | internal（別名 `judge`） | models(ro) |
@@ -42,12 +42,39 @@ bash deploy/isolation_test.sh                                  # clef 構成な�
 
 モデルは `models` volume に事前取得しておく（revision 固定・取得用トークンはコンテナに渡さない）。各サービスは `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1` で起動する。
 
+## Gateway は単一ワーカーでしか起動しない
+
+Gateway は起動時に送信中（ATTEMPTING）の行をすべて「結果不明」にするため、同じ DB を 2 つ以上のプロセスで使うと、
+後から起動した方が他方の送信中の行を不明扱いにしてしまう。これを防ぐため、Gateway は起動時に DB と同じ場所の
+ロックファイル（`/data/gateway.db.lock`）に排他ロック（`flock`）を取り、取れなければ
+「別のプロセスが使用中」というメッセージで起動に失敗する。
+
+- `uvicorn --workers 2` 以上、`docker compose up --scale gateway=2`、同じ `gateway-data` volume を別コンテナに付ける、のいずれも 2 つ目が起動しない。
+- ロックはプロセスが終われば解放される。`/data/gateway.db.lock` は残ってよい（消さない）。
+- `python -m gateway.purge` はロックを取らないので、Gateway の稼働中に実行してよい。
+- `flock` はローカルの FS（Docker の local volume）前提。NFS 等の共有 FS に DB を置かない。
+
+## 監査 DB と定期 purge
+
+- 監査 DB（`orchestrator.audit_store`）の場所は環境変数 `ORCHESTRATOR_AUDIT_DB`（絶対パス）で指定する。compose では internal-app に `/audit-data/audit.db`（専用 volume `audit-data`。internal-app だけがマウント）を設定済み。
+- 既定パスは持たない。未設定・相対パスなら Orchestrator は起動時にエラーで止まる（勝手な場所に書くと purge や保全の対象から漏れるため）。volume を付け忘れて親ディレクトリが無い場合も、ディレクトリを作らずにエラーになる。
+- 保持期限（メタデータ 90 日）の削除は、Orchestrator に常駐プロセスがまだ無いため、ホストの cron から 1 日 1 回 `python -m orchestrator.purge` を internal-app 内で実行する。定義例は `deploy/audit-purge.cron`:
+
+```
+17 3 * * * cd "$V2_DIR" && docker compose -f deploy/compose.yml exec -T internal-app python -m orchestrator.purge >> "$HOME/audit-purge.log" 2>&1
+```
+
+- `--db` を省略すると `ORCHESTRATOR_AUDIT_DB` を使う（アプリと同じ DB を必ず対象にするため、cron 側でパスを書かない）。`--dry-run` で削除せず件数だけを確認できる。
+- 出力は件数だけの JSON（run_id・本文は出ない）。DB ファイルが無い・場所が未設定なら終了コード 1。
+- WSL 内 Engine で動かす場合は WSL 側で cron サービスを起動しておく（WSL は既定で cron を起動しない）。Docker Desktop の場合は Windows のタスクスケジューラから同じコマンドを 1 日 1 回呼ぶ。
+- **現時点の internal-app はプレースホルダ**で orchestrator パッケージを含まないため、この cron はまだ動かない。Orchestrator 本体のイメージに差し替えた時点で有効になる。常駐プロセスができたら、Gateway と同様にプロセス内で定期実行する方式へ移す。
+
 ## 保証すること（静的に検査済み: `tests/deploy/test_compose_static.py`）
 
 - 社内サービスは `internal: true` のネットワークだけに参加し、公開ポートを持たない。公開は frontend の 127.0.0.1 のみ。
 - gateway は egress ネットワークだけに参加し、社内 volume（docs / internal-data / models / qdrant-data）と Docker ソケットをマウントしない。
 - Orchestrator↔Gateway の受け渡しは `gateway-sock` volume だけ（共有するのは internal-app と gateway の 2 つ）。
-- gateway の DB は `gateway-data`（gateway 専用）。API キーは compose secrets で gateway にだけ渡し、環境変数に置かない。
+- gateway の DB は `gateway-data`（gateway 専用）。監査 DB は `audit-data`（internal-app 専用。`tests/orchestrator/test_audit_deploy.py` で検査）。API キーは compose secrets で gateway にだけ渡し、環境変数に置かない。
 - 全サービス read_only / cap_drop ALL / no-new-privileges / 非 root ユーザ。
 - Clef-flash 構成（profile clef）では vllm を起動しない。
 - gateway イメージは v2/common と v2/gateway だけを含む。

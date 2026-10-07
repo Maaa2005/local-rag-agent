@@ -16,14 +16,31 @@ def _run(cid, tmp_path, **kw):
     return run_case(CASES[cid], RuleC1Router(), RuleC2Gate(), workdir=tmp_path, **kw)
 
 
-def test_v072_rejected_at_eligibility_without_adapter_call(tmp_path):
+def test_v072_rejected_at_c1_without_adapter_call(tmp_path):
+    # 元資料の直接指定（source）は C1 が契約入力の中身を見て reject する（送信資格の検査より前で止まる）。
+    # cases.jsonl の expected_stop は旧挙動の "eligibility" のままなので stop は一致しない（outcome は一致）
     r = _run("V072", tmp_path)
-    assert (r["outcome"], r["stop"]) == ("rejected", "eligibility")
+    assert (r["outcome"], r["stop"], r["raw_stopped_at"]) == ("rejected", "route", "C1")
+    assert (r["c1_route"], r["c1_destination"], r["c1_model"]) == ("reject", None, "rules")
     assert r["adapter_calls"] == 0 and r["sent_destinations"] == []
     assert r["gateway_received"] is False and r["attempted"] is False
     assert r["driver"] == "generic"  # source 指定は run_contract_a が受け付けない
-    assert "閲覧権限" in r["reason"]
+    assert "raw source reference" in r["reason"]
     assert r["missend"] is False
+
+
+def test_v072_held_by_guard_even_if_router_allows(tmp_path):
+    # 判定モデルが契約の経路と正しい宛先を返しても、guarded_c1 が契約入力の形で止める
+    from judge.base import C1Decision
+
+    class AlwaysA:
+        def route(self, user, request, input):  # noqa: A002
+            return C1Decision(route="A", destination="claude", reason="fake", model="fake", revision="r",
+                              question_version="q@1")
+
+    r = run_case(CASES["V072"], AlwaysA(), RuleC2Gate(), workdir=tmp_path)
+    assert (r["outcome"], r["raw_stopped_at"], r["c1_model"]) == ("held", "C1", "guard")
+    assert r["adapter_calls"] == 0 and r["gateway_received"] is False and r["missend"] is False
 
 
 @pytest.mark.parametrize("cid,dest", [("V001", "claude"), ("V003", "claude"), ("V011", "codex"), ("V012", "codex")])
@@ -112,8 +129,8 @@ def test_cli_writes_report_and_results(tmp_path, capsys):
     res = json.loads((out / "results.json").read_text(encoding="utf-8"))
     assert res["summary"]["cases"] == len(CASES)
     assert "judge_layer_summary" in res and res["confirm_policy"]
-    # V072 は判断層では誤送信に数えられるが、実システムでは送信資格で止まる
-    assert "V072" in res["judge_layer_summary"]["missend_ids"]
+    # V072 は C1 層（契約入力の中身の照合）で止まるので、判断層でも誤送信に数えない
+    assert "V072" not in res["judge_layer_summary"]["missend_ids"]
     assert "V072" not in res["summary"]["system_missend_ids"]
     md = (out / "report.md").read_text(encoding="utf-8")
     assert "E2E" in md and "判断層" in md

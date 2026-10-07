@@ -23,6 +23,9 @@ from typing import Any
 from common.schemas import C1Decision, C2Verdict, Message, SendPayload
 from judge.base import C1Router, C2Gate, guarded_c1, guarded_c2
 
+# 評価データだけが持つキー。製品の契約入力には無い（destination_hint は製品入力にもあるので除かない）
+EVAL_ONLY_KEYS = ("condition",)
+
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CASES = ROOT / "evaluation" / "v2" / "cases.jsonl"
 
@@ -122,7 +125,9 @@ def evaluate(cases: list[dict[str, Any]], router: C1Router, gate: C2Gate, *, tim
         inp = case.get("input")
         cond = (inp or {}).get("condition") or ""
         t0 = time.perf_counter()
-        dec = guarded_c1(router, case["user"], case["request"], inp, timeout_s, max_input_chars)
+        # 評価専用キー（condition 等）は製品の入力に無いので C1 には渡さない（run_v2_e2e と同じ扱い）
+        c1_inp = {k: v for k, v in inp.items() if k not in EVAL_ONLY_KEYS} if inp else inp
+        dec = guarded_c1(router, case["user"], case["request"], c1_inp, timeout_s, max_input_chars)
         t_c1 = time.perf_counter() - t0
         verdict: C2Verdict | None = None
         t_c2 = None

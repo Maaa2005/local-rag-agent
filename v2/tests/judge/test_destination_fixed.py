@@ -86,7 +86,7 @@ def test_rules_c1_holds_on_bad_config(tmp_path, monkeypatch):
 
     p = _write(tmp_path, lambda d: d[A].update(destinations=["claude", "codex"]))
     monkeypatch.setattr(rules, "lookup_contract", lambda key, path=p: lookup_contract(key, p))
-    d = RuleC1Router().route("u_general", "FAQにして", {"contract": A})
+    d = RuleC1Router().route("u_general", "FAQにして", A_INPUT)
     assert d.route == "human" and d.destination is None
 
 
@@ -106,20 +106,20 @@ def _g(router, inp, **kw):
 
 
 def test_guard_passes_sole_destination():
-    d = _g(Stub("A", "claude"), {"contract": A})
+    d = _g(Stub("A", "claude"), A_INPUT)
     assert (d.route, d.destination, d.model) == ("A", "claude", "m") and not is_guard_stop(d)
-    d = _g(Stub("B", "codex"), {"contract": B})
+    d = _g(Stub("B", "codex"), B_INPUT)
     assert (d.route, d.destination) == ("B", "codex")
 
 
 @pytest.mark.parametrize("stub,inp", [
-    (Stub("A", "codex"), {"contract": A}),            # 逆の宛先
-    (Stub("B", "claude"), {"contract": B}),
-    (Stub("A", None), {"contract": A}),               # 宛先欠落
+    (Stub("A", "codex"), A_INPUT),                    # 逆の宛先
+    (Stub("B", "claude"), B_INPUT),
+    (Stub("A", None), A_INPUT),                       # 宛先欠落
     (Stub("A", "claude"), None),                      # 契約なし
     (Stub("A", "claude"), {"contract": "A-faq-format@2"}),  # 旧版・未知版
-    (Stub("A", "claude"), {"contract": B}),           # 経路と契約の不整合
-    (Stub("A", "claude", truncated=True), {"contract": A}),
+    (Stub("A", "claude"), B_INPUT),                   # 経路と契約の不整合
+    (Stub("A", "claude", truncated=True), A_INPUT),
 ])
 def test_guard_holds(stub, inp):
     d = _g(stub, inp)
@@ -127,13 +127,13 @@ def test_guard_holds(stub, inp):
 
 
 def test_guard_truncated_flag_and_original_recorded():
-    d = _g(Stub("A", "claude", truncated=True), {"contract": A})
+    d = _g(Stub("A", "claude", truncated=True), A_INPUT)
     assert d.truncated and "judge m rev=r q=q@1" in d.reason
 
 
 def test_guard_bad_config_holds(tmp_path):
     p = _write(tmp_path, lambda d: d[A].update(destinations=["claude", "codex"]))
-    d = _g(Stub("A", "claude"), {"contract": A}, contracts_path=p)
+    d = _g(Stub("A", "claude"), A_INPUT, contracts_path=p)
     assert d.route == "human" and is_guard_stop(d)
 
 
@@ -155,7 +155,7 @@ def test_http_c1_truncated_reflected_and_held():
             "answers": [{"id": "route", "answer": "A", "probs": {"A": 0.9}}]}
     d = _http(body).route("u", "x", {"contract": A})
     assert d.truncated is True and d.destination == "claude"
-    g = guarded_c1(_http(body), "u", "x", {"contract": A}, 5.0, 4000)
+    g = guarded_c1(_http(body), "u", "x", A_INPUT, 5.0, 4000)
     assert g.route == "human" and g.truncated and is_guard_stop(g)
 
 
