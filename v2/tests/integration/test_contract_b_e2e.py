@@ -13,13 +13,13 @@ from pathlib import Path
 import pytest
 import uvicorn
 
-from common.schemas import C2Verdict, SendPayload, SendState, payload_digest
+from common.schemas import SendPayload, SendState, payload_digest
 from gateway.adapters import FakeAdapter
 from gateway.app import create_app
 from gateway.service import GatewayService
 from gateway.store import SendStore
 from integration.flow import default_c1, default_c2
-from judge.base import C1Decision
+from judge.base import C1Decision, C2Verdict
 from integration.flow_b import CONTRACT_B, contract_b_input, run_contract_b
 from integration.gateway_client import GatewayClient
 from integration.observe import AttemptingProbe, observe
@@ -66,10 +66,10 @@ class StubC2:
     def check(self, payload: SendPayload) -> C2Verdict:
         self.calls += 1
         if self.decision is not None:
-            return C2Verdict(decision=self.decision, reason="stub", model="stub", revision="0")
+            return C2Verdict(decision=self.decision, reason="stub", model="stub", revision="0", question_version="stub@1")
         text = "\n".join(m.content for m in payload.messages)
         d = "block" if self._PAT.search(text) else "allow"
-        return C2Verdict(decision=d, reason="stub", model="stub", revision="0")
+        return C2Verdict(decision=d, reason="stub", model="stub", revision="0", question_version="stub@1")
 
 
 class CountingC2:

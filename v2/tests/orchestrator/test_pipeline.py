@@ -18,6 +18,9 @@ from common.schemas import (
     StatusResponse,
     payload_digest,
 )
+from judge.base import GUARD_QUESTION_VERSION
+from judge.base import C2Verdict as JudgeC2Verdict
+from orchestrator.audit_store import AuditStore
 from orchestrator.candidate import SendCandidate, build_candidate
 from orchestrator.pipeline import GatewayNotReached, run_contract
 from orchestrator.policy import DEFAULT_POLICY_DIR, JST, check_eligibility, load_policy, sha256_text
@@ -69,8 +72,11 @@ class FakeGateway:
 
 
 class FakeC2:
-    def __init__(self, decision: str = "allow", truncated: bool = False, delay: float = 0.0, exc: Exception | None = None):
+    def __init__(self, decision: str = "allow", truncated: bool = False, delay: float = 0.0, exc: Exception | None = None,
+                 question_version: str | None = "fake@1"):
         self.decision, self.truncated, self.delay, self.exc = decision, truncated, delay, exc
+        # None なら質問の版を持たない（common.schemas の）C2Verdict を返す＝形式不正
+        self.question_version = question_version
         self.seen = []
 
     def check(self, payload):
@@ -79,7 +85,10 @@ class FakeC2:
             time.sleep(self.delay)
         if self.exc:
             raise self.exc
-        return C2Verdict(decision=self.decision, reason="fake", model="fake", revision="0", truncated=self.truncated)
+        kw = dict(decision=self.decision, reason="fake", model="fake", revision="0", truncated=self.truncated)
+        if self.question_version is None:
+            return C2Verdict(**kw)
+        return JudgeC2Verdict(**kw, question_version=self.question_version)
 
 
 class FakeConfirmer:
@@ -331,3 +340,98 @@ def test_rejected_run_has_no_visibility():
     res, gw = run(user="u_general", inp=B_INPUT, dest="codex")
     assert res.outcome == "rejected" and res.response_visibility is None and gw.calls == 0
     assert not res.can_view("u_general", 3)
+
+
+# ---- C2 の応答が C2Verdict でない・形式不正でも held/C2 で止め、監査に残す ----
+
+class RawC2:
+    """check が任意の値をそのまま返す C2 実装。"""
+
+    def __init__(self, raw):
+        self.raw = raw
+        self.calls = 0
+
+    def check(self, payload):
+        self.calls += 1
+        return self.raw
+
+
+class ExplodingVerdict:
+    """属性アクセスのたびに例外を投げる応答。"""
+
+    def __getattr__(self, name):
+        raise RuntimeError(f"boom on {name}")
+
+
+_VALID_DICT = dict(decision="allow", reason="dict", model="m", revision="1", question_version="q@1")
+
+
+@pytest.mark.parametrize("raw", [
+    pytest.param({k: v for k, v in _VALID_DICT.items() if k != "question_version"}, id="dict_without_question_version"),
+    pytest.param({"decision": "maybe", "reason": "x", "model": "m", "revision": "1", "question_version": "q@1"},
+                 id="dict_bad_decision"),
+    pytest.param({"foo": "bar"}, id="dict_wrong_shape"),
+    pytest.param(None, id="none"),
+    pytest.param("allow", id="string"),
+    pytest.param(C2Verdict(decision="allow", reason="no qv", model="m", revision="1"), id="verdict_without_question_version"),
+    pytest.param(ExplodingVerdict(), id="attribute_access_raises"),
+])
+@pytest.mark.parametrize("user,inp,dest", [("u_general", A_INPUT, "claude"), ("u_manager", B_INPUT, "codex")])
+def test_c2_malformed_response_held_and_persisted(tmp_path, raw, user, inp, dest):
+    store = AuditStore(tmp_path / "audit.db")
+    try:
+        conf = FakeConfirmer()
+        res, gw = run(user=user, inp=inp, dest=dest, c2=RawC2(raw), confirmer=conf, audit_sink=store)
+        assert (res.outcome, res.stopped_at) == ("held", "C2")
+        assert gw.calls == 0 and gw.prepared == [] and not res.gateway_received and not res.attempted
+        assert conf.seen == []
+        assert res.audit_persisted is True
+        assert res.c2_verdict is not None and res.c2_verdict.decision == "hold"
+        assert res.c2_verdict.question_version == GUARD_QUESTION_VERSION
+        (row,) = store.runs()
+        assert (row["outcome"], row["stopped_at"]) == ("held", "C2")
+        assert row["c2_decision"] == "hold" and row["c2_question_version"] == GUARD_QUESTION_VERSION
+    finally:
+        store.close()
+
+
+def test_c2_valid_dict_response_is_accepted():
+    res, gw = run(c2=RawC2(dict(_VALID_DICT)))
+    assert res.outcome == "sent" and len(gw.commits) == 1
+    assert res.c2_verdict.question_version == "q@1"
+
+
+@pytest.mark.parametrize("c2", [
+    FakeC2(exc=RuntimeError("down")),
+    FakeC2(delay=0.5),
+    FakeC2("allow", truncated=True),
+    FakeC2(question_version=None),
+], ids=["exception", "timeout", "truncated", "no_question_version"])
+def test_c2_failures_held_and_persisted(tmp_path, c2):
+    store = AuditStore(tmp_path / "audit.db")
+    try:
+        res, gw = run(c2=c2, audit_sink=store, c2_timeout_s=0.05)
+        assert (res.outcome, res.stopped_at) == ("held", "C2") and gw.calls == 0
+        assert res.audit_persisted is True
+        (row,) = store.runs()
+        assert (row["outcome"], row["stopped_at"], row["c2_decision"]) == ("held", "C2", "hold")
+    finally:
+        store.close()
+
+
+def test_c2_dict_allow_truncated_held_keeps_judge_question_version(tmp_path):
+    store = AuditStore(tmp_path / "audit.db")
+    try:
+        res, gw = run(c2=RawC2({**_VALID_DICT, "truncated": True}), audit_sink=store)
+        assert (res.outcome, res.stopped_at) == ("held", "C2") and gw.calls == 0
+        assert res.c2_verdict.decision == "hold" and res.c2_verdict.truncated
+        (row,) = store.runs()
+        assert row["c2_decision"] == "hold" and row["c2_truncated"] == 1 and row["c2_question_version"] == "q@1"
+    finally:
+        store.close()
+
+
+def test_c2_timeout_none_waits_without_timeout():
+    # c2_timeout_s=None はタイムアウトなし（従来互換）。遅い C2 でも結果を待って使う
+    res, gw = run(c2=FakeC2(delay=0.1), c2_timeout_s=None)
+    assert res.outcome == "sent" and len(gw.commits) == 1

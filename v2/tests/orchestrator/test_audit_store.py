@@ -300,7 +300,7 @@ class GuardedC2:
     """guard を通した C2（判定器が質問の版を返さない → hold）。"""
 
     def check(self, payload):
-        return guarded_c2(FakeC2(), payload, 1.0, 10_000)
+        return guarded_c2(FakeC2(question_version=None), payload, 1.0, 10_000)
 
 
 def test_guard_hold_records_guard_question_version(store):

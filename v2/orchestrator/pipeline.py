@@ -5,7 +5,6 @@
 """
 from __future__ import annotations
 
-import concurrent.futures
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Literal, Mapping, Protocol, Sequence
@@ -20,6 +19,7 @@ from common.schemas import (
     SendState,
     StatusResponse,
 )
+from judge.base import call_c2
 from orchestrator.audit_store import AuditSink, persist_run
 from orchestrator.candidate import ContractViolation, SendCandidate, build_candidate
 from orchestrator.policy import ApprovedText, Contract, Policy, check_eligibility, load_policy
@@ -154,18 +154,6 @@ def _free_text_authority(pol: Policy, user: str, contract: Contract) -> bool | N
     return u is not None and contract.key in u.free_text_approval
 
 
-def _call_c2(c2: C2Checker, payload: SendPayload, timeout_s: float | None) -> C2Verdict:
-    if timeout_s is None:
-        return c2.check(payload)
-    ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    try:
-        return ex.submit(c2.check, payload).result(timeout=timeout_s)
-    except concurrent.futures.TimeoutError as e:
-        raise TimeoutError(f"C2 が {timeout_s} 秒以内に応答しない") from e
-    finally:
-        ex.shutdown(wait=False, cancel_futures=True)
-
-
 def run_contract(
     user: str,
     input: Mapping[str, Any],
@@ -224,18 +212,23 @@ def run_contract(
     ids = dict(request_id=cand.request_id, digest=cand.digest)
     bodies.extend(m.content for m in cand.payload.messages)
 
-    # 3. C2（失敗・タイムアウト・切り捨て・保留・拒否は Gateway に渡さない）
+    # 3. C2（失敗・タイムアウト・形式不正・切り捨て・保留・拒否は Gateway に渡さない）
+    # 応答の検査は judge.base.guarded_c2 と同じ規則（call_c2）。C2 実装が C2Verdict 以外を返しても
+    # ここで hold の C2Verdict に揃うので、以降の属性参照で例外が外へ出て監査が残らないことはない。
+    # 入力長の上限は掛けない: 送信本文は build_candidate が契約の payload_chars で既に制限している
     try:
-        verdict = _call_c2(c2, cand.payload, c2_timeout_s)
-    except Exception as e:  # noqa: BLE001  失敗は送らない側へ倒す
+        verdict = call_c2(c2, cand.payload, c2_timeout_s)
+        detail = f"{verdict.reason} truncated={verdict.truncated} model={verdict.model}@{verdict.revision}"
+        decision, truncated = verdict.decision, verdict.truncated
+    except Exception as e:  # noqa: BLE001  検査自体の想定外の失敗も送らない側へ倒す
         reason = f"C2 失敗: {type(e).__name__}: {e}"
         audit.append(AuditEvent("C2", "error", reason))
         return stop("held", "C2", reason, **ids)
-    audit.append(AuditEvent("C2", verdict.decision, f"{verdict.reason} truncated={verdict.truncated} model={verdict.model}@{verdict.revision}"))
-    if verdict.truncated:
+    audit.append(AuditEvent("C2", decision, detail))
+    if truncated:
         return stop("held", "C2", "C2 の入力が切り捨てられ全文を検査できていない", c2_verdict=verdict, **ids)
-    if verdict.decision != "allow":
-        return stop("held", "C2", f"C2 が {verdict.decision}: {verdict.reason}", c2_verdict=verdict, **ids)
+    if decision != "allow":
+        return stop("held", "C2", f"C2 が {decision}: {verdict.reason}", c2_verdict=verdict, **ids)
 
     # 4. 利用者確認（同じ候補の digest に結び付ける）
     try:

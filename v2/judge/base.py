@@ -89,18 +89,16 @@ def _run_with_timeout(fn, timeout_s: float):
         ex.shutdown(wait=False, cancel_futures=True)
 
 
-def guarded_c2(gate: C2Gate, payload: SendPayload, timeout_s: float, max_input_chars: int) -> C2Verdict:
-    """C2 を呼び、失敗はすべて hold に倒す。allow を返すのは正常完了かつ全文検査済みのときだけ。"""
-    n = payload_chars(payload)
-    if n > max_input_chars:
-        # 全文を検査できないので判定モデルに渡す前に保留する（設計書: 入力切り捨て→保留）
-        return _hold(f"input too long: {n} > {max_input_chars} chars", truncated=True)
-    try:
-        raw = _run_with_timeout(lambda: gate.check(payload), timeout_s)
-    except cf.TimeoutError:
-        return _hold(f"C2 timeout after {timeout_s}s")
-    except Exception as e:  # noqa: BLE001  判定の失敗はすべて hold
-        return _hold(f"C2 error: {type(e).__name__}: {e}")
+def _call(fn, timeout_s: float | None):
+    """timeout_s=None はタイムアウトなし（呼び出したスレッドでそのまま待つ）。"""
+    return fn() if timeout_s is None else _run_with_timeout(fn, timeout_s)
+
+
+def check_c2_verdict(raw: Any) -> C2Verdict:
+    """C2 実装の応答を判断モデル層の C2Verdict に揃え、使えない応答は hold に倒す。
+
+    形式不正（dict の不足・None・文字列・質問の版の欠落など）と、全文を見ずに出した allow は hold。
+    """
     try:
         verdict = _coerce(C2Verdict, raw)
     except (ValidationError, TypeError) as e:
@@ -110,6 +108,26 @@ def guarded_c2(gate: C2Gate, payload: SendPayload, timeout_s: float, max_input_c
         return _hold("C2 reported truncated input", truncated=True, model=verdict.model, revision=verdict.revision,
                      question_version=verdict.question_version)
     return verdict
+
+
+def call_c2(gate: C2Gate, payload: SendPayload, timeout_s: float | None) -> C2Verdict:
+    """C2 を呼び、例外・タイムアウト・形式不正・切り捨てを hold に倒す（入力長の上限は掛けない）。"""
+    try:
+        raw = _call(lambda: gate.check(payload), timeout_s)
+    except cf.TimeoutError:
+        return _hold(f"C2 timeout after {timeout_s}s")
+    except Exception as e:  # noqa: BLE001  判定の失敗はすべて hold
+        return _hold(f"C2 error: {type(e).__name__}: {e}")
+    return check_c2_verdict(raw)
+
+
+def guarded_c2(gate: C2Gate, payload: SendPayload, timeout_s: float, max_input_chars: int) -> C2Verdict:
+    """C2 を呼び、失敗はすべて hold に倒す。allow を返すのは正常完了かつ全文検査済みのときだけ。"""
+    n = payload_chars(payload)
+    if n > max_input_chars:
+        # 全文を検査できないので判定モデルに渡す前に保留する（設計書: 入力切り捨て→保留）
+        return _hold(f"input too long: {n} > {max_input_chars} chars", truncated=True)
+    return call_c2(gate, payload, timeout_s)
 
 
 def _human(reason: str, *, truncated: bool = False) -> C1Decision:
