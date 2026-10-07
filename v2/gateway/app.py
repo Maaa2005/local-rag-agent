@@ -6,6 +6,8 @@
   GATEWAY_CLAUDE_MODEL  Claude のモデル名（未設定なら claude 宛先を無効）
   GATEWAY_CODEX_MODEL   Codex のモデル名（未設定なら codex 宛先を無効）
   GATEWAY_CLAUDE_KEY_FILE / GATEWAY_CODEX_KEY_FILE  キーのファイルパス（キー自体は環境変数に置かない）
+  GATEWAY_PURGE_INTERVAL_SECONDS  保持期限削除の定期実行間隔（秒、既定 86400。不正値・0 以下は既定値、
+                        60 未満は 60。解釈は gateway.purge.parse_purge_interval）
 
 単一ワーカー前提: 起動時の recover_on_startup は ATTEMPTING の行をすべて FAILED/unknown にする。
 複数ワーカー（別プロセス）で動かすと、後から起動したワーカーが他ワーカーの送信中の行を
@@ -14,6 +16,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -39,6 +42,7 @@ from gateway.service import (
     NotFound,
     PayloadTooLarge,
 )
+from gateway.purge import purge_interval_from_env, purge_periodically
 from gateway.store import StoreError
 
 
@@ -56,7 +60,12 @@ def _http_error(e: GatewayError) -> HTTPException:
     return HTTPException(status_code=code, detail=type(e).__name__)
 
 
-def create_app(service: GatewayService) -> FastAPI:
+def create_app(service: GatewayService, purge_interval: float | None = None) -> FastAPI:
+    """purge_interval: 定期 purge の間隔（秒）。None なら環境変数から読む。"""
+    interval = purge_interval_from_env() if purge_interval is None else purge_interval
+    if not interval > 0:
+        raise ValueError("purge_interval must be positive")
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         # 先に ATTEMPTING→unknown（updated_at=起動時刻）にしてから保持期限の削除を行う。
@@ -67,7 +76,14 @@ def create_app(service: GatewayService) -> FastAPI:
             # 削除に失敗しても送信記録の整合は崩れない（1 トランザクションで ROLLBACK）。起動は続ける。
             logging.getLogger("gateway").error(
                 "startup purge failed kind=%s", type(e.__cause__ or e).__name__)
-        yield
+        # 常駐中の定期 purge。送信処理と同時に走ってよい（SendStore.purge_expired の docstring）。
+        stop = asyncio.Event()
+        task = asyncio.create_task(purge_periodically(lambda: service.purge_expired(), interval, stop))
+        try:
+            yield
+        finally:
+            stop.set()
+            await task
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 

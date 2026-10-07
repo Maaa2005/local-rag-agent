@@ -9,7 +9,7 @@
   90 日）を過ぎた行だけをトリガーで許し、それ以外は拒否する。削除の API は purge だけ。
 - 保持期限: ここに残すのはメタデータだけ（本文は持たない）なので N7 の「本文 30 日」は対象外。
   purge(now) が recorded_at から 90 日を過ぎた runs と、その events を 1 トランザクションで消す。
-  purge を定期実行する仕組み（スケジューラ）は未実装。
+  定期実行は CLI（python -m orchestrator.purge）を外部 cron 等から呼ぶ（Orchestrator の常駐プロセスは未実装）。
 - 改ざん検知（HMAC 等）は未実装。recorded_at を過去に偽って書けば早く消せるが、書き込めるのは
   Orchestrator 自身で、侵害された Orchestrator は設計書の対象外。
 - 質問の版（F9）: c1_question_version / c2_question_version に判断モデルへ渡した質問の版を残す。
@@ -286,11 +286,12 @@ class AuditStore:
                 c.execute("ROLLBACK")
                 raise
 
-    def purge(self, now: datetime | None = None) -> PurgeResult:
+    def purge(self, now: datetime | None = None, *, dry_run: bool = False) -> PurgeResult:
         """recorded_at から 90 日を過ぎた runs と、その events を 1 トランザクションで削除する。
 
         本文はここに保存しないので N7 の本文 30 日は対象外。削除可否は DB トリガーも
         実時刻で判定するため、未来の now を渡して期限内の行を消そうとすると全体が中止される。
+        dry_run=True は同じ DELETE を実行して件数を数え、最後に ROLLBACK する（何も消さない）。
         """
         now = now or datetime.now(timezone.utc)
         if now.tzinfo is None:
@@ -303,7 +304,7 @@ class AuditStore:
             try:
                 ev = c.execute(f"DELETE FROM events WHERE run_id IN ({old})", (cutoff,)).rowcount
                 rn = c.execute(f"DELETE FROM runs WHERE run_id IN ({old})", (cutoff,)).rowcount
-                c.execute("COMMIT")
+                c.execute("ROLLBACK" if dry_run else "COMMIT")
             except BaseException:
                 c.execute("ROLLBACK")
                 raise

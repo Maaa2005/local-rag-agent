@@ -90,6 +90,14 @@ class StoreError(RuntimeError):
     """記録に失敗した。"""
 
 
+class _DryRunRollback(Exception):
+    """dry_run の purge を ROLLBACK させるための内部例外（結果を運ぶ）。"""
+
+    def __init__(self, result: PurgeResult) -> None:
+        super().__init__("dry run")
+        self.result = result
+
+
 class SendStore:
     def __init__(self, path: str | Path) -> None:
         self._path = str(path)
@@ -221,13 +229,17 @@ class SendStore:
             )
             return cur.rowcount
 
-    def purge_expired(self, now: float) -> PurgeResult:
+    def purge_expired(self, now: float, *, dry_run: bool = False) -> PurgeResult:
         """保持期限を過ぎた記録を 1 トランザクションで消す。
 
         - META_RETENTION_DAYS 経過: sends 行と、その send_history 行を削除
         - BODY_RETENTION_DAYS 経過: payload_json を空文字、output_text を NULL にする
           （digest・状態・failure・request_id・時刻・履歴は残す）
         経過は「起点 <= now - 日数」で判定する（ちょうど期限の時刻で対象になる）。
+        dry_run=True は同じ文を実行して件数を数え、最後に ROLLBACK する（何も消さない）。
+
+        送信処理と同時に呼んでよい: 書き込みは全経路 BEGIN IMMEDIATE で直列化され、対象は
+        終端状態と期限切れ PREPARED に状態条件で限られる（ATTEMPTING・未期限 PREPARED は消さない）。
         """
         body_cut = now - BODY_RETENTION_DAYS * _DAY_SECONDS
         meta_cut = now - META_RETENTION_DAYS * _DAY_SECONDS
@@ -250,7 +262,12 @@ class SendStore:
                     f"WHERE {_RETENTION_TARGET} AND (payload_json != ? OR output_text IS NOT NULL)",
                     (PURGED_PAYLOAD, *params(body_cut), PURGED_PAYLOAD),
                 ).rowcount
-                return PurgeResult(bodies_purged=bodies, sends_deleted=sends, history_deleted=hist)
+                result = PurgeResult(bodies_purged=bodies, sends_deleted=sends, history_deleted=hist)
+                if dry_run:
+                    raise _DryRunRollback(result)
+                return result
+        except _DryRunRollback as d:
+            return d.result
         except sqlite3.Error as e:
             raise StoreError("purge failed") from e
 

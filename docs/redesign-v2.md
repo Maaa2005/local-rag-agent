@@ -232,7 +232,7 @@ Clef-flash の静的構成で生成 LLM を止めている間はローカル生�
 | N4 | 判定の失敗・タイムアウト・形式不正・入力切り捨ては「送らない」側に倒す |
 | N5 | 外部 API キーは Gateway 専用の secret ファイル等で渡し、リポジトリ・社内コンテナ・UI・監査本文・例外ログに出さない。交換は手順と再起動で行う |
 | N6 | モデルの重み・tokenizer は事前取得して revision を固定し、実行時はローカルパス・オフライン設定で起動する。取得用トークンを社内サービスに残さない |
-| N7 | 保持期限（本文 30 日・メタデータ 90 日）は実装済み（Gateway の送信記録は `gateway/store.py` の `purge_expired`、監査ログ（メタデータのみ・90 日）は `orchestrator/audit_store.py` の `purge`。Gateway 側の外部 cron 用 CLI は `python -m gateway.purge`）。監査ログの改ざん検知は初版では未実装（後回し） |
+| N7 | 保持期限（本文 30 日・メタデータ 90 日）は実装済み（Gateway の送信記録は `gateway/store.py` の `purge_expired`、監査ログ（メタデータのみ・90 日）は `orchestrator/audit_store.py` の `purge`）。定期実行: Gateway は起動時に 1 回、常駐中は `GATEWAY_PURGE_INTERVAL_SECONDS` 秒ごと（既定 86400 = 24 時間。未設定・数値でない・0 以下は既定値、60 未満は 60 に切り上げ。設定ミスで削除が止まらないよう無効化はしない）にバックグラウンドで実行し、失敗はログに出して継続する。送信処理と同時に走ってよい（全書き込みが BEGIN IMMEDIATE で直列化され、対象は終端状態と期限切れ PREPARED に限る。ATTEMPTING・未期限 PREPARED は消さない）。Orchestrator は常駐プロセスが未実装のため、監査ログは CLI `python -m orchestrator.purge --db PATH` を cron 等で 1 日 1 回実行する（常駐化したらライフサイクル内で同様に定期実行する）。Gateway 側の外部 cron 用 CLI は `python -m gateway.purge [--db PATH]`。どちらの CLI も件数を JSON で出し、`--dry-run` で削除せず件数だけを出す。監査ログの改ざん検知は初版では未実装（後回し） |
 | N8 | 応答時間は目標を決めず実測値を出す（v1 は 6GB 環境で中央値 約 34.7 秒） |
 
 ### 合格条件（初版）

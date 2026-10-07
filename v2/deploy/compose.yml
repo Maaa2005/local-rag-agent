@@ -174,6 +174,8 @@ services:
       GATEWAY_CODEX_MODEL: ${GATEWAY_CODEX_MODEL:-}
       GATEWAY_CLAUDE_KEY_FILE: /run/secrets/anthropic_api_key
       GATEWAY_CODEX_KEY_FILE: /run/secrets/openai_api_key
+      # 保持期限削除（N7）の定期実行間隔（秒）。既定 24 時間。不正値・0 以下は既定値、60 未満は 60。
+      GATEWAY_PURGE_INTERVAL_SECONDS: ${GATEWAY_PURGE_INTERVAL_SECONDS:-86400}
     secrets:
       - anthropic_api_key
       - openai_api_key
