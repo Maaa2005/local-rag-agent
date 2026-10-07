@@ -1,0 +1,19 @@
+{
+  "id": "spec-csv-001",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は date（YYYY-MM-DD）, category（文字列）, amount（整数）\n条件: 外部ライブラリは pandas のみ使ってよい。ファイル入出力は引数で受け取ったパスだけ",
+  "sha256": "a3f0de6209d5205bfc03fb0462167c75dffaa00aaabf9d27c708b206ca6d46c0",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1
+}

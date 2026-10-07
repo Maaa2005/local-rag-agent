@@ -1,0 +1,19 @@
+{
+  "id": "expl-keihi-001",
+  "version": 1,
+  "kind": "explanation",
+  "body": "経費の精算は、費用が発生した月の翌月10日までに経費精算システムから申請します。\n期限を過ぎた申請は原則として受け付けません。\n申請には領収書を添付します。領収書をなくした場合は、上長の承認を得て支出証明書で代えられます。\n承認された経費は、申請月の翌々月の給与振込日に給与口座へ振り込まれます。",
+  "sha256": "51734a6ff2abaa3386690981a2b70b3249f6b20ee1476cda2a63f81c1a2b8e5c",
+  "approver": "総務部長（架空）",
+  "purpose": "社員向けFAQ",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "A-faq-format@1"
+  ],
+  "source": "general/経費精算規程.md（第3条・第4条・第7条）",
+  "source_level": 1
+}

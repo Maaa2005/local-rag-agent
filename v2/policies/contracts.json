@@ -1,0 +1,57 @@
+{
+  "A-faq-format@1": {
+    "id": "A-faq-format",
+    "version": 1,
+    "enabled": true,
+    "purpose": "社員向けFAQ",
+    "input": "explanation",
+    "options": {
+      "文体": [
+        "です・ます調",
+        "である調",
+        "箇条書き"
+      ],
+      "長さ": [
+        "200字以内",
+        "400字以内"
+      ]
+    },
+    "free_text": null,
+    "limits": {
+      "payload_chars": 2000,
+      "output_chars": 1500
+    },
+    "destinations": [
+      "claude",
+      "codex"
+    ],
+    "template": "A-faq-format/1",
+    "response_visibility": "source_level_requester_only"
+  },
+  "B-csv-codegen@1": {
+    "id": "B-csv-codegen",
+    "version": 1,
+    "enabled": true,
+    "purpose": "汎用CSV処理のコード案",
+    "input": "spec",
+    "options": {
+      "言語": [
+        "Python 3.11"
+      ]
+    },
+    "free_text": {
+      "max_chars": 200,
+      "approval": "per_send_by_author"
+    },
+    "limits": {
+      "payload_chars": 1500,
+      "output_chars": 3000
+    },
+    "destinations": [
+      "claude",
+      "codex"
+    ],
+    "template": "B-csv-codegen/1",
+    "response_visibility": "requester_only_no_exec"
+  }
+}
