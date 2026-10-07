@@ -132,9 +132,9 @@ def test_size_limit_contract_a(svc):
 
 
 def test_size_limit_contract_b(svc):
-    svc.prepare(make_req(rid="req-ok-b-01", text="b" * 1497, contract="B-csv-codegen@1"))
+    svc.prepare(make_req(rid="req-ok-b-01", text="b" * 1497, contract="B-csv-codegen@1", dest="codex"))
     with pytest.raises(PayloadTooLarge):
-        svc.prepare(make_req(rid="req-ng-b-01", text="b" * 1498, contract="B-csv-codegen@1"))
+        svc.prepare(make_req(rid="req-ng-b-01", text="b" * 1498, contract="B-csv-codegen@1", dest="codex"))
 
 
 @pytest.mark.parametrize("contract", ["C-x@1", "A-faq", "A@1", "", "Z-foo@2"])
@@ -242,7 +242,7 @@ def test_destination_not_configured(db):
 
     svc = GatewayService(SendStore(db), {"claude": FakeAdapter()})
     with pytest.raises(InvalidRequest):
-        svc.prepare(make_req(dest="codex"))
+        svc.prepare(make_req(dest="codex", contract="B-csv-codegen@1"))
 
 
 # ---- 実アダプタ（SDK はダミーモジュールで差し替え。ネットワークに出ない） ----
@@ -350,7 +350,7 @@ def test_api_key_not_in_exception(monkeypatch, key_file, db, which, where):
     assert e.__suppress_context__
 
     svc = GatewayService(SendStore(db), {dest: adapter})
-    req = make_req(dest=dest)
+    req = make_req(dest=dest, contract="A-faq-format@1" if dest == "claude" else "B-csv-codegen@1")
     d = svc.prepare(req).digest
     st = svc.commit(CommitRequest(request_id=req.request_id, expected_digest=d))
     assert st.state == SendState.FAILED

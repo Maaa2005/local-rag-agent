@@ -40,6 +40,9 @@ class Contract:
     template: str
     # 応答の閲覧制約（設計書: 外部応答には入力資料の閲覧制約を引き継ぐ。初版では依頼者の会話内にだけ返す）
     response_visibility: str = "requester_only_no_exec"
+    # 契約が対応する処理経路（"A" / "B"）。C1 は契約キーを完全一致で引き、この経路と
+    # 唯一の許可宛先を返す（宛先の推論・代替選択はしない）
+    route: str | None = None
 
 
 # 既知の応答閲覧制約。未知の値は読み込み時に拒否する（解釈できない制約で表示しない）
@@ -87,14 +90,10 @@ def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def load_policy(policy_dir: Path | str = DEFAULT_POLICY_DIR) -> Policy:
-    d = Path(policy_dir)
-    users = {
-        uid: User(uid, int(u["level"]), tuple(u["contracts"]), tuple(u["free_text_approval"]))
-        for uid, u in _load_json(d / "users.json").items()
-    }
+def load_contracts(path: Path | str = DEFAULT_POLICY_DIR / "contracts.json") -> dict[str, Contract]:
+    """社内の契約定義（policies/contracts.json）を読む。C1 と送信資格の検査が同じ定義を使う。"""
     contracts = {}
-    for key, c in _load_json(d / "contracts.json").items():
+    for key, c in _load_json(Path(path)).items():
         ft = c.get("free_text")
         vis = c.get("response_visibility")
         if vis not in RESPONSE_VISIBILITIES:
@@ -111,7 +110,18 @@ def load_policy(policy_dir: Path | str = DEFAULT_POLICY_DIR) -> Policy:
             destinations=tuple(c["destinations"]),
             template=c["template"],
             response_visibility=vis,
+            route=c.get("route"),
         )
+    return contracts
+
+
+def load_policy(policy_dir: Path | str = DEFAULT_POLICY_DIR) -> Policy:
+    d = Path(policy_dir)
+    users = {
+        uid: User(uid, int(u["level"]), tuple(u["contracts"]), tuple(u["free_text_approval"]))
+        for uid, u in _load_json(d / "users.json").items()
+    }
+    contracts = load_contracts(d / "contracts.json")
     approved = {}
     for p in sorted((d / "approved").glob("*.json")):
         a = _load_json(p)
@@ -160,6 +170,9 @@ def check_eligibility(
         return _deny(f"契約が無効: {contract.key}", user=user)
     if contract.key not in user.contracts:
         return _deny(f"{user.id} は契約 {contract.key} の利用権限がない", user=user)
+    if len(contract.destinations) != 1:
+        # 初版は 1 契約 1 宛先。複数・0 件は設定異常として送らない
+        return _deny(f"契約 {contract.key} の宛先設定が異常（宛先は 1 件のみ）: {list(contract.destinations)}", user=user)
     if destination not in contract.destinations:
         return _deny(f"宛先 {destination} は契約 {contract.key} で許可されていない", user=user)
 

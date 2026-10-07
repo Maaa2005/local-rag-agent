@@ -110,6 +110,23 @@ def visibility_fields(user: str, contract: Contract, approved: ApprovedText) -> 
     )
 
 
+def confirmation_view(candidate: SendCandidate) -> dict[str, Any]:
+    """利用者確認に出す情報。実際の宛先（候補の payload.destination）・契約・全本文・digest。
+
+    宛先は digest の計算対象（payload に含まれる）なので、確認した digest と送信先は結び付く。
+    宛先は C1 が契約から解決した唯一の宛先で、destination_hint（利用者の希望）では変わらない。
+    """
+    p = candidate.payload
+    return {
+        "destination": p.destination,
+        "contract": p.contract,
+        "messages": [{"role": m.role, "content": m.content} for m in p.messages],
+        "max_output_chars": p.max_output_chars,
+        "approved_ref": candidate.approved_ref,
+        "digest": candidate.digest,
+    }
+
+
 def c1_detail(decision: C1Decision) -> str:
     return f"route={decision.route} destination={decision.destination} model={decision.model}@{decision.revision}: {decision.reason}"
 
@@ -232,7 +249,7 @@ def run_contract(
     if confirmed != cand.digest:
         audit.append(AuditEvent("confirm", "mismatch", f"confirmed={confirmed}"))
         return stop("rejected", "digest", "確認済みの内容と送信候補が一致しない。新しい候補として C2 と確認をやり直す", c2_verdict=verdict, **ids)
-    audit.append(AuditEvent("confirm", "ok", f"{confirmed} approver={user}"))
+    audit.append(AuditEvent("confirm", "ok", f"{confirmed} approver={user} destination={cand.payload.destination}"))
     vis.update(approver=user, approver_authority=_free_text_authority(pol, user, elig.contract))
 
     # 5. 権限再確認

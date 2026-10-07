@@ -31,18 +31,20 @@ import httpx
 
 from common.schemas import SendPayload
 from judge.base import C1Decision, C2Verdict, question_version
+from judge.destination import resolve_destination
 
 ROUTES = ["code", "local", "A", "B", "human", "reject"]
-DESTS = ["claude", "codex"]
 
-C1_PROMPT_VERSION = "c1-route@1"
+C1_PROMPT_VERSION = "c1-route@2"
 C2_PROMPT_VERSION = "c2-forbidden@1"
 
 # 送る質問セット。文言を変えたら *_PROMPT_VERSION を上げる（上げ忘れてもハッシュで区別される）
 C1_QUESTIONS: tuple[dict[str, Any], ...] = (
     {"id": "route", "type": "choice", "prompt": "この依頼の処理経路はどれか", "choices": ROUTES},
-    {"id": "destination", "type": "choice", "prompt": "外部に頼む場合の送信先はどちらが適切か", "choices": DESTS},
 )
+# 宛先はモデルに質問しない。外部経路（A/B）の宛先は、入力の契約キーを社内の契約定義から
+# 完全一致で引いた唯一の許可宛先（judge.destination.resolve_destination）。解決できなければ
+# destination=None で返し、guarded_c1 が human に倒す
 C2_QUESTIONS: tuple[dict[str, Any], ...] = ({
     "id": "forbidden", "type": "noul",
     "prompt": "このテキストに、社外へ送ってはいけない情報（個人名・社員番号・取引先名・金額や日付の実データ・"
@@ -96,14 +98,16 @@ class HttpC1Router:
         route = ra.get("answer")
         if route not in ROUTES:
             raise MalformedResponse(f"bad route {route!r}")
-        dest = None
+        dest, why = None, ""
         if route in ("A", "B"):
-            dest = self._c.answer(body, "destination").get("answer")
-            if dest not in DESTS:
-                raise MalformedResponse(f"bad destination {dest!r}")
+            dest, why = resolve_destination(route, (input or {}).get("contract"))
         probs = {k: float(v) for k, v in (ra.get("probs") or {}).items()}
-        return C1Decision(route=route, destination=dest, reason=f"{C1_PROMPT_VERSION}", model=str(body.get("model") or self._c.model),
-                          revision=str(body["revision"]), probs=probs, question_version=C1_QUESTION_VERSION)
+        # 切り捨ては結果に載せ、guarded_c1 が human に倒す（全文を見ずに出した判定を使わない）
+        truncated = bool(body.get("truncated", False))
+        reason = C1_PROMPT_VERSION + (f"; dest: {why}" if why else "")
+        return C1Decision(route=route, destination=dest, reason=reason, model=str(body.get("model") or self._c.model),
+                          revision=str(body["revision"]), probs=probs, question_version=C1_QUESTION_VERSION,
+                          truncated=truncated)
 
 
 class HttpC2Gate:

@@ -32,6 +32,8 @@ GUARD_QUESTION_VERSION = "guard-failsafe@1"
 
 class C1Decision(schemas.C1Decision):
     question_version: str = Field(min_length=1)
+    # 判断モデルが入力を切り捨てて判定したか。True の判定は guarded_c1 が human に倒す
+    truncated: bool = False
 
 
 class C2Verdict(schemas.C2Verdict):
@@ -110,18 +112,31 @@ def guarded_c2(gate: C2Gate, payload: SendPayload, timeout_s: float, max_input_c
     return verdict
 
 
-def _human(reason: str) -> C1Decision:
+def _human(reason: str, *, truncated: bool = False) -> C1Decision:
     return C1Decision(route="human", destination=None, reason=reason, model=GUARD_MODEL, revision=GUARD_REVISION,
-                      question_version=GUARD_QUESTION_VERSION)
+                      question_version=GUARD_QUESTION_VERSION, truncated=truncated)
+
+
+def is_guard_stop(decision: Any) -> bool:
+    """guarded_c1 が失敗・不正・契約不整合で止めた判定か（＝保留扱い）。"""
+    return getattr(decision, "model", None) == GUARD_MODEL
 
 
 def guarded_c1(
-    router: C1Router, user: str, request: str, input: dict[str, Any] | None, timeout_s: float, max_input_chars: int
+    router: C1Router, user: str, request: str, input: dict[str, Any] | None, timeout_s: float, max_input_chars: int,
+    *, contracts_path: Any = None,
 ) -> C1Decision:
-    """C1 を呼び、失敗は route='human'（人に回す・外部へ送らない）に倒す。"""
+    """C1 を呼び、失敗は route='human'（人に回す・外部へ送らない）に倒す。
+
+    外部経路（A/B）の判定は、入力の契約キーを社内の契約定義から完全一致で引き直し、
+    経路が契約と一致し、宛先がその契約の唯一の許可宛先と一致するときだけ通す。
+    未知の版・無効契約・経路と契約の不整合・宛先の欠落や不一致・設定異常・切り捨ては human。
+    """
+    from judge.destination import CONTRACTS_PATH, resolve_destination
+
     n = len(request) + (len(str(input)) if input else 0)
     if n > max_input_chars:
-        return _human(f"input too long: {n} > {max_input_chars} chars")
+        return _human(f"input too long: {n} > {max_input_chars} chars", truncated=True)
     try:
         raw = _run_with_timeout(lambda: router.route(user, request, input), timeout_s)
     except cf.TimeoutError:
@@ -132,7 +147,20 @@ def guarded_c1(
         dec = _coerce(C1Decision, raw)
     except (ValidationError, TypeError) as e:
         return _human(f"C1 malformed decision: {type(e).__name__}")
-    if dec.route in ("A", "B") and dec.destination is None:
-        # 外部経路なのに宛先が無いのは形式不正扱い
-        return _human("C1 external route without destination")
+    # guard が止めた判定は model=guard で返す（呼び出し側が「保留」と「モデルが他経路を選んだ」を
+    # 区別できるように）。元の判定のモデル・版・質問の版は理由欄に残す
+    judged = f" [judge {dec.model} rev={dec.revision} q={dec.question_version} route={dec.route} dest={dec.destination}]"
+    if dec.truncated:
+        # 全文を見ずに出した判定は使わない（判定したモデル・版は残す）
+        return _human("C1 reported truncated input" + judged, truncated=True)
+    if dec.route in ("A", "B"):
+        if dec.destination is None:
+            # 外部経路なのに宛先が無いのは形式不正扱い
+            return _human("C1 external route without destination" + judged)
+        key = (input or {}).get("contract")
+        expected, why = resolve_destination(dec.route, key, contracts_path or CONTRACTS_PATH)
+        if expected is None:
+            return _human(f"C1 external route not backed by contract: {why}" + judged)
+        if dec.destination != expected:
+            return _human(f"C1 destination {dec.destination} is not the sole destination {expected} of {key}" + judged)
     return dec

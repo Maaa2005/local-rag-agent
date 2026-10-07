@@ -58,6 +58,10 @@ class PayloadTooLarge(InvalidRequest):
     pass
 
 
+class ContractRevoked(InvalidRequest):
+    """commit 時点の契約レジストリで、この PREPARED を送れない（無効・未登録・宛先不一致）。"""
+
+
 class Expired(GatewayError):
     pass
 
@@ -82,6 +86,21 @@ def contract_spec(contract: str) -> ContractSpec:
     return spec
 
 
+def check_contract_destination(contract: str, destination: str) -> ContractSpec:
+    """契約が有効で、宛先がその契約の唯一の許可宛先であることを確かめる。
+
+    初版は 1 契約 1 宛先。宛先が 1 件でない契約は設定異常として通さない。
+    """
+    spec = contract_spec(contract)
+    if not spec.enabled:
+        raise InvalidRequest("contract disabled")
+    if len(spec.destinations) != 1:
+        raise InvalidRequest("contract must have exactly one destination")
+    if destination not in spec.destinations:
+        raise InvalidRequest("destination not allowed for contract")
+    return spec
+
+
 def body_chars(payload: SendPayload) -> int:
     return sum(len(m.content) for m in payload.messages)
 
@@ -102,9 +121,7 @@ class GatewayService:
     # ---- 検査 ----
     def _validate(self, req: PrepareRequest) -> None:
         p = req.payload
-        spec = contract_spec(p.contract)
-        if p.destination not in spec.destinations:
-            raise InvalidRequest("destination not allowed for contract")
+        spec = check_contract_destination(p.contract, p.destination)
         if not p.messages:
             raise InvalidRequest("empty messages")
         # 構造: system は先頭に最大 1 件、残りは user のみ（assistant は契約 A/B に不要）
@@ -169,6 +186,14 @@ class GatewayService:
         # 保存内容の改変検出（DB 直接改変など）
         if payload_digest(payload) != rec.digest:
             raise DigestMismatch("stored payload digest mismatch")
+        # 送る直前に現行レジストリで契約を再検査する。prepare 後に契約が無効化・宛先変更された場合や、
+        # 旧方針（1 契約 2 宛先）で作られた PREPARED（例: A 契約で codex 宛）は送らずに拒否する。
+        # 行は PREPARED のまま残り、送信期限切れ後に保持期限で消える（別宛先への切り替えはしない）
+        try:
+            check_contract_destination(payload.contract, payload.destination)
+        except InvalidRequest as e:
+            log.warning("commit refused by contract recheck request_id=%s reason=%s", rec.request_id, e)
+            raise ContractRevoked(f"contract recheck failed: {e}") from e
         adapter = self.adapters.get(payload.destination)
         if adapter is None:
             raise InvalidRequest("destination not available")

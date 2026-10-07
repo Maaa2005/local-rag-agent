@@ -8,52 +8,19 @@
 """
 from __future__ import annotations
 
-import json
 import re
-from pathlib import Path
 from typing import Any
 
 from common.schemas import SendPayload
 from judge.base import C1Decision, C2Verdict, question_version
+from judge.destination import lookup_contract
 
 MODEL = "rules"
 REVISION = "rules-v1"
 
-_CONTRACT_ROUTE = {"A-faq-format": "A", "B-csv-codegen": "B"}
-# 宛先選択の基準: 設計書（redesign-v2.md / v2-contract-examples.md）は「どちらにするかは C1 が選ぶ」
-# とだけ書き、Claude / Codex の使い分け基準は規定していない（規定なし）。
-# そのため契約既定宛先を返す。既定は契約例ドキュメントの宛先欄の筆頭
-# （契約 A「Claude または Codex」→ claude、契約 B「Codex または Claude」→ codex）。
+# 宛先: C1 は契約キーを社内の契約定義（policies/contracts.json）から完全一致で引き、
+# その契約の経路と唯一の許可宛先を返す（judge.destination）。宛先の推論・代替選択はしない。
 # destination_hint は利用者の希望という参考情報で、宛先の決定には使わない（理由欄に記録だけする）。
-_DEFAULT_DEST = {"A": "claude", "B": "codex"}
-_DESTS = ("claude", "codex")
-_CONTRACTS_PATH = Path(__file__).resolve().parents[1] / "policies" / "contracts.json"
-
-
-def _allowed_destinations(contract_key: str, path: Path = _CONTRACTS_PATH) -> tuple[str, ...]:
-    """policies/contracts.json（読み取りのみ）の契約宛先。読めなければ両方を候補にする。"""
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        c = data.get(contract_key) or next((v for k, v in data.items() if k.split("@", 1)[0] == contract_key.split("@", 1)[0]), None)
-        dests = tuple(d for d in (c or {}).get("destinations", ()) if d in _DESTS)
-        return dests or _DESTS
-    except (OSError, ValueError, AttributeError):
-        return _DESTS
-
-
-def choose_destination(route: str, contract_key: str, hint: Any = None, path: Path = _CONTRACTS_PATH) -> tuple[str, str]:
-    """契約既定宛先を契約の許可宛先内で選ぶ。hint は既定宛先が契約で使えないときの候補順にだけ使う。"""
-    allowed = _allowed_destinations(contract_key, path)
-    default = _DEFAULT_DEST[route]
-    if default in allowed:
-        dest, why = default, "contract default"
-    elif hint in allowed:
-        dest, why = str(hint), "default not allowed; hint within contract"
-    else:
-        dest, why = allowed[0], "default not allowed; first contract destination"
-    if hint in _DESTS and hint != dest:
-        why += f"; hint {hint} not followed (no selection rule in design doc)"
-    return dest, why
 
 # C1: 契約を使わない依頼の素朴なキーワード振り分け（契約例ドキュメントの経路定義から）
 _C1_REJECT = re.compile(r"(指示は?無視|全文を(出力|送|貼)|外部に(送|出)|持ち出|漏ら)")
@@ -61,8 +28,8 @@ _C1_HUMAN = re.compile(r"(人事|評価|処分|例外|判断して|相談|承認
 _C1_CODE = re.compile(r"(計算|合計|集計|何日|日数|件数|平均|変換)")
 # ルールベースは判断モデルに質問しないので、「質問の版」= 判定規則そのものの版（F9）。
 # 規則の定義から計算するので、規則を変えれば版も変わる
-C1_QUESTION_VERSION = question_version("rules-c1@1", {
-    "contract_route": _CONTRACT_ROUTE, "default_dest": _DEFAULT_DEST,
+C1_QUESTION_VERSION = question_version("rules-c1@2", {
+    "contract": "exact key -> contracts.json route + sole destination",
     "reject": _C1_REJECT.pattern, "human": _C1_HUMAN.pattern, "code": _C1_CODE.pattern,
 })
 
@@ -72,13 +39,15 @@ class RuleC1Router:
 
     def route(self, user: str, request: str, input: dict[str, Any] | None) -> C1Decision:
         if input and input.get("contract"):
-            cid = str(input["contract"]).split("@", 1)[0]
-            route = _CONTRACT_ROUTE.get(cid)
-            if route is None:
-                return C1Decision(route="human", reason=f"unknown contract {cid}", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
-            dest, why = choose_destination(route, str(input["contract"]), input.get("destination_hint"))
-            # 権限は C1 では与えない（送信資格で別に検査する）。契約指定どおりに経路候補を返すだけ
-            return C1Decision(route=route, destination=dest, reason=f"contract {cid}; dest: {why}", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
+            key = input["contract"]
+            c, why = lookup_contract(key)
+            if c is None:
+                return C1Decision(route="human", reason=f"contract not usable: {why}", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
+            hint = input.get("destination_hint")
+            note = f"; hint {hint} is reference only" if hint is not None else ""
+            # 権限は C1 では与えない（送信資格で別に検査する）。契約の経路と唯一の宛先を返すだけ
+            return C1Decision(route=c.route, destination=c.destinations[0], reason=f"contract {key}; sole destination{note}",
+                              model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
         if _C1_REJECT.search(request):
             return C1Decision(route="reject", reason="exfiltration/injection phrase", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
         if _C1_HUMAN.search(request):

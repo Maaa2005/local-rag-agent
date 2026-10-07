@@ -1,6 +1,8 @@
 """Gateway 側の固定契約レジストリ（コード内定数）。
 
-値は policies/contracts.json（Orchestrator 側の契約定義）の limits / destinations と揃える。
+値は policies/contracts.json（Orchestrator 側の契約定義）の limits / destinations / enabled と揃える
+（一致は tests/gateway/test_destination_fixed.py で自動検査）。
+初版は 1 契約 1 宛先（A=claude、B=codex）。宛先が 1 件でない・無効な契約は prepare も commit も通さない。
 Gateway は社内ゾーンの設定ファイルを読まず、この定数だけを正とする。
 キーは完全一致で引く（"A-faq-format@1" など）。
 """
@@ -21,6 +23,7 @@ class ContractSpec:
     output_chars: int           # max_output_chars の上限
     destinations: frozenset[str]
     max_ttl_seconds: float      # expires_at - now の上限
+    enabled: bool = True        # False なら prepare を拒否し、既存の PREPARED も commit で送らない
 
     @property
     def max_output_tokens(self) -> int:
@@ -32,14 +35,14 @@ CONTRACTS: dict[str, ContractSpec] = {
         key="A-faq-format@1",
         payload_chars=2000,
         output_chars=1500,
-        destinations=frozenset({"claude", "codex"}),
+        destinations=frozenset({"claude"}),
         max_ttl_seconds=15 * 60,
     ),
     "B-csv-codegen@1": ContractSpec(
         key="B-csv-codegen@1",
         payload_chars=1500,
         output_chars=3000,
-        destinations=frozenset({"claude", "codex"}),
+        destinations=frozenset({"codex"}),
         max_ttl_seconds=15 * 60,
     ),
 }

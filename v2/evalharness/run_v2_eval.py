@@ -55,9 +55,14 @@ def load_cases(path: Path = DEFAULT_CASES) -> list[dict[str, Any]]:
 
 
 def build_payload(case: dict[str, Any], decision: C1Decision) -> SendPayload | None:
-    """C1 が A/B を選んだときの送信候補を組み立てる。組めなければ None。"""
+    """C1 が A/B を選んだときの送信候補を組み立てる。組めなければ None。
+
+    宛先は C1 の結果だけを使う（既定宛先での補完はしない）。宛先が無ければ送信候補を作らない。
+    """
     inp = case.get("input") or {}
-    dest = decision.destination or ("claude" if decision.route == "A" else "codex")
+    dest = decision.destination
+    if dest is None:
+        return None
     opts = inp.get("options") or {}
     if decision.route == "A":
         eid = inp.get("explanation", "")

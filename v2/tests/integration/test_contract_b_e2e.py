@@ -13,12 +13,13 @@ from pathlib import Path
 import pytest
 import uvicorn
 
-from common.schemas import C1Decision, C2Verdict, SendPayload, SendState, payload_digest
+from common.schemas import C2Verdict, SendPayload, SendState, payload_digest
 from gateway.adapters import FakeAdapter
 from gateway.app import create_app
 from gateway.service import GatewayService
 from gateway.store import SendStore
 from integration.flow import default_c1, default_c2
+from judge.base import C1Decision
 from integration.flow_b import CONTRACT_B, contract_b_input, run_contract_b
 from integration.gateway_client import GatewayClient
 from integration.observe import AttemptingProbe, observe
@@ -47,7 +48,10 @@ class StubC1:
         self.destination = DEST if destination is _DEST_DEFAULT else destination
 
     def route(self, user, request, input):  # noqa: A002
-        return C1Decision(route=self.route_value, destination=self.destination, reason="stub", model="stub", revision="0")
+        self.calls = getattr(self, "calls", 0) + 1
+        self.last_input = input
+        return C1Decision(route=self.route_value, destination=self.destination, reason="stub", model="stub",
+                          revision="0", question_version="stub@1", truncated=getattr(self, "truncated", False))
 
 
 class StubC2:
@@ -331,12 +335,13 @@ def test_spec_ref_must_be_approved_for_contract_b(gw):
     _assert_nothing_sent(counting, store, fake)
 
 
-# ---- C1 の宛先照合（設計書 決定事項 5: 宛先は C1 が決める。不一致時の扱いは規定なし→安全側で保留） ----
+# ---- C1 の宛先照合（宛先固定: 宛先は C1 結果＝契約の唯一の宛先。呼び出し側の補完はしない） ----
 
 def test_c1_destination_mismatch_is_held_and_not_sent(gw):
+    """呼び出し側の destination が C1 結果（codex）と違えば停止する。"""
     svc, store, fake, probe = gw
     counting, c2c = CountingGateway(svc), CountingC2(c2())
-    res = run_contract_b(USER, SPEC, FREE, OPTS, DEST, c1=StubC1("B", destination="claude"), c2=c2c,
+    res = run_contract_b(USER, SPEC, FREE, OPTS, "claude", c1=StubC1("B"), c2=c2c,
                          confirmer=DigestConfirmer(), gateway=counting)
     assert res.outcome == "held"
     assert (res.run.outcome, res.run.stopped_at) == ("held", "C1")
@@ -345,15 +350,95 @@ def test_c1_destination_mismatch_is_held_and_not_sent(gw):
     _assert_nothing_sent(counting, store, fake)
 
 
-def test_c1_destination_none_uses_caller_and_is_audited(gw):
+def test_c1_reverse_destination_is_held_by_guard(gw):
+    """C1 が契約 B に claude を返したら guard が止める。"""
     svc, store, fake, probe = gw
-    conf = DigestConfirmer()
+    counting, c2c = CountingGateway(svc), CountingC2(c2())
+    res = run_contract_b(USER, SPEC, FREE, OPTS, None, c1=StubC1("B", destination="claude"), c2=c2c,
+                         confirmer=DigestConfirmer(), gateway=counting)
+    assert res.outcome == "held" and res.run.stopped_at == "C1" and res.c1.model == "guard"
+    assert c2c.calls == 0
+    _assert_nothing_sent(counting, store, fake)
+
+
+def test_c1_destination_none_is_held_not_filled_by_caller(gw):
+    svc, store, fake, probe = gw
+    counting = CountingGateway(svc)
     res = run_contract_b(USER, SPEC, FREE, OPTS, DEST, c1=StubC1("B", destination=None), c2=c2(),
-                         confirmer=conf, gateway=svc)
+                         confirmer=DigestConfirmer(), gateway=counting)
+    assert res.outcome == "held" and res.run.stopped_at == "C1"
+    assert any(e.stage == "C1" and e.result == "error" and "without destination" in e.detail for e in res.run.audit)
+    _assert_nothing_sent(counting, store, fake)
+
+
+class BrokenC1:
+    def route(self, user, request, input):  # noqa: A002
+        raise RuntimeError("model down")
+
+
+class MalformedC1:
+    def route(self, user, request, input):  # noqa: A002
+        return {"route": "B", "destination": "codex"}
+
+
+def _truncated_stub():
+    s = StubC1("B")
+    s.truncated = True
+    return s
+
+
+@pytest.mark.parametrize("make_c1,needle", [
+    (lambda: None, "C1 が設定されていない"),
+    (BrokenC1, "model down"),
+    (MalformedC1, "malformed"),
+    (_truncated_stub, "truncated"),
+])
+def test_c1_failure_modes_held(gw, make_c1, needle):
+    svc, store, fake, probe = gw
+    counting, c2c = CountingGateway(svc), CountingC2(c2())
+    res = run_contract_b(USER, SPEC, FREE, OPTS, None, c1=make_c1(), c2=c2c, confirmer=DigestConfirmer(), gateway=counting)
+    assert res.outcome == "held" and res.run.stopped_at == "C1" and needle in res.reason
+    assert c2c.calls == 0
+    _assert_nothing_sent(counting, store, fake)
+
+
+def test_flow_b_goes_through_guarded_c1(gw, monkeypatch):
+    import integration.flow as flow
+
+    seen = []
+    real = flow.guarded_c1
+
+    def spy(*a, **kw):
+        seen.append(a[0])
+        return real(*a, **kw)
+
+    monkeypatch.setattr(flow, "guarded_c1", spy)
+    svc, store, fake, probe = gw
+    stub = StubC1("B")
+    res = run_contract_b(USER, SPEC, FREE, OPTS, None, c1=stub, c2=c2(), confirmer=DigestConfirmer(), gateway=svc)
     assert res.outcome == "sent", res.reason
-    assert fake.received[-1].destination == DEST
-    first = res.run.audit[0]
-    assert first.stage == "C1" and "destination=None" in first.detail and DEST in first.detail
+    assert seen == [stub]
+
+
+def test_destination_from_c1_and_hint_ignored(gw):
+    from orchestrator.pipeline import confirmation_view
+
+    svc, store, fake, probe = gw
+    views = []
+
+    class ViewConfirmer:
+        def confirm(self, candidate):
+            views.append(confirmation_view(candidate))
+            return candidate.digest
+
+    stub = StubC1("B")
+    res = run_contract_b(USER, SPEC, FREE, OPTS, None, c1=stub, c2=c2(), confirmer=ViewConfirmer(), gateway=svc,
+                         destination_hint="claude")
+    assert res.outcome == "sent", res.reason
+    assert views[0]["destination"] == "codex" and views[0]["contract"] == CONTRACT_B
+    assert fake.received[-1].destination == "codex"
+    assert stub.last_input.get("destination_hint") == "claude"
+    assert "hint=claude" in res.run.audit[0].detail
 
 
 # ---- 応答の閲覧制約（契約 B = requester_only_no_exec） ----

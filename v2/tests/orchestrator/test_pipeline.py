@@ -231,22 +231,22 @@ def test_destination_not_allowed():
 # ---- 契約 B の拒否・保留 ----
 
 def test_b_r5_general_user_rejected():
-    res, gw = run(user="u_general", inp=B_INPUT)
+    res, gw = run(user="u_general", inp=B_INPUT, dest="codex")
     assert (res.outcome, res.stopped_at) == ("rejected", "eligibility") and gw.calls == 0
 
 
 def test_b_r6_free_text_over_200_rejected():
-    res, gw = run(user="u_manager", inp={**B_INPUT, "free_text": "あ" * 201})
+    res, gw = run(user="u_manager", inp={**B_INPUT, "free_text": "あ" * 201}, dest="codex")
     assert (res.outcome, res.stopped_at) == ("rejected", "contract") and gw.calls == 0
 
 
 def test_b_free_text_200_ok():
-    res, _ = run(user="u_manager", inp={**B_INPUT, "free_text": "あ" * 200})
+    res, _ = run(user="u_manager", inp={**B_INPUT, "free_text": "あ" * 200}, dest="codex")
     assert res.outcome == "sent"
 
 
 def test_b_r7_unconfirmed_held():
-    res, gw = run(user="u_manager", inp=B_INPUT, confirmer=FakeConfirmer("none"))
+    res, gw = run(user="u_manager", inp=B_INPUT, dest="codex", confirmer=FakeConfirmer("none"))
     assert (res.outcome, res.stopped_at) == ("held", "confirm") and gw.calls == 0
 
 
@@ -262,7 +262,8 @@ def test_b_r7_unconfirmed_held():
 @pytest.mark.parametrize("user,inp", [("u_general", A_INPUT), ("u_manager", B_INPUT)])
 def test_c2_non_allow_never_reaches_gateway(c2, user, inp):
     conf = FakeConfirmer()
-    res, gw = run(user=user, inp=inp, c2=c2, confirmer=conf)
+    dest = "codex" if inp is B_INPUT else "claude"
+    res, gw = run(user=user, inp=inp, dest=dest, c2=c2, confirmer=conf)
     assert (res.outcome, res.stopped_at) == ("held", "C2")
     assert gw.calls == 0 and not res.gateway_received and not res.attempted
     assert conf.seen == []
@@ -327,6 +328,6 @@ def test_policy_rejects_unknown_response_visibility(policy_copy: Path, value):
 
 
 def test_rejected_run_has_no_visibility():
-    res, gw = run(user="u_general", inp=B_INPUT)
+    res, gw = run(user="u_general", inp=B_INPUT, dest="codex")
     assert res.outcome == "rejected" and res.response_visibility is None and gw.calls == 0
     assert not res.can_view("u_general", 3)

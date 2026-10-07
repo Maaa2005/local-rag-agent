@@ -144,7 +144,7 @@ def test_contract_destination_not_allowed(svc, monkeypatch):
 def test_registry_values():
     a, b = CONTRACTS["A-faq-format@1"], CONTRACTS["B-csv-codegen@1"]
     assert (a.payload_chars, a.output_chars, b.payload_chars, b.output_chars) == (2000, 1500, 1500, 3000)
-    assert a.destinations == b.destinations == {"claude", "codex"}
+    assert (a.destinations, b.destinations) == ({"claude"}, {"codex"})
 
 
 # ---- 4. messages の構造 ----
@@ -214,9 +214,9 @@ def test_max_output_chars_contract_limit(svc):
     svc.prepare(make_req(rid="req-out-ok01", max_out=1500))
     with pytest.raises(InvalidRequest):
         svc.prepare(make_req(rid="req-out-ng01", max_out=1501))
-    svc.prepare(make_req(rid="req-out-ok02", contract="B-csv-codegen@1", max_out=3000))
+    svc.prepare(make_req(rid="req-out-ok02", contract="B-csv-codegen@1", dest="codex", max_out=3000))
     with pytest.raises(InvalidRequest):
-        svc.prepare(make_req(rid="req-out-ng02", contract="B-csv-codegen@1", max_out=3001))
+        svc.prepare(make_req(rid="req-out-ng02", contract="B-csv-codegen@1", dest="codex", max_out=3001))
 
 
 @pytest.mark.parametrize("contract", ["A-faq-format@1", "B-csv-codegen@1"])

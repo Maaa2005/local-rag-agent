@@ -7,7 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from common.schemas import C1Decision, SendState
+from common.schemas import SendState
+from judge.base import C1Decision
 from integration.flow import run_contract_a
 from integration.flow_b import run_contract_b
 from judge.base import GUARD_QUESTION_VERSION, guarded_c2
@@ -70,7 +71,7 @@ class LeakyC2(FakeC2):
 class StubC1:
     def __init__(self, route: str, destination: str | None, reason: str = "stub"):
         self.d = C1Decision(route=route, destination=destination, reason=reason, model="c1m", revision="r1",
-                            probs={route: 0.9})
+                            question_version="c1q@1", probs={route: 0.9})
 
     def route(self, user, request, input):  # noqa: A002
         return self.d
@@ -125,7 +126,7 @@ def _only_run(store: AuditStore) -> tuple[dict, list[dict]]:
 
 
 def test_stop_eligibility(store):
-    res, _ = run(user="u_general", inp=B_INPUT, audit_sink=store)
+    res, _ = run(user="u_general", inp=B_INPUT, dest="codex", audit_sink=store)
     row, ev = _only_run(store)
     assert res.stopped_at == "eligibility" and row["stopped_at"] == "eligibility" and row["outcome"] == "rejected"
     assert [e["stage"] for e in ev] == ["eligibility", "result"]
@@ -158,7 +159,7 @@ def test_stop_c1_contract_b(store):
 
 
 def test_stop_c2(store):
-    res, gw = run(user="u_manager", inp=B_INPUT, c2=FakeC2("block"), audit_sink=store)
+    res, gw = run(user="u_manager", inp=B_INPUT, dest="codex", c2=FakeC2("block"), audit_sink=store)
     row, ev = _only_run(store)
     assert row["stopped_at"] == "C2" and row["c2_decision"] == "block" and gw.calls == 0
     assert row["digest"] == res.digest and row["request_id"] == res.request_id
