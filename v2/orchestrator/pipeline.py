@@ -8,7 +8,7 @@ from __future__ import annotations
 import concurrent.futures
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Literal, Mapping, Protocol
+from typing import Any, Literal, Mapping, Protocol, Sequence
 
 from common.schemas import (
     C1Decision,
@@ -20,6 +20,7 @@ from common.schemas import (
     SendState,
     StatusResponse,
 )
+from orchestrator.audit_store import AuditSink, persist_run
 from orchestrator.candidate import ContractViolation, SendCandidate, build_candidate
 from orchestrator.policy import ApprovedText, Contract, Policy, check_eligibility, load_policy
 
@@ -78,6 +79,10 @@ class RunResult:
     visible_to: str | None = None  # 応答を取得できるのは依頼者本人だけ
     min_view_level: int | None = None  # 元資料の閲覧レベル（source_level_* のとき）
     no_exec: bool = True  # 応答は表示のみ。コードを含んでも実行しない（F6）
+    # 監査の永続化（orchestrator.audit_store）。None=sink 未指定 / False=書き込み失敗（送信判断には影響しない）
+    audit_persisted: bool | None = None
+    audit_error: str | None = None
+    audit_run_id: str | None = None
 
     def can_view(self, user_id: str, level: int | None = None) -> bool:
         """user_id（閲覧レベル level）がこの応答を取得してよいか。制約が不明なら見せない。"""
@@ -141,14 +146,23 @@ def run_contract(
     policy: Policy | None = None,
     c2_timeout_s: float | None = 30.0,
     request_id: str | None = None,
+    audit_sink: AuditSink | None = None,
+    audit_prefix: Sequence[AuditEvent] = (),
+    c1_decision: C1Decision | None = None,
+    audit_bodies: Sequence[str] = (),
 ) -> RunResult:
     pol = policy or load_policy()
-    audit: list[AuditEvent] = []
+    audit: list[AuditEvent] = list(audit_prefix)
     vis: dict[str, Any] = {}
+    # 監査に残さない本文（依頼文・承認済みテキスト・送信本文）。理由文に混ざっていれば除去する
+    bodies: list[str] = [t for t in (input.get("free_text"), *audit_bodies) if isinstance(t, str)]
 
     def stop(outcome: Outcome, at: StoppedAt, reason: str, **kw: Any) -> RunResult:
         audit.append(AuditEvent("result", outcome, f"stopped_at={at}: {reason}"))
-        return RunResult(outcome=outcome, stopped_at=at, reason=reason, audit=audit, **vis, **kw)
+        res = RunResult(outcome=outcome, stopped_at=at, reason=reason, audit=audit, **vis, **kw)
+        contract = input.get("contract")
+        return persist_run(audit_sink, res, user=user, contract=contract if isinstance(contract, str) else None,
+                           destination=destination, run_at=now, bodies=bodies, c1=c1_decision)
 
     # 1. 送信資格
     elig = check_eligibility(pol, user, input, destination, now)
@@ -156,6 +170,7 @@ def run_contract(
     if not elig.ok:
         return stop("rejected", "eligibility", elig.reason)
     assert elig.contract is not None and elig.approved is not None
+    bodies.append(elig.approved.body)
     vis.update(visibility_fields(user, elig.contract, elig.approved))
 
     # 2. 変更不能な送信候補
@@ -174,6 +189,7 @@ def run_contract(
         return stop("rejected", "contract", str(e))
     audit.append(AuditEvent("candidate", "created", f"request_id={cand.request_id} digest={cand.digest}"))
     ids = dict(request_id=cand.request_id, digest=cand.digest)
+    bodies.extend(m.content for m in cand.payload.messages)
 
     # 3. C2（失敗・タイムアウト・切り捨て・保留・拒否は Gateway に渡さない）
     try:

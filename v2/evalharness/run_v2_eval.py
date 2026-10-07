@@ -132,6 +132,9 @@ def evaluate(cases: list[dict[str, Any]], router: C1Router, gate: C2Gate, *, tim
             "id": case["id"], "category": case.get("category"), "user": case["user"],
             "expected_route": case["expected_route"], "route": dec.route, "destination": dec.destination,
             "route_ok": dec.route == case["expected_route"],
+            # 宛先の期待値（expected_destination）があるケースだけ採点。無ければ None
+            "expected_destination": case.get("expected_destination"),
+            "destination_ok": (dec.destination == case["expected_destination"]) if case.get("expected_destination") else None,
             "expected_stop": case["expected_stop"], "expected_outcome": case["expected_outcome"],
             "data_class": case["data_class"], "condition": cond or None,
             "c1_model": dec.model, "c1_revision": dec.revision, "c1_reason": dec.reason,
@@ -155,6 +158,9 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "cases": len(rows),
         "c1_route_accuracy": _rate(sum(r["route_ok"] for r in rows), len(rows)),
+        # 宛先正答率: expected_destination を持つケースだけ。期待値が 1 件も無ければ of=0（rate=None）
+        "c1_destination_accuracy": _rate(sum(bool(r.get("destination_ok")) for r in rows if r.get("destination_ok") is not None),
+                                         sum(r.get("destination_ok") is not None for r in rows)),
         # C2 の成果: expected_stop==C2 のケースだけ。C1 が外部経路を選ばず C2 に届かなかったものは検出に数えない
         "c2_detection": _rate(sum(r["c2"] in STOP for r in c2_rows), len(c2_rows)),
         "c2_not_reached": sum(r["c2"] is None for r in c2_rows),
@@ -185,6 +191,7 @@ def summary_row(label_c1: str, label_c2: str, s: dict[str, Any]) -> str:
 def to_markdown(result: dict[str, Any], label_c1: str, label_c2: str) -> str:
     s = result["summary"]
     lines = ["# v2 判断モデル層 評価", "", SUMMARY_HEADER, summary_row(label_c1, label_c2, s), "",
+             f"- C1 宛先正答（expected_destination があるケースのみ）: {_fmt(s['c1_destination_accuracy']) if s.get('c1_destination_accuracy') else '-'}",
              f"- C2 対象のうち C2 まで届かなかった件数: {s['c2_not_reached']}",
              f"- 誤送信（判断層）ID: {', '.join(s['missend_ids']) or 'なし'}",
              "- 誤送信は判断層だけの値。送信資格・契約・確認・digest の検査は含まない",
@@ -232,6 +239,7 @@ def main(argv: list[str] | None = None) -> int:
     (a.out / "report.md").write_text(md, encoding="utf-8")
     print(SUMMARY_HEADER)
     print(summary_row(l1, l2, res["summary"]))
+    print(f"C1 宛先正答（expected_destination があるケースのみ）: {_fmt(res['summary']['c1_destination_accuracy'])}")
     return 0
 
 

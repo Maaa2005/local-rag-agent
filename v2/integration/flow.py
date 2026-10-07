@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Any, Mapping, Protocol
 
 from common.schemas import C1Decision
+from orchestrator.audit_store import AuditSink, persist_run
 from orchestrator.pipeline import (
     AuditEvent,
     C2Checker,
@@ -95,7 +96,14 @@ def run_contract_a(
     policy: Policy | None = None,
     request_id: str | None = None,
     c2_timeout_s: float | None = 30.0,
+    audit_sink: AuditSink | None = None,
 ) -> FlowResult:
+    when = now or datetime.now(JST)
+
+    def c1_stop(run: RunResult) -> RunResult:
+        return persist_run(audit_sink, run, user=user, contract=CONTRACT_A, destination=destination,
+                           run_at=when, bodies=[request_text], c1=decision)
+
     inp = contract_a_input(explanation_ref, options)
     decision: C1Decision | None = None
     c1_event: AuditEvent | None = None
@@ -104,25 +112,27 @@ def run_contract_a(
             decision = c1.route(user, request_text, {**inp, "destination_hint": destination})
         except Exception as e:  # noqa: BLE001  C1 失敗は送らない側へ倒す
             reason = f"C1 失敗: {type(e).__name__}: {e}"
-            return FlowResult("held", reason, None, stopped_at_c1(None, reason, error=True))
+            return FlowResult("held", reason, None, c1_stop(stopped_at_c1(None, reason, error=True)))
         if decision.route != "A":
             reason = f"C1 が経路 {decision.route} を選んだ: {decision.reason}"
-            return FlowResult("not_routed", reason, decision, stopped_at_c1(decision, reason))
+            return FlowResult("not_routed", reason, decision, c1_stop(stopped_at_c1(decision, reason)))
         held, c1_event = check_c1_destination(decision, destination)
         if held is not None:
-            return FlowResult("held", held.reason, decision, held)
+            return FlowResult("held", held.reason, decision, c1_stop(held))
     run = run_contract(
         user,
         inp,
         destination,
-        now or datetime.now(JST),
+        when,
         c2,
         confirmer,
         gateway,
         policy=policy,
         c2_timeout_s=c2_timeout_s,
         request_id=request_id,
+        audit_sink=audit_sink,
+        audit_prefix=[c1_event] if c1_event is not None else (),
+        c1_decision=decision,
+        audit_bodies=[request_text],
     )
-    if c1_event is not None:
-        run.audit.insert(0, c1_event)
     return FlowResult(run.outcome, run.reason, decision, run)

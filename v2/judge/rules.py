@@ -8,7 +8,9 @@
 """
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any
 
 from common.schemas import C1Decision, C2Verdict, SendPayload
@@ -17,7 +19,40 @@ MODEL = "rules"
 REVISION = "rules-v1"
 
 _CONTRACT_ROUTE = {"A-faq-format": "A", "B-csv-codegen": "B"}
+# 宛先選択の基準: 設計書（redesign-v2.md / v2-contract-examples.md）は「どちらにするかは C1 が選ぶ」
+# とだけ書き、Claude / Codex の使い分け基準は規定していない（規定なし）。
+# そのため契約既定宛先を返す。既定は契約例ドキュメントの宛先欄の筆頭
+# （契約 A「Claude または Codex」→ claude、契約 B「Codex または Claude」→ codex）。
+# destination_hint は利用者の希望という参考情報で、宛先の決定には使わない（理由欄に記録だけする）。
 _DEFAULT_DEST = {"A": "claude", "B": "codex"}
+_DESTS = ("claude", "codex")
+_CONTRACTS_PATH = Path(__file__).resolve().parents[1] / "policies" / "contracts.json"
+
+
+def _allowed_destinations(contract_key: str, path: Path = _CONTRACTS_PATH) -> tuple[str, ...]:
+    """policies/contracts.json（読み取りのみ）の契約宛先。読めなければ両方を候補にする。"""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        c = data.get(contract_key) or next((v for k, v in data.items() if k.split("@", 1)[0] == contract_key.split("@", 1)[0]), None)
+        dests = tuple(d for d in (c or {}).get("destinations", ()) if d in _DESTS)
+        return dests or _DESTS
+    except (OSError, ValueError, AttributeError):
+        return _DESTS
+
+
+def choose_destination(route: str, contract_key: str, hint: Any = None, path: Path = _CONTRACTS_PATH) -> tuple[str, str]:
+    """契約既定宛先を契約の許可宛先内で選ぶ。hint は既定宛先が契約で使えないときの候補順にだけ使う。"""
+    allowed = _allowed_destinations(contract_key, path)
+    default = _DEFAULT_DEST[route]
+    if default in allowed:
+        dest, why = default, "contract default"
+    elif hint in allowed:
+        dest, why = str(hint), "default not allowed; hint within contract"
+    else:
+        dest, why = allowed[0], "default not allowed; first contract destination"
+    if hint in _DESTS and hint != dest:
+        why += f"; hint {hint} not followed (no selection rule in design doc)"
+    return dest, why
 
 # C1: 契約を使わない依頼の素朴なキーワード振り分け（契約例ドキュメントの経路定義から）
 _C1_REJECT = re.compile(r"(指示は?無視|全文を(出力|送|貼)|外部に(送|出)|持ち出|漏ら)")
@@ -32,10 +67,9 @@ class RuleC1Router:
             route = _CONTRACT_ROUTE.get(cid)
             if route is None:
                 return C1Decision(route="human", reason=f"unknown contract {cid}", model=MODEL, revision=REVISION)
-            hint = input.get("destination_hint")
-            dest = hint if hint in ("claude", "codex") else _DEFAULT_DEST[route]
+            dest, why = choose_destination(route, str(input["contract"]), input.get("destination_hint"))
             # 権限は C1 では与えない（送信資格で別に検査する）。契約指定どおりに経路候補を返すだけ
-            return C1Decision(route=route, destination=dest, reason=f"contract {cid}", model=MODEL, revision=REVISION)
+            return C1Decision(route=route, destination=dest, reason=f"contract {cid}; dest: {why}", model=MODEL, revision=REVISION)
         if _C1_REJECT.search(request):
             return C1Decision(route="reject", reason="exfiltration/injection phrase", model=MODEL, revision=REVISION)
         if _C1_HUMAN.search(request):
