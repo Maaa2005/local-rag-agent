@@ -19,7 +19,7 @@ from common.schemas import (
 )
 from gateway.adapters import Adapter, NotSentError, RejectedError
 from gateway.contracts import ContractSpec, lookup
-from gateway.store import SendRecord, SendStore, StoreError
+from gateway.store import PURGED_PAYLOAD, PurgeResult, SendRecord, SendStore, StoreError
 
 log = logging.getLogger("gateway")
 
@@ -163,6 +163,8 @@ class GatewayService:
             return self._status(rec)
         if rec.expires_at <= self.clock():
             raise Expired("expired")
+        if rec.payload_json == PURGED_PAYLOAD:  # 保持期限で本文が消えた行は送れない
+            raise Expired("payload purged")
         payload = SendPayload.model_validate_json(rec.payload_json)
         # 保存内容の改変検出（DB 直接改変など）
         if payload_digest(payload) != rec.digest:
@@ -237,3 +239,10 @@ class GatewayService:
 
     def recover_on_startup(self) -> int:
         return self.store.fail_attempting_as_unknown()
+
+    def purge_expired(self, now: float | None = None) -> PurgeResult:
+        """保持期限（本文 30 日・メタデータ 90 日）を過ぎた記録を消す。件数だけをログに出す。"""
+        result = self.store.purge_expired(self.clock() if now is None else now)
+        log.info("purge bodies=%d sends=%d history=%d",
+                 result.bodies_purged, result.sends_deleted, result.history_deleted)
+        return result

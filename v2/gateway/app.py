@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -38,6 +39,7 @@ from gateway.service import (
     NotFound,
     PayloadTooLarge,
 )
+from gateway.store import StoreError
 
 
 def _http_error(e: GatewayError) -> HTTPException:
@@ -57,7 +59,14 @@ def _http_error(e: GatewayError) -> HTTPException:
 def create_app(service: GatewayService) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        # 先に ATTEMPTING→unknown（updated_at=起動時刻）にしてから保持期限の削除を行う。
         service.recover_on_startup()
+        try:
+            service.purge_expired()
+        except StoreError as e:
+            # 削除に失敗しても送信記録の整合は崩れない（1 トランザクションで ROLLBACK）。起動は続ける。
+            logging.getLogger("gateway").error(
+                "startup purge failed kind=%s", type(e.__cause__ or e).__name__)
         yield
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)

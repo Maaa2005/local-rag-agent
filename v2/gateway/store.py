@@ -36,6 +36,22 @@ CREATE TABLE IF NOT EXISTS send_history (
 )
 """
 _HISTORY_INDEX = "CREATE INDEX IF NOT EXISTS send_history_rid ON send_history (request_id, seq)"
+# 保持期限（設計書 N7: 本文 30 日・メタデータ 90 日）
+BODY_RETENTION_DAYS = 30
+META_RETENTION_DAYS = 90
+_DAY_SECONDS = 86400.0
+# 本文を消した行の payload_json。既存 DB の NOT NULL 制約を変えずに済むよう空文字を使う。
+PURGED_PAYLOAD = ""
+
+_TERMINAL = (SendState.SUCCEEDED.value, SendState.FAILED.value)
+
+# 保持期限の起点。終端は updated_at（終端化した時刻）。期限切れ PREPARED は送信不能になった
+# 時刻 = max(updated_at, expires_at)。未期限の PREPARED と ATTEMPTING は対象外。
+_RETENTION_TARGET = (
+    "((state IN (?, ?) AND updated_at <= ?) "
+    "OR (state = ? AND expires_at <= ? AND MAX(updated_at, expires_at) <= ?))"
+)
+
 _HISTORY_INSERT = (
     "INSERT INTO send_history (request_id, from_state, to_state, failure, at) VALUES (?,?,?,?,?)"
 )
@@ -59,6 +75,15 @@ class Transition:
     to_state: SendState
     failure: FailureKind | None
     at: float
+
+
+@dataclass(frozen=True)
+class PurgeResult:
+    """purge_expired で消した件数。"""
+
+    bodies_purged: int      # 本文・出力を消した行（行自体は残る）
+    sends_deleted: int      # 削除した sends 行
+    history_deleted: int    # 削除した send_history 行
 
 
 class StoreError(RuntimeError):
@@ -195,6 +220,39 @@ class SendStore:
                 (SendState.FAILED.value, FailureKind.unknown.value, now, SendState.ATTEMPTING.value),
             )
             return cur.rowcount
+
+    def purge_expired(self, now: float) -> PurgeResult:
+        """保持期限を過ぎた記録を 1 トランザクションで消す。
+
+        - META_RETENTION_DAYS 経過: sends 行と、その send_history 行を削除
+        - BODY_RETENTION_DAYS 経過: payload_json を空文字、output_text を NULL にする
+          （digest・状態・failure・request_id・時刻・履歴は残す）
+        経過は「起点 <= now - 日数」で判定する（ちょうど期限の時刻で対象になる）。
+        """
+        body_cut = now - BODY_RETENTION_DAYS * _DAY_SECONDS
+        meta_cut = now - META_RETENTION_DAYS * _DAY_SECONDS
+
+        def params(cut: float) -> tuple:
+            return (*_TERMINAL, cut, SendState.PREPARED.value, now, cut)
+
+        try:
+            with self._tx() as conn:
+                hist = conn.execute(
+                    "DELETE FROM send_history WHERE request_id IN "
+                    f"(SELECT request_id FROM sends WHERE {_RETENTION_TARGET})",
+                    params(meta_cut),
+                ).rowcount
+                sends = conn.execute(
+                    f"DELETE FROM sends WHERE {_RETENTION_TARGET}", params(meta_cut)
+                ).rowcount
+                bodies = conn.execute(
+                    "UPDATE sends SET payload_json=?, output_text=NULL "
+                    f"WHERE {_RETENTION_TARGET} AND (payload_json != ? OR output_text IS NOT NULL)",
+                    (PURGED_PAYLOAD, *params(body_cut), PURGED_PAYLOAD),
+                ).rowcount
+                return PurgeResult(bodies_purged=bodies, sends_deleted=sends, history_deleted=hist)
+        except sqlite3.Error as e:
+            raise StoreError("purge failed") from e
 
     def history(self, request_id: str) -> list[Transition]:
         """request_id の遷移を記録順に返す（本文・出力は含まない）。"""
