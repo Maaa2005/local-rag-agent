@@ -5,8 +5,18 @@
 対応付ける（本文は Gateway が保持する。設計書 N7 の保持期限は本文 30 日・メタデータ 90 日で、
 本文をここに複製すると保持の管理対象が増えるため）。承認済み説明文・依頼文・出力テキストは保存しない。
 
-- 追記専用: UPDATE / DELETE の API を持たず、DB にもトリガーで禁止する。
-  そのため N7 の保持期限による削除は未実装（「実装済み」と書かない）。改ざん検知（HMAC 等）も未実装。
+- 追記専用: UPDATE の API を持たず、DB でもトリガーで禁止する。DELETE は保持期限（N7 のメタデータ
+  90 日）を過ぎた行だけをトリガーで許し、それ以外は拒否する。削除の API は purge だけ。
+- 保持期限: ここに残すのはメタデータだけ（本文は持たない）なので N7 の「本文 30 日」は対象外。
+  purge(now) が recorded_at から 90 日を過ぎた runs と、その events を 1 トランザクションで消す。
+  purge を定期実行する仕組み（スケジューラ）は未実装。
+- 改ざん検知（HMAC 等）は未実装。recorded_at を過去に偽って書けば早く消せるが、書き込めるのは
+  Orchestrator 自身で、侵害された Orchestrator は設計書の対象外。
+- 質問の版（F9）: c1_question_version / c2_question_version に判断モデルへ渡した質問の版を残す。
+- 承認者と対象（F9）: approver（確認した主体 = 依頼者本人）・approver_authority（依頼文の外部利用を
+  承認できる権限。依頼文を取らない契約では NULL）・approved_ref / approved_by（事前承認済みテキストと
+  その承認者）。対象の送信内容は digest で対応付ける。
+- 旧版の DB は起動時に移行する（不足列の追加と、無条件 DELETE 禁止トリガーの置き換え）。
 - 1 実行 = 1 run_id。runs 1 行 + events n 行を 1 トランザクションで書く。
 - 書き込み失敗は送信判断に影響させない。persist_run は例外を上げず結果に印を付けるだけ。
 """
@@ -18,7 +28,7 @@ import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable, Protocol, Sequence
 
@@ -45,11 +55,17 @@ CREATE TABLE IF NOT EXISTS runs (
     c1_model TEXT,
     c1_revision TEXT,
     c1_probs TEXT,
+    c1_question_version TEXT,
     c2_decision TEXT,
     c2_model TEXT,
     c2_revision TEXT,
     c2_prob_block REAL,
     c2_truncated INTEGER,
+    c2_question_version TEXT,
+    approver TEXT,
+    approver_authority INTEGER,
+    approved_ref TEXT,
+    approved_by TEXT,
     response_visibility TEXT,
     output_sha256 TEXT,
     output_chars INTEGER
@@ -64,15 +80,38 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS runs_request_id ON runs(request_id);
 CREATE TRIGGER IF NOT EXISTS runs_no_update BEFORE UPDATE ON runs BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
-CREATE TRIGGER IF NOT EXISTS runs_no_delete BEFORE DELETE ON runs BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS events_no_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
-CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
 """
 
-_RUN_COLUMNS = {
-    line.split()[0]
-    for line in SCHEMA.split("CREATE TABLE IF NOT EXISTS runs (")[1].split(");")[0].strip().splitlines()
+RETENTION_DAYS = 90  # 設計書 N7: メタデータ 90 日
+
+# DELETE は recorded_at から 90 日を過ぎた行（ちょうど 90 日は期限内）だけ許す。recorded_at が日時として読めない行
+# （julianday が NULL）は消させない。events は親の run が 90 日を過ぎているときだけ。
+# 旧版 DB の無条件禁止トリガーを置き換えるため、起動のたびに DROP → CREATE する（同一トランザクション）。
+# 文は空行で区切る（トリガー本体に ; を含むため）
+DELETE_TRIGGERS = f"""DROP TRIGGER IF EXISTS runs_no_delete
+
+DROP TRIGGER IF EXISTS events_no_delete
+
+CREATE TRIGGER runs_no_delete BEFORE DELETE ON runs
+WHEN julianday(OLD.recorded_at) IS NULL OR julianday(OLD.recorded_at) >= julianday('now', '-{RETENTION_DAYS} days')
+BEGIN SELECT RAISE(ABORT, 'audit is append-only (retention {RETENTION_DAYS} days)'); END
+
+CREATE TRIGGER events_no_delete BEFORE DELETE ON events
+WHEN NOT EXISTS (
+    SELECT 1 FROM runs WHERE run_id = OLD.run_id
+    AND julianday(recorded_at) < julianday('now', '-{RETENTION_DAYS} days')
+)
+BEGIN SELECT RAISE(ABORT, 'audit is append-only (retention {RETENTION_DAYS} days)'); END"""
+
+_RUN_COLUMN_DEFS = {
+    parts[0]: " ".join(parts[1:]).rstrip(",")
+    for parts in (
+        line.split()
+        for line in SCHEMA.split("CREATE TABLE IF NOT EXISTS runs (")[1].split(");")[0].strip().splitlines()
+    )
 }
+_RUN_COLUMNS = set(_RUN_COLUMN_DEFS)
 
 REDACTED = "[本文除去]"
 _MIN_FRAGMENT = 8  # 本文の行単位の断片もこの字数以上なら除去する
@@ -83,6 +122,12 @@ class AuditRecord:
     run: dict[str, Any]
     events: tuple[tuple[str, str, str], ...]  # (stage, result, detail)
     run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
+
+
+@dataclass(frozen=True)
+class PurgeResult:
+    runs: int
+    events: int
 
 
 class AuditSink(Protocol):
@@ -139,11 +184,17 @@ def build_record(
         c1_model=getattr(c1, "model", None),
         c1_revision=getattr(c1, "revision", None),
         c1_probs=json.dumps(c1.probs, sort_keys=True) if c1 is not None and getattr(c1, "probs", None) else None,
+        c1_question_version=getattr(c1, "question_version", None),
         c2_decision=v.decision if v else None,
         c2_model=v.model if v else None,
         c2_revision=v.revision if v else None,
         c2_prob_block=v.prob_block if v else None,
         c2_truncated=int(v.truncated) if v else None,
+        c2_question_version=getattr(v, "question_version", None) if v else None,
+        approver=result.approver,
+        approver_authority=None if result.approver_authority is None else int(result.approver_authority),
+        approved_ref=result.approved_ref,
+        approved_by=result.approved_by,
         response_visibility=result.response_visibility,
         output_sha256=_sha256(out) if out else None,
         output_chars=len(out) if out else None,
@@ -182,7 +233,7 @@ def persist_run(
 
 
 class AuditStore:
-    """SQLite（WAL, synchronous=FULL）の追記専用ストア。append と読み出しだけを持つ。"""
+    """SQLite（WAL, synchronous=FULL）の追記専用ストア。append・読み出し・保持期限切れの purge だけを持つ。"""
 
     def __init__(self, path: str | Path) -> None:
         self.path = str(path)
@@ -192,6 +243,23 @@ class AuditStore:
         self._conn.execute("PRAGMA synchronous=FULL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """旧版 DB を現行に揃える: 不足列を追加し、DELETE トリガーを保持期限付きに置き換える。"""
+        c = self._conn
+        c.execute("BEGIN IMMEDIATE")
+        try:
+            have = {r[1] for r in c.execute("PRAGMA table_info(runs)")}
+            for name, decl in _RUN_COLUMN_DEFS.items():
+                if name not in have:
+                    c.execute(f"ALTER TABLE runs ADD COLUMN {name} {decl}")
+            for stmt in DELETE_TRIGGERS.split("\n\n"):
+                c.execute(stmt)
+            c.execute("COMMIT")
+        except BaseException:
+            c.execute("ROLLBACK")
+            raise
 
     def close(self) -> None:
         self._conn.close()
@@ -217,6 +285,29 @@ class AuditStore:
             except BaseException:
                 c.execute("ROLLBACK")
                 raise
+
+    def purge(self, now: datetime | None = None) -> PurgeResult:
+        """recorded_at から 90 日を過ぎた runs と、その events を 1 トランザクションで削除する。
+
+        本文はここに保存しないので N7 の本文 30 日は対象外。削除可否は DB トリガーも
+        実時刻で判定するため、未来の now を渡して期限内の行を消そうとすると全体が中止される。
+        """
+        now = now or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            raise ValueError("now は aware datetime で渡す")
+        cutoff = (now - timedelta(days=RETENTION_DAYS)).astimezone(timezone.utc).isoformat()
+        old = "SELECT run_id FROM runs WHERE julianday(recorded_at) < julianday(?)"
+        with self._lock:
+            c = self._conn
+            c.execute("BEGIN IMMEDIATE")
+            try:
+                ev = c.execute(f"DELETE FROM events WHERE run_id IN ({old})", (cutoff,)).rowcount
+                rn = c.execute(f"DELETE FROM runs WHERE run_id IN ({old})", (cutoff,)).rowcount
+                c.execute("COMMIT")
+            except BaseException:
+                c.execute("ROLLBACK")
+                raise
+        return PurgeResult(runs=rn, events=ev)
 
     def runs(self, request_id: str | None = None) -> list[dict[str, Any]]:
         q, args = "SELECT * FROM runs", ()

@@ -13,7 +13,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from common.schemas import C1Decision, C2Verdict, SendPayload
+from common.schemas import SendPayload
+from judge.base import C1Decision, C2Verdict, question_version
 
 MODEL = "rules"
 REVISION = "rules-v1"
@@ -58,25 +59,33 @@ def choose_destination(route: str, contract_key: str, hint: Any = None, path: Pa
 _C1_REJECT = re.compile(r"(指示は?無視|全文を(出力|送|貼)|外部に(送|出)|持ち出|漏ら)")
 _C1_HUMAN = re.compile(r"(人事|評価|処分|例外|判断して|相談|承認して)")
 _C1_CODE = re.compile(r"(計算|合計|集計|何日|日数|件数|平均|変換)")
+# ルールベースは判断モデルに質問しないので、「質問の版」= 判定規則そのものの版（F9）。
+# 規則の定義から計算するので、規則を変えれば版も変わる
+C1_QUESTION_VERSION = question_version("rules-c1@1", {
+    "contract_route": _CONTRACT_ROUTE, "default_dest": _DEFAULT_DEST,
+    "reject": _C1_REJECT.pattern, "human": _C1_HUMAN.pattern, "code": _C1_CODE.pattern,
+})
 
 
 class RuleC1Router:
+    question_version = C1_QUESTION_VERSION
+
     def route(self, user: str, request: str, input: dict[str, Any] | None) -> C1Decision:
         if input and input.get("contract"):
             cid = str(input["contract"]).split("@", 1)[0]
             route = _CONTRACT_ROUTE.get(cid)
             if route is None:
-                return C1Decision(route="human", reason=f"unknown contract {cid}", model=MODEL, revision=REVISION)
+                return C1Decision(route="human", reason=f"unknown contract {cid}", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
             dest, why = choose_destination(route, str(input["contract"]), input.get("destination_hint"))
             # 権限は C1 では与えない（送信資格で別に検査する）。契約指定どおりに経路候補を返すだけ
-            return C1Decision(route=route, destination=dest, reason=f"contract {cid}; dest: {why}", model=MODEL, revision=REVISION)
+            return C1Decision(route=route, destination=dest, reason=f"contract {cid}; dest: {why}", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
         if _C1_REJECT.search(request):
-            return C1Decision(route="reject", reason="exfiltration/injection phrase", model=MODEL, revision=REVISION)
+            return C1Decision(route="reject", reason="exfiltration/injection phrase", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
         if _C1_HUMAN.search(request):
-            return C1Decision(route="human", reason="needs human judgement", model=MODEL, revision=REVISION)
+            return C1Decision(route="human", reason="needs human judgement", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
         if _C1_CODE.search(request):
-            return C1Decision(route="code", reason="deterministic computation", model=MODEL, revision=REVISION)
-        return C1Decision(route="local", reason="default: answer locally", model=MODEL, revision=REVISION)
+            return C1Decision(route="code", reason="deterministic computation", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
+        return C1Decision(route="local", reason="default: answer locally", model=MODEL, revision=REVISION, question_version=C1_QUESTION_VERSION)
 
 
 # C2: 禁止情報リストに対応する正規表現（追加の拒否検査。許可の根拠にはしない）
@@ -91,13 +100,16 @@ _C2_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("person_name", re.compile(r"[一-龥]{1,4}(さん|氏|(?<![仕同模多各異])様)")),
     ("counterparty", re.compile(r"([A-ZＡ-Ｚ]社|株式会社|㈱)")),
 ]
+C2_QUESTION_VERSION = question_version("rules-c2@1", [(n, p.pattern, p.flags) for n, p in _C2_PATTERNS])
 
 
 class RuleC2Gate:
+    question_version = C2_QUESTION_VERSION
+
     def check(self, payload: SendPayload) -> C2Verdict:
         text = "\n".join(m.content for m in payload.messages)
         hits = [name for name, pat in _C2_PATTERNS if pat.search(text)]
         if hits:
-            return C2Verdict(decision="block", reason="matched: " + ",".join(hits), model=MODEL, revision=REVISION, prob_block=1.0)
+            return C2Verdict(decision="block", reason="matched: " + ",".join(hits), model=MODEL, revision=REVISION, prob_block=1.0, question_version=C2_QUESTION_VERSION)
         # 正規表現に当たらない＝安全、ではない。基準線として allow を返すだけ
-        return C2Verdict(decision="allow", reason="no rule matched", model=MODEL, revision=REVISION, prob_block=0.0)
+        return C2Verdict(decision="allow", reason="no rule matched", model=MODEL, revision=REVISION, prob_block=0.0, question_version=C2_QUESTION_VERSION)

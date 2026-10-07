@@ -83,6 +83,13 @@ class RunResult:
     audit_persisted: bool | None = None
     audit_error: str | None = None
     audit_run_id: str | None = None
+    # 承認者と対象（F9）。Confirmer は digest しか返さないので、確認した主体は依頼者本人
+    # （確認は依頼者のセッションに結び付く。設計書 項目 8）。確認前に止まった実行では None
+    approver: str | None = None
+    # approver が契約の依頼文を外部利用承認できる権限を持つか。依頼文を取らない契約では None
+    approver_authority: bool | None = None
+    approved_ref: str | None = None  # 事前承認済みテキストの key（"id@version"）
+    approved_by: str | None = None  # その事前承認の承認者（policy 上の記録）
 
     def can_view(self, user_id: str, level: int | None = None) -> bool:
         """user_id（閲覧レベル level）がこの応答を取得してよいか。制約が不明なら見せない。"""
@@ -122,6 +129,14 @@ def stopped_at_c1(decision: C1Decision | None, reason: str, *, error: bool = Fal
     return RunResult(outcome=outcome, stopped_at="C1", reason=reason, audit=audit)
 
 
+def _free_text_authority(pol: Policy, user: str, contract: Contract) -> bool | None:
+    """依頼文の外部利用を承認できる権限（設計書 項目 8）。依頼文を取らない契約では None。"""
+    if contract.free_text_max is None:
+        return None
+    u = pol.users.get(user)
+    return u is not None and contract.key in u.free_text_approval
+
+
 def _call_c2(c2: C2Checker, payload: SendPayload, timeout_s: float | None) -> C2Verdict:
     if timeout_s is None:
         return c2.check(payload)
@@ -153,7 +168,7 @@ def run_contract(
 ) -> RunResult:
     pol = policy or load_policy()
     audit: list[AuditEvent] = list(audit_prefix)
-    vis: dict[str, Any] = {}
+    vis: dict[str, Any] = {}  # 応答の可視範囲・承認者と対象。以降の全 RunResult に載せる
     # 監査に残さない本文（依頼文・承認済みテキスト・送信本文）。理由文に混ざっていれば除去する
     bodies: list[str] = [t for t in (input.get("free_text"), *audit_bodies) if isinstance(t, str)]
 
@@ -172,6 +187,7 @@ def run_contract(
     assert elig.contract is not None and elig.approved is not None
     bodies.append(elig.approved.body)
     vis.update(visibility_fields(user, elig.contract, elig.approved))
+    vis.update(approved_ref=elig.approved.key, approved_by=elig.approved.approver)
 
     # 2. 変更不能な送信候補
     try:
@@ -216,10 +232,12 @@ def run_contract(
     if confirmed != cand.digest:
         audit.append(AuditEvent("confirm", "mismatch", f"confirmed={confirmed}"))
         return stop("rejected", "digest", "確認済みの内容と送信候補が一致しない。新しい候補として C2 と確認をやり直す", c2_verdict=verdict, **ids)
-    audit.append(AuditEvent("confirm", "ok", confirmed))
+    audit.append(AuditEvent("confirm", "ok", f"{confirmed} approver={user}"))
+    vis.update(approver=user, approver_authority=_free_text_authority(pol, user, elig.contract))
 
     # 5. 権限再確認
     elig2 = check_eligibility(pol, user, input, destination, now)
+    vis.update(approver_authority=_free_text_authority(pol, user, elig.contract))  # 再確認時点の権限で上書き
     if not elig2.ok or elig2.approved is None or elig2.approved.sha256 != cand.approved_sha256:
         reason = elig2.reason if not elig2.ok else "承認済みテキストが候補作成後に変わった"
         audit.append(AuditEvent("recheck", "deny", reason))

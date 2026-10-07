@@ -8,8 +8,9 @@ import pytest
 
 from common.schemas import C1Decision, C2Verdict, Message, SendPayload
 from evalharness.run_v2_eval import evaluate, load_cases, main
-from judge.base import C1Router, C2Gate, guarded_c1, guarded_c2
-from judge.http_adapter import HttpC1Router, HttpC2Gate
+from judge.base import C2Verdict as JC2Verdict  # 質問の版を持つ判定
+from judge.base import GUARD_QUESTION_VERSION, C1Router, C2Gate, guarded_c1, guarded_c2, question_version
+from judge.http_adapter import C1_QUESTION_VERSION, C2_QUESTION_VERSION, HttpC1Router, HttpC2Gate
 from judge.rules import RuleC1Router, RuleC2Gate
 
 
@@ -27,13 +28,14 @@ class G:
         return self.fn(p)
 
 
-ALLOW = C2Verdict(decision="allow", reason="ok", model="m", revision="r")
+ALLOW = JC2Verdict(decision="allow", reason="ok", model="m", revision="r", question_version="q@1")
 
 
 # ---- guarded_c2 ----
 
 def test_guard_passes_allow():
-    assert guarded_c2(G(lambda p: ALLOW), payload(), 1.0, 1000).decision == "allow"
+    v = guarded_c2(G(lambda p: ALLOW), payload(), 1.0, 1000)
+    assert v.decision == "allow" and v.question_version == "q@1"
 
 
 def test_guard_timeout_holds():
@@ -53,8 +55,45 @@ def test_guard_malformed_holds(raw):
 
 
 def test_guard_dict_verdict_accepted():
-    raw = {"decision": "block", "reason": "x", "model": "m", "revision": "r"}
+    raw = {"decision": "block", "reason": "x", "model": "m", "revision": "r", "question_version": "q@1"}
     assert guarded_c2(G(lambda p: raw), payload(), 1.0, 1000).decision == "block"
+
+
+# 質問の版（F9）: 版のない判断は revision 欠落と同じく不正形式として扱う
+@pytest.mark.parametrize("qv", [None, ""])
+def test_guard_missing_question_version_holds(qv):
+    raw = {"decision": "allow", "reason": "x", "model": "m", "revision": "r"}
+    if qv is not None:
+        raw["question_version"] = qv
+    v = guarded_c2(G(lambda p: raw), payload(), 1.0, 1000)
+    assert v.decision == "hold" and v.question_version == GUARD_QUESTION_VERSION
+    # common.schemas の版なし C2Verdict も同じ
+    bare = C2Verdict(decision="allow", reason="ok", model="m", revision="r")
+    assert guarded_c2(G(lambda p: bare), payload(), 1.0, 1000).decision == "hold"
+
+
+def test_guard_hold_paths_carry_guard_question_version():
+    def boom(p):
+        raise RuntimeError("x")
+    for v in (guarded_c2(G(boom), payload(), 1.0, 1000),
+              guarded_c2(G(lambda p: (time.sleep(0.5), ALLOW)[1]), payload(), 0.05, 1000),
+              guarded_c2(G(lambda p: ALLOW), payload("x" * 2000), 1.0, 100)):
+        assert v.decision == "hold" and v.question_version == GUARD_QUESTION_VERSION
+    for d in (guarded_c1(R(lambda *a: {"route": "zzz"}), "u", "q", None, 1.0, 100),
+              guarded_c1(R(lambda *a: None), "u", "q" * 500, None, 1.0, 100)):
+        assert d.route == "human" and d.question_version == GUARD_QUESTION_VERSION
+
+
+def test_guard_truncated_allow_keeps_gate_question_version():
+    v = guarded_c2(G(lambda p: ALLOW.model_copy(update={"truncated": True})), payload(), 1.0, 1000)
+    assert v.decision == "hold" and v.question_version == "q@1"
+
+
+def test_question_version_tracks_spec():
+    assert question_version("x@1", [1, 2]) == question_version("x@1", [1, 2])
+    assert question_version("x@1", [1, 2]) != question_version("x@1", [1, 3])
+    assert RuleC1Router().route("u", "q", None).question_version.startswith("rules-c1@1#")
+    assert RuleC2Gate().check(payload()).question_version.startswith("rules-c2@1#")
 
 
 def test_guard_too_long_holds_without_calling():
@@ -85,6 +124,10 @@ def test_c1_guard_failures_go_human():
     assert guarded_c1(R(lambda *a: (time.sleep(0.5), None)[1]), "u", "q", None, 0.05, 100).route == "human"
     assert guarded_c1(R(lambda *a: {"route": "zzz"}), "u", "q", None, 1.0, 100).route == "human"
     assert guarded_c1(R(lambda *a: C1Decision(route="A", reason="", model="m", revision="r")), "u", "q", None, 1.0, 100).route == "human"
+    ok = C1Decision(route="local", reason="", model="m", revision="r")
+    assert guarded_c1(R(lambda *a: ok), "u", "q", None, 1.0, 100).route == "human"  # 質問の版なし
+    d = guarded_c1(R(lambda *a: {**ok.model_dump(), "question_version": "q@1"}), "u", "q", None, 1.0, 100)
+    assert (d.route, d.question_version) == ("local", "q@1")
     assert guarded_c1(R(lambda *a: None), "u", "q" * 500, None, 1.0, 100).route == "human"
 
 
@@ -144,6 +187,8 @@ def test_http_c1_parses_and_records_revision():
     d = HttpC1Router("http://judge.internal", "laya-multilingual", transport=mock(h)).route("u", "q", None)
     assert seen["path"] == "/v1/systemone" and seen["body"]["questions"][0]["type"] == "choice"
     assert (d.route, d.destination, d.model, d.revision, d.probs["B"]) == ("B", "codex", "laya-multilingual", "abc123", 0.9)
+    # 質問の版はアダプタが送った質問から決まる（応答側の申告には依存しない）
+    assert d.question_version == C1_QUESTION_VERSION and d.question_version.startswith("c1-")
 
 
 @pytest.mark.parametrize("p,expected", [(0.9, "block"), (0.05, "allow"), (0.3, "hold")])
@@ -154,6 +199,7 @@ def test_http_c2_thresholds(p, expected):
 
     v = HttpC2Gate("http://j", "clef-flash", transport=mock(h)).check(payload())
     assert v.decision == expected and v.revision == "r1" and v.prob_block == p
+    assert v.question_version == C2_QUESTION_VERSION
 
 
 @pytest.mark.parametrize("resp", [
