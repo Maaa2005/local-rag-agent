@@ -34,6 +34,7 @@ from gateway.service import (
     Expired,
     GatewayError,
     GatewayService,
+    HistoryResponse,
     NotFound,
     PayloadTooLarge,
 )
@@ -88,6 +89,15 @@ def create_app(service: GatewayService) -> FastAPI:
     ) -> StatusResponse:
         try:
             return service.status(request_id)
+        except GatewayError as e:
+            raise _http_error(e) from None
+
+    @app.get("/history/{request_id}", response_model=HistoryResponse)
+    def history(
+        request_id: str = Path(min_length=1, max_length=64, pattern=REQUEST_ID_PATTERN),
+    ) -> HistoryResponse:
+        try:
+            return service.history(request_id)
         except GatewayError as e:
             raise _http_error(e) from None
 

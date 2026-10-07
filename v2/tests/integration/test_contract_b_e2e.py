@@ -38,12 +38,16 @@ FREE_SECRET = "田中さん（社員番号 E12345）が株式会社サンプル�
 
 # ---- スタブ（judge が無い場合の C1/C2） ----
 
+_DEST_DEFAULT = object()
+
+
 class StubC1:
-    def __init__(self, route: str = "B") -> None:
+    def __init__(self, route: str = "B", destination=_DEST_DEFAULT) -> None:
         self.route_value = route
+        self.destination = DEST if destination is _DEST_DEFAULT else destination
 
     def route(self, user, request, input):  # noqa: A002
-        return C1Decision(route=self.route_value, destination=DEST, reason="stub", model="stub", revision="0")
+        return C1Decision(route=self.route_value, destination=self.destination, reason="stub", model="stub", revision="0")
 
 
 class StubC2:
@@ -293,7 +297,9 @@ def test_user_without_contract_b_is_not_sent(gw):
     _assert_nothing_sent(counting, store, fake)
 
 
-# 権限不足: 契約 B は使えるが依頼文の外部利用を承認できない利用者（policies に該当者がいないので差し替え）
+# 権限不足: 契約 B は使えるが依頼文の外部利用を承認できない利用者。
+# 設計書（v2-contract-examples 登場する利用者）は u_general/u_manager/u_exec の 3 名で、契約 B の利用権限者は
+# 全員が依頼文の承認権限を持つため policies/users.json には追加せず、Policy を差し替えて検査する
 def test_user_without_free_text_approval_is_not_sent(gw):
     svc, store, fake, probe = gw
     u = POLICY.users[USER]
@@ -311,7 +317,7 @@ def test_c1_non_b_route_sends_nothing(gw):
     svc, store, fake, probe = gw
     counting, c2c = CountingGateway(svc), CountingC2(c2())
     res = run_contract_b(USER, SPEC, FREE, OPTS, DEST, c1=StubC1("human"), c2=c2c, confirmer=DigestConfirmer(), gateway=counting)
-    assert res.outcome == "not_routed" and res.run is None
+    assert res.outcome == "not_routed" and res.run.stopped_at == "C1" and not res.run.gateway_received
     assert c2c.calls == 0
     _assert_nothing_sent(counting, store, fake)
 
@@ -323,3 +329,41 @@ def test_spec_ref_must_be_approved_for_contract_b(gw):
     res = run_contract_b(USER, "expl-keihi-001@1", FREE, OPTS, DEST, c1=c1(), c2=c2(), confirmer=DigestConfirmer(), gateway=counting)
     assert res.outcome == "rejected" and res.run.stopped_at == "eligibility"
     _assert_nothing_sent(counting, store, fake)
+
+
+# ---- C1 の宛先照合（設計書 決定事項 5: 宛先は C1 が決める。不一致時の扱いは規定なし→安全側で保留） ----
+
+def test_c1_destination_mismatch_is_held_and_not_sent(gw):
+    svc, store, fake, probe = gw
+    counting, c2c = CountingGateway(svc), CountingC2(c2())
+    res = run_contract_b(USER, SPEC, FREE, OPTS, DEST, c1=StubC1("B", destination="claude"), c2=c2c,
+                         confirmer=DigestConfirmer(), gateway=counting)
+    assert res.outcome == "held"
+    assert (res.run.outcome, res.run.stopped_at) == ("held", "C1")
+    assert any(e.stage == "C1" and e.result == "destination_mismatch" for e in res.run.audit)
+    assert c2c.calls == 0
+    _assert_nothing_sent(counting, store, fake)
+
+
+def test_c1_destination_none_uses_caller_and_is_audited(gw):
+    svc, store, fake, probe = gw
+    conf = DigestConfirmer()
+    res = run_contract_b(USER, SPEC, FREE, OPTS, DEST, c1=StubC1("B", destination=None), c2=c2(),
+                         confirmer=conf, gateway=svc)
+    assert res.outcome == "sent", res.reason
+    assert fake.received[-1].destination == DEST
+    first = res.run.audit[0]
+    assert first.stage == "C1" and "destination=None" in first.detail and DEST in first.detail
+
+
+# ---- 応答の閲覧制約（契約 B = requester_only_no_exec） ----
+
+def test_contract_b_response_visibility_requester_only_no_exec(gw):
+    svc, store, fake, probe = gw
+    res = run_contract_b(USER, SPEC, FREE, OPTS, DEST, c1=c1(), c2=c2(), confirmer=DigestConfirmer(), gateway=svc)
+    assert res.outcome == "sent", res.reason
+    run = res.run
+    assert run.response_visibility == "requester_only_no_exec"
+    assert run.visible_to == USER and run.no_exec is True and run.min_view_level is None
+    assert run.can_view(USER, 2)
+    assert not run.can_view("u_exec", 3)  # 上位レベルでも依頼者以外は取得できない

@@ -21,7 +21,7 @@ from common.schemas import (
     StatusResponse,
 )
 from orchestrator.candidate import ContractViolation, SendCandidate, build_candidate
-from orchestrator.policy import Policy, check_eligibility, load_policy
+from orchestrator.policy import ApprovedText, Contract, Policy, check_eligibility, load_policy
 
 Outcome = Literal["sent", "held", "rejected"]
 StoppedAt = Literal["C1", "eligibility", "contract", "C2", "confirm", "digest", "none"]
@@ -73,6 +73,29 @@ class RunResult:
     c2_verdict: C2Verdict | None = None
     output_text: str | None = None  # 信頼しないテキスト。表示のみ
     audit: list[AuditEvent] = field(default_factory=list)
+    # 応答の閲覧制約（policies/contracts.json の response_visibility）。資格検査を通った後に設定
+    response_visibility: str | None = None
+    visible_to: str | None = None  # 応答を取得できるのは依頼者本人だけ
+    min_view_level: int | None = None  # 元資料の閲覧レベル（source_level_* のとき）
+    no_exec: bool = True  # 応答は表示のみ。コードを含んでも実行しない（F6）
+
+    def can_view(self, user_id: str, level: int | None = None) -> bool:
+        """user_id（閲覧レベル level）がこの応答を取得してよいか。制約が不明なら見せない。"""
+        if self.response_visibility is None or self.visible_to is None or user_id != self.visible_to:
+            return False
+        if self.min_view_level is not None and (level is None or level < self.min_view_level):
+            return False
+        return True
+
+
+def visibility_fields(user: str, contract: Contract, approved: ApprovedText) -> dict[str, Any]:
+    vis = contract.response_visibility
+    return dict(
+        response_visibility=vis,
+        visible_to=user,
+        min_view_level=approved.source_level if vis.startswith("source_level") else None,
+        no_exec=True,
+    )
 
 
 def c1_detail(decision: C1Decision) -> str:
@@ -121,10 +144,11 @@ def run_contract(
 ) -> RunResult:
     pol = policy or load_policy()
     audit: list[AuditEvent] = []
+    vis: dict[str, Any] = {}
 
     def stop(outcome: Outcome, at: StoppedAt, reason: str, **kw: Any) -> RunResult:
         audit.append(AuditEvent("result", outcome, f"stopped_at={at}: {reason}"))
-        return RunResult(outcome=outcome, stopped_at=at, reason=reason, audit=audit, **kw)
+        return RunResult(outcome=outcome, stopped_at=at, reason=reason, audit=audit, **vis, **kw)
 
     # 1. 送信資格
     elig = check_eligibility(pol, user, input, destination, now)
@@ -132,6 +156,7 @@ def run_contract(
     if not elig.ok:
         return stop("rejected", "eligibility", elig.reason)
     assert elig.contract is not None and elig.approved is not None
+    vis.update(visibility_fields(user, elig.contract, elig.approved))
 
     # 2. 変更不能な送信候補
     try:

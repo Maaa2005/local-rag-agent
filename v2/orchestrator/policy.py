@@ -38,6 +38,14 @@ class Contract:
     output_chars: int
     destinations: tuple[str, ...]
     template: str
+    # 応答の閲覧制約（設計書: 外部応答には入力資料の閲覧制約を引き継ぐ。初版では依頼者の会話内にだけ返す）
+    response_visibility: str = "requester_only_no_exec"
+
+
+# 既知の応答閲覧制約。未知の値は読み込み時に拒否する（解釈できない制約で表示しない）
+#   source_level_requester_only: 依頼者本人のみ、かつ元資料の閲覧レベル以上（契約 A）
+#   requester_only_no_exec:      依頼者本人のみ、コードは表示だけで実行しない（契約 B）
+RESPONSE_VISIBILITIES = frozenset({"source_level_requester_only", "requester_only_no_exec"})
 
 
 @dataclass(frozen=True)
@@ -88,6 +96,9 @@ def load_policy(policy_dir: Path | str = DEFAULT_POLICY_DIR) -> Policy:
     contracts = {}
     for key, c in _load_json(d / "contracts.json").items():
         ft = c.get("free_text")
+        vis = c.get("response_visibility")
+        if vis not in RESPONSE_VISIBILITIES:
+            raise ValueError(f"契約 {key} の response_visibility が未定義または未知: {vis!r}")
         contracts[key] = Contract(
             key=key,
             enabled=bool(c["enabled"]),
@@ -99,6 +110,7 @@ def load_policy(policy_dir: Path | str = DEFAULT_POLICY_DIR) -> Policy:
             output_chars=int(c["limits"]["output_chars"]),
             destinations=tuple(c["destinations"]),
             template=c["template"],
+            response_visibility=vis,
         )
     approved = {}
     for p in sorted((d / "approved").glob("*.json")):

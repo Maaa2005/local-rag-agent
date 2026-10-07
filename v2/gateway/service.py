@@ -5,6 +5,8 @@ import logging
 import time
 from typing import Callable, Mapping
 
+from pydantic import BaseModel
+
 from common.schemas import (
     CommitRequest,
     FailureKind,
@@ -24,6 +26,20 @@ log = logging.getLogger("gateway")
 # commit 後の記録（finish）の再試行。DB 書き込みだけを短く繰り返す。外部送信は再送しない。
 FINISH_ATTEMPTS = 3
 FINISH_BACKOFF_SECONDS = 0.05
+
+
+class TransitionEntry(BaseModel):
+    from_state: SendState | None
+    to_state: SendState
+    failure: FailureKind | None = None
+    at: float
+
+
+class HistoryResponse(BaseModel):
+    """状態遷移履歴。本文・出力は含めない。"""
+
+    request_id: str
+    transitions: list[TransitionEntry]
 
 
 class GatewayError(Exception):
@@ -160,7 +176,7 @@ class GatewayService:
             return self._status(self.store.get(rec.request_id))  # type: ignore[arg-type]
 
         try:
-            out = adapter.send(payload)
+            out = adapter.send(payload, request_id=rec.request_id)
         except NotSentError as e:
             log.warning("send not_sent request_id=%s kind=%s", rec.request_id, type(e).__name__)
             ok = self._finish(rec.request_id, SendState.FAILED, FailureKind.not_sent)
@@ -207,6 +223,17 @@ class GatewayService:
         if rec is None:
             raise NotFound("unknown request_id")
         return self._status(rec)
+
+    def history(self, request_id: str) -> HistoryResponse:
+        if self.store.get(request_id) is None:
+            raise NotFound("unknown request_id")
+        return HistoryResponse(
+            request_id=request_id,
+            transitions=[
+                TransitionEntry(from_state=t.from_state, to_state=t.to_state, failure=t.failure, at=t.at)
+                for t in self.store.history(request_id)
+            ],
+        )
 
     def recover_on_startup(self) -> int:
         return self.store.fail_attempting_as_unknown()

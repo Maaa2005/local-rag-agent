@@ -34,7 +34,7 @@ class UnknownOutcomeError(AdapterError):
 
 
 class Adapter(Protocol):
-    def send(self, payload: SendPayload) -> str: ...
+    def send(self, payload: SendPayload, request_id: str | None = None) -> str: ...
 
 
 def read_secret(path: str | Path) -> str:
@@ -58,20 +58,22 @@ class FakeAdapter:
         reply: str = "fake-output",
         mode: str = "ok",
         delay: float = 0.0,
-        on_send: Callable[[SendPayload], None] | None = None,
+        on_send: Callable[[SendPayload, str | None], None] | None = None,
     ) -> None:
         self.reply = reply
         self.mode = mode
         self.delay = delay
         self.on_send = on_send
         self.received: list[SendPayload] = []
+        self.received_ids: list[str | None] = []
         self._lock = threading.Lock()
 
-    def send(self, payload: SendPayload) -> str:
+    def send(self, payload: SendPayload, request_id: str | None = None) -> str:
         with self._lock:
             self.received.append(payload)
+            self.received_ids.append(request_id)
         if self.on_send:
-            self.on_send(payload)
+            self.on_send(payload, request_id)
         if self.delay:
             import time
 
@@ -119,7 +121,8 @@ class ClaudeAdapter:
         self.key_path = Path(key_path)
         self.timeout = timeout
 
-    def send(self, payload: SendPayload) -> str:
+    def send(self, payload: SendPayload, request_id: str | None = None) -> str:  # noqa: ARG002
+        # request_id は Gateway 内の照合用。外部 API には送らない
         try:
             import anthropic  # noqa: PLC0415
         except ImportError:
@@ -150,7 +153,8 @@ class CodexAdapter:
         self.key_path = Path(key_path)
         self.timeout = timeout
 
-    def send(self, payload: SendPayload) -> str:
+    def send(self, payload: SendPayload, request_id: str | None = None) -> str:  # noqa: ARG002
+        # request_id は Gateway 内の照合用。外部 API には送らない
         try:
             import openai  # noqa: PLC0415
         except ImportError:

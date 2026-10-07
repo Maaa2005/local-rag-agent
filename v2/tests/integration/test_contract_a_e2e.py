@@ -32,12 +32,16 @@ POLICY = load_policy()
 
 # ---- スタブ（judge が無い場合の C1/C2） ----
 
+_DEST_DEFAULT = object()
+
+
 class StubC1:
-    def __init__(self, route: str = "A") -> None:
+    def __init__(self, route: str = "A", destination=_DEST_DEFAULT) -> None:
         self.route_value = route
+        self.destination = DEST if destination is _DEST_DEFAULT else destination
 
     def route(self, user, request, input):  # noqa: A002
-        return C1Decision(route=self.route_value, destination=DEST, reason="stub", model="stub", revision="0")
+        return C1Decision(route=self.route_value, destination=self.destination, reason="stub", model="stub", revision="0")
 
 
 class StubC2:
@@ -327,3 +331,42 @@ def test_commit_timeout_resolves_by_status_without_retry(uds_server):
     time.sleep(1.2)
     assert len(fake.received) == 1
     assert store.get(res.run.request_id).state == SendState.SUCCEEDED
+
+
+# ---- C1 の宛先照合（設計書 決定事項 5: 宛先は C1 が決める。不一致時の扱いは規定なし→安全側で保留） ----
+
+def test_c1_destination_mismatch_is_held_and_not_sent(gw):
+    svc, store, fake, probe = gw
+    counting = CountingGateway(svc)
+    c2 = StubC2()
+    res = run_contract_a(USER, REF, OPTS, DEST, c1=StubC1("A", destination="codex"), c2=c2,
+                         confirmer=DigestConfirmer(), gateway=counting)
+    assert res.outcome == "held"
+    assert (res.run.outcome, res.run.stopped_at) == ("held", "C1")
+    assert any(e.stage == "C1" and e.result == "destination_mismatch" for e in res.run.audit)
+    assert not res.run.gateway_received and c2.calls == 0 and counting.calls == [] and _rows(store) == 0
+
+
+def test_c1_destination_none_uses_caller_and_is_audited(gw):
+    svc, store, fake, probe = gw
+    conf = DigestConfirmer()
+    res = run_contract_a(USER, REF, OPTS, DEST, c1=StubC1("A", destination=None), c2=c2_allow(), confirmer=conf, gateway=svc)
+    assert res.outcome == "sent", res.reason
+    assert fake.received[-1].destination == DEST
+    first = res.run.audit[0]
+    assert first.stage == "C1" and "destination=None" in first.detail and DEST in first.detail
+
+
+# ---- 応答の閲覧制約（契約 A = source_level_requester_only） ----
+
+def test_contract_a_response_visibility_source_level_requester_only(gw):
+    svc, store, fake, probe = gw
+    res = run_contract_a(USER, REF, OPTS, DEST, c1=c1(), c2=c2_allow(), confirmer=DigestConfirmer(), gateway=svc)
+    assert res.outcome == "sent", res.reason
+    run = res.run
+    assert run.response_visibility == "source_level_requester_only"
+    assert run.visible_to == USER and run.no_exec is True
+    assert run.min_view_level == POLICY.approved[REF].source_level
+    assert run.can_view(USER, 1)
+    assert not run.can_view("u_manager", 2)  # 依頼者以外は不可
+    assert not run.can_view(USER, None)  # レベル不明なら見せない

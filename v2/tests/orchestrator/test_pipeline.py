@@ -303,3 +303,30 @@ def test_prepare_unknown_failure_assumes_received(exc):
     res, gw = run(gw=RaisingPrepareGateway(exc))
     assert (res.outcome, res.stopped_at) == ("held", "none")
     assert res.gateway_received and not res.attempted and gw.commits == []
+
+
+# ---- response_visibility の読み込み ----
+
+def test_policy_loads_response_visibility():
+    pol = load_policy()
+    assert pol.contracts["A-faq-format@1"].response_visibility == "source_level_requester_only"
+    assert pol.contracts["B-csv-codegen@1"].response_visibility == "requester_only_no_exec"
+
+
+@pytest.mark.parametrize("value", [None, "public"])
+def test_policy_rejects_unknown_response_visibility(policy_copy: Path, value):
+    p = policy_copy / "contracts.json"
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if value is None:
+        del data["B-csv-codegen@1"]["response_visibility"]
+    else:
+        data["B-csv-codegen@1"]["response_visibility"] = value
+    p.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="response_visibility"):
+        load_policy(policy_copy)
+
+
+def test_rejected_run_has_no_visibility():
+    res, gw = run(user="u_general", inp=B_INPUT)
+    assert res.outcome == "rejected" and res.response_visibility is None and gw.calls == 0
+    assert not res.can_view("u_general", 3)

@@ -108,7 +108,7 @@ def test_finish_rowcount_mismatch_logged(tmp_path, caplog):
     req = make_req()
     d = svc.prepare(req).digest
     # 送信中に別経路で終端化された状況を作る
-    fake.on_send = lambda p: store.fail_attempting_as_unknown()
+    fake.on_send = lambda p, rid: store.fail_attempting_as_unknown()
     with caplog.at_level(logging.ERROR, logger="gateway"):
         st = svc.commit(CommitRequest(request_id=req.request_id, expected_digest=d))
     assert "finish rowcount=0" in caplog.text

@@ -10,7 +10,16 @@ from datetime import datetime
 from typing import Any, Mapping, Protocol
 
 from common.schemas import C1Decision
-from orchestrator.pipeline import C2Checker, Confirmer, Gateway, RunResult, run_contract, stopped_at_c1
+from orchestrator.pipeline import (
+    AuditEvent,
+    C2Checker,
+    Confirmer,
+    Gateway,
+    RunResult,
+    c1_detail,
+    run_contract,
+    stopped_at_c1,
+)
 from orchestrator.policy import JST, Policy
 
 CONTRACT_A = "A-faq-format@1"
@@ -26,6 +35,29 @@ class FlowResult:
     reason: str
     c1: C1Decision | None
     run: RunResult  # C1 で止まったら stopped_at="C1"（Gateway に何も渡していない）
+
+
+def check_c1_destination(decision: C1Decision, destination: str) -> tuple[RunResult | None, AuditEvent]:
+    """C1 の宛先と呼び出し側の宛先を照合する。
+
+    設計書「決定事項 5」: どちら（Claude / Codex）に頼むかは C1 の振り分けで決める → 宛先の正は C1。
+    ただし利用者が確認するのは呼び出し側の宛先で組み立てた候補なので、黙って C1 の宛先に
+    差し替えると確認内容と送信先がずれる。不一致時の扱いは設計書に規定がないため、
+    送らずに人の判断へ回す（held, stopped_at="C1"）安全側で仮実装する。
+    C1 が宛先を返さない（None）場合の扱いも設計書に規定がないため、呼び出し側の指定を
+    採用し、その旨を監査に残す（宛先の可否は送信資格で契約・承認済みテキストと照合される）。
+
+    戻り値: (止めるなら RunResult / 続行なら None, 監査イベント)
+    """
+    if decision.destination is None:
+        ev = AuditEvent("C1", decision.route, f"{c1_detail(decision)} | destination=None のため呼び出し側指定 {destination} を採用")
+        return None, ev
+    if decision.destination != destination:
+        reason = f"C1 の宛先 {decision.destination} と呼び出し側の宛先 {destination} が一致しない。送らずに人の判断へ回す"
+        run = stopped_at_c1(decision, reason)
+        run.audit.insert(1, AuditEvent("C1", "destination_mismatch", reason))
+        return run, run.audit[0]
+    return None, AuditEvent("C1", decision.route, f"{c1_detail(decision)} | 宛先一致")
 
 
 def default_c1() -> C1Router | None:
@@ -66,6 +98,7 @@ def run_contract_a(
 ) -> FlowResult:
     inp = contract_a_input(explanation_ref, options)
     decision: C1Decision | None = None
+    c1_event: AuditEvent | None = None
     if c1 is not None:
         try:
             decision = c1.route(user, request_text, {**inp, "destination_hint": destination})
@@ -75,6 +108,9 @@ def run_contract_a(
         if decision.route != "A":
             reason = f"C1 が経路 {decision.route} を選んだ: {decision.reason}"
             return FlowResult("not_routed", reason, decision, stopped_at_c1(decision, reason))
+        held, c1_event = check_c1_destination(decision, destination)
+        if held is not None:
+            return FlowResult("held", held.reason, decision, held)
     run = run_contract(
         user,
         inp,
@@ -87,4 +123,6 @@ def run_contract_a(
         c2_timeout_s=c2_timeout_s,
         request_id=request_id,
     )
+    if c1_event is not None:
+        run.audit.insert(0, c1_event)
     return FlowResult(run.outcome, run.reason, decision, run)

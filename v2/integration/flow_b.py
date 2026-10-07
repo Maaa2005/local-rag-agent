@@ -14,8 +14,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Mapping
 
-from integration.flow import C1Router, FlowResult
-from orchestrator.pipeline import C2Checker, Confirmer, Gateway, run_contract
+from integration.flow import C1Router, FlowResult, check_c1_destination
+from orchestrator.pipeline import C2Checker, Confirmer, Gateway, run_contract, stopped_at_c1
 from orchestrator.policy import JST, Policy
 
 CONTRACT_B = "B-csv-codegen@1"
@@ -43,14 +43,20 @@ def run_contract_b(
 ) -> FlowResult:
     inp = contract_b_input(spec_ref, free_text, options)
     decision = None
+    c1_event = None
     if c1 is not None:
         try:
             # C1 は社内ゾーンなので依頼文をそのまま見せてよい。経路候補を選ぶだけで権限は与えない
             decision = c1.route(user, free_text, {**inp, "destination_hint": destination})
         except Exception as e:  # noqa: BLE001  C1 失敗は送らない側へ倒す
-            return FlowResult("held", f"C1 失敗: {type(e).__name__}: {e}", None, None)
+            reason = f"C1 失敗: {type(e).__name__}: {e}"
+            return FlowResult("held", reason, None, stopped_at_c1(None, reason, error=True))
         if decision.route != "B":
-            return FlowResult("not_routed", f"C1 が経路 {decision.route} を選んだ: {decision.reason}", decision, None)
+            reason = f"C1 が経路 {decision.route} を選んだ: {decision.reason}"
+            return FlowResult("not_routed", reason, decision, stopped_at_c1(decision, reason))
+        held, c1_event = check_c1_destination(decision, destination)
+        if held is not None:
+            return FlowResult("held", held.reason, decision, held)
     run = run_contract(
         user,
         inp,
@@ -63,4 +69,6 @@ def run_contract_b(
         c2_timeout_s=c2_timeout_s,
         request_id=request_id,
     )
+    if c1_event is not None:
+        run.audit.insert(0, c1_event)
     return FlowResult(run.outcome, run.reason, decision, run)
