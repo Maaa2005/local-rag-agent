@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Literal, Mapping, Protocol
 
 from common.schemas import (
+    C1Decision,
     C2Verdict,
     CommitRequest,
     PrepareRequest,
@@ -23,9 +24,17 @@ from orchestrator.candidate import ContractViolation, SendCandidate, build_candi
 from orchestrator.policy import Policy, check_eligibility, load_policy
 
 Outcome = Literal["sent", "held", "rejected"]
-StoppedAt = Literal["eligibility", "contract", "C2", "confirm", "digest", "none"]
+StoppedAt = Literal["C1", "eligibility", "contract", "C2", "confirm", "digest", "none"]
 
 PREPARE_TTL = timedelta(minutes=10)
+
+
+class GatewayNotReached(Exception):
+    """要求（本文）が Gateway に届いていないと確定できる失敗（接続不能など）。
+
+    Gateway クライアントはこれを継承した例外を上げる。タイムアウトなど
+    到達したか不明な失敗には使わない（届いたかもしれない側に倒す）。
+    """
 
 
 class C2Checker(Protocol):
@@ -64,6 +73,25 @@ class RunResult:
     c2_verdict: C2Verdict | None = None
     output_text: str | None = None  # 信頼しないテキスト。表示のみ
     audit: list[AuditEvent] = field(default_factory=list)
+
+
+def c1_detail(decision: C1Decision) -> str:
+    return f"route={decision.route} destination={decision.destination} model={decision.model}@{decision.revision}: {decision.reason}"
+
+
+def stopped_at_c1(decision: C1Decision | None, reason: str, *, error: bool = False) -> RunResult:
+    """C1 で止めた結果。Gateway には何も渡していない。
+
+    C1 が reject を選んだら rejected、それ以外の経路・C1 失敗は held。
+    """
+    if error or decision is None:
+        audit = [AuditEvent("C1", "error", reason)]
+        outcome: Outcome = "held"
+    else:
+        audit = [AuditEvent("C1", decision.route, c1_detail(decision))]
+        outcome = "rejected" if decision.route == "reject" else "held"
+    audit.append(AuditEvent("result", outcome, f"stopped_at=C1: {reason}"))
+    return RunResult(outcome=outcome, stopped_at="C1", reason=reason, audit=audit)
 
 
 def _call_c2(c2: C2Checker, payload: SendPayload, timeout_s: float | None) -> C2Verdict:
@@ -162,9 +190,11 @@ def run_contract(
     try:
         prep = gateway.prepare(PrepareRequest(request_id=cand.request_id, payload=cand.payload, expires_at=expires_at))
     except Exception as e:  # noqa: BLE001
+        # 未到達と確定できる例外だけ False。タイムアウト等は届いたかもしれないので True
+        reached = not isinstance(e, GatewayNotReached)
         reason = f"prepare 失敗: {type(e).__name__}: {e}"
-        audit.append(AuditEvent("gateway_received", "error", reason))
-        return stop("held", "none", reason, gateway_received=True, c2_verdict=verdict, **ids)
+        audit.append(AuditEvent("gateway_received", "error", f"{reason} reached={'unknown' if reached else 'no'}"))
+        return stop("held", "none", reason, gateway_received=reached, c2_verdict=verdict, **ids)
     audit.append(AuditEvent("gateway_received", prep.state.value, f"digest={prep.digest}"))
     if prep.request_id != cand.request_id or prep.digest != confirmed:
         reason = "Gateway が保存した内容の digest が確認済みのものと一致しない"

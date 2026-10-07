@@ -19,7 +19,7 @@ from common.schemas import (
     payload_digest,
 )
 from orchestrator.candidate import SendCandidate, build_candidate
-from orchestrator.pipeline import run_contract
+from orchestrator.pipeline import GatewayNotReached, run_contract
 from orchestrator.policy import DEFAULT_POLICY_DIR, JST, check_eligibility, load_policy, sha256_text
 
 NOW = datetime(2026, 10, 20, 10, 0, tzinfo=JST)
@@ -279,3 +279,27 @@ def test_gateway_digest_mismatch_stops_before_commit():
 def test_gateway_unknown_not_reported_as_sent():
     res, _ = run(gw=FakeGateway(final=SendState.FAILED))
     assert res.outcome == "held" and res.attempted and res.gateway_state == SendState.FAILED
+
+
+class RaisingPrepareGateway(FakeGateway):
+    def __init__(self, exc: Exception):
+        super().__init__()
+        self.exc = exc
+
+    def prepare(self, req: PrepareRequest) -> PrepareResponse:
+        self.prepared.append(req)
+        raise self.exc
+
+
+def test_prepare_not_reached_marks_gateway_not_received():
+    res, gw = run(gw=RaisingPrepareGateway(GatewayNotReached("connect refused")))
+    assert (res.outcome, res.stopped_at) == ("held", "none")
+    assert not res.gateway_received and not res.attempted and gw.commits == []
+
+
+@pytest.mark.parametrize("exc", [TimeoutError("read timeout"), RuntimeError("HTTP 500")])
+def test_prepare_unknown_failure_assumes_received(exc):
+    """タイムアウト等は届いたか不明なので安全側（届いたかもしれない）に倒す。"""
+    res, gw = run(gw=RaisingPrepareGateway(exc))
+    assert (res.outcome, res.stopped_at) == ("held", "none")
+    assert res.gateway_received and not res.attempted and gw.commits == []

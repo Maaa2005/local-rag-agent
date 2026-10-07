@@ -1,0 +1,211 @@
+# local-rag-agent v2 配置構成（初版）
+#
+# 使い方（v2/ から）:
+#   通常構成（生成 LLM + Laya）:  docker compose -f deploy/compose.yml --profile laya up -d
+#   Clef-flash 構成（vLLM 停止）:  docker compose -f deploy/compose.yml --profile clef up -d
+#   ※ laya と clef を同時に指定しない（6GB GPU に同居させない静的切替）。
+#
+# ゾーン:
+#   社内ゾーン   : internal-app / qdrant / vllm / judge-* / frontend  → ネットワーク "internal"（internal: true）
+#   Gateway ゾーン: gateway                                         → ネットワーク "egress" のみ
+#   受け渡し     : 名前付き volume "gateway-sock" 上の Unix ソケットだけ（ネットワークは共有しない）
+#
+# 共通の堅牢化: read_only / cap_drop: [ALL] / no-new-privileges / 非 root ユーザ。
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+x-offline-env: &offline-env
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+  HF_DATASETS_OFFLINE: "1"
+
+services:
+  # --- 社内ゾーン ---------------------------------------------------------
+  internal-app:
+    <<: *hardening
+    # Orchestrator（FastAPI）本体は未実装。現時点は分離試験用のプレースホルダ。
+    # 本体ができたら build と command を差し替える。
+    image: python:3.11-slim
+    command: ["python", "-c", "import time; print('internal-app placeholder (Orchestrator 未実装)', flush=True); time.sleep(10**9)"]
+    user: "10002:10001"
+    environment:
+      <<: *offline-env
+      GATEWAY_SOCKET: /run/gateway/gateway.sock
+      QDRANT_URL: http://qdrant:6333
+      VLLM_BASE_URL: http://vllm:8000/v1
+      JUDGE_BASE_URL: http://judge:8080
+      INTERNAL_DB: /internal-data/internal.db
+      MODELS_DIR: /models
+      HOME: /tmp
+    volumes:
+      - docs:/docs:ro
+      - internal-data:/internal-data
+      - models:/models:ro
+      - gateway-sock:/run/gateway
+    tmpfs:
+      - /tmp
+    networks:
+      - internal
+
+  qdrant:
+    <<: *hardening
+    image: qdrant/qdrant:v1.12.4-unprivileged
+    user: "1000:1000"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    tmpfs:
+      - /qdrant/snapshots
+      - /tmp
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+      QDRANT__TELEMETRY_DISABLED: "true"
+    networks:
+      - internal
+
+  vllm:
+    <<: *hardening
+    # Clef-flash 構成（profile clef）では起動しない。
+    profiles: ["laya"]
+    image: vllm/vllm-openai:v0.25.1
+    runtime: nvidia
+    user: "10003:10003"
+    environment:
+      <<: *offline-env
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
+    volumes:
+      - models:/models:ro
+    tmpfs:
+      - /tmp
+    # モデルは事前取得済みのローカルパス（revision 固定は取得手順側で行う）。取得用トークンは渡さない。
+    command: >
+      --model /models/${LLM_MODEL_DIR:-gemma-4-E2B-it-AWQ-INT4}
+      --quantization awq
+      --dtype auto
+      --max-model-len 4096
+      --gpu-memory-utilization 0.6
+      --served-model-name local-llm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - internal
+
+  judge-laya:
+    <<: *hardening
+    profiles: ["laya"]
+    # 判断モデル（Laya-multilingual・CPU）。共通アダプタ（/v1/systemone 互換）は未実装のためプレースホルダ。
+    image: python:3.11-slim
+    command: ["python", "-c", "import time; print('judge-laya placeholder', flush=True); time.sleep(10**9)"]
+    user: "10004:10004"
+    environment:
+      <<: *offline-env
+      JUDGE_MODEL_PATH: /models/laya-multilingual
+      HOME: /tmp
+    volumes:
+      - models:/models:ro
+    tmpfs:
+      - /tmp
+    networks:
+      internal:
+        aliases: [judge]
+
+  judge-clef:
+    <<: *hardening
+    profiles: ["clef"]
+    # 判断モデル（Clef-flash Q4・llama.cpp）。vLLM を止めて GPU を使う静的構成。起動確認は未実施。
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    runtime: nvidia
+    user: "10004:10004"
+    environment:
+      <<: *offline-env
+      HOME: /tmp
+    volumes:
+      - models:/models:ro
+    tmpfs:
+      - /tmp
+    command: ["-m", "/models/clef-flash-Q4/model.gguf", "--host", "0.0.0.0", "--port", "8080", "--n-gpu-layers", "${CLEF_GPU_LAYERS:-20}"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      internal:
+        aliases: [judge]
+
+  frontend:
+    <<: *hardening
+    # UI 刷新は後回し。現時点はプレースホルダ（nginx 非特権イメージ）。
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    user: "101:101"
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:8080"
+    networks:
+      - internal
+      - frontend-publish
+
+  # --- Gateway ゾーン -----------------------------------------------------
+  gateway:
+    <<: *hardening
+    build:
+      context: ..
+      dockerfile: deploy/gateway.Dockerfile
+    image: local-rag-agent-v2/gateway:dev
+    user: "10001:10001"
+    environment:
+      GATEWAY_DB: /data/gateway.db
+      GATEWAY_SOCKET: /run/gateway/gateway.sock
+      GATEWAY_CLAUDE_MODEL: ${GATEWAY_CLAUDE_MODEL:-}
+      GATEWAY_CODEX_MODEL: ${GATEWAY_CODEX_MODEL:-}
+      GATEWAY_CLAUDE_KEY_FILE: /run/secrets/anthropic_api_key
+      GATEWAY_CODEX_KEY_FILE: /run/secrets/openai_api_key
+    secrets:
+      - anthropic_api_key
+      - openai_api_key
+    # 社内 volume（docs / internal-data / models / qdrant-data）と Docker ソケットはマウントしない。
+    volumes:
+      - gateway-data:/data
+      - gateway-sock:/run/gateway
+    tmpfs:
+      - /tmp
+    networks:
+      - egress
+
+networks:
+  internal:
+    internal: true
+  # Gateway の外向き専用。社内サービスは参加しない。
+  egress:
+    driver: bridge
+  # frontend を 127.0.0.1 に公開するためだけのネットワーク（internal ネットワークは公開できないため）。
+  frontend-publish:
+    driver: bridge
+
+volumes:
+  docs:
+  internal-data:
+  models:
+  qdrant-data:
+  gateway-data:
+  gateway-sock:
+
+secrets:
+  anthropic_api_key:
+    file: ${ANTHROPIC_API_KEY_FILE:-./secrets/anthropic_api_key}
+  openai_api_key:
+    file: ${OPENAI_API_KEY_FILE:-./secrets/openai_api_key}

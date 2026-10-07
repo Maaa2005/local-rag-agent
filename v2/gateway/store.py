@@ -113,10 +113,12 @@ class SendStore:
         state: SendState,
         failure: FailureKind | None = None,
         output_text: str | None = None,
-    ) -> None:
-        conn = self._connect()
+    ) -> int:
+        """ATTEMPTING の行だけを終端状態にする。更新行数を返す（正常なら 1）。"""
+        conn = None
         try:
-            conn.execute(
+            conn = self._connect()
+            cur = conn.execute(
                 "UPDATE sends SET state=?, failure=?, output_text=?, updated_at=? "
                 "WHERE request_id=? AND state=?",
                 (
@@ -128,10 +130,12 @@ class SendStore:
                     SendState.ATTEMPTING.value,
                 ),
             )
+            return cur.rowcount
         except sqlite3.Error as e:
             raise StoreError("finish failed") from e
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
 
     def fail_attempting_as_unknown(self) -> int:
         conn = self._connect()

@@ -10,16 +10,29 @@ import json
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Destination = Literal["claude", "codex"]
 Route = Literal["code", "local", "A", "B", "human", "reject"]
+
+# request_id の許容文字（URL パス・ログにそのまま載せられる範囲）
+REQUEST_ID_PATTERN = r"^[A-Za-z0-9_-]+$"
+# 1 送信あたりの messages 件数上限
+MAX_MESSAGES = 16
 
 
 class Message(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     role: Literal["system", "user"]
     content: str
+
+    @field_validator("content")
+    @classmethod
+    def _no_surrogates(cls, v: str) -> str:
+        # 孤立サロゲートは UTF-8 にできず、送信・記録・ダイジェストで不整合を起こす
+        if any("\ud800" <= ch <= "\udfff" for ch in v):
+            raise ValueError("surrogate code point not allowed")
+        return v
 
 
 class SendPayload(BaseModel):
@@ -28,7 +41,7 @@ class SendPayload(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     contract: str  # 例 "A-faq-format@1"
     destination: Destination
-    messages: tuple[Message, ...]
+    messages: tuple[Message, ...] = Field(max_length=MAX_MESSAGES)
     max_output_chars: int = Field(gt=0)
 
 
@@ -42,9 +55,9 @@ def payload_digest(payload: SendPayload) -> str:
 
 class PrepareRequest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-    request_id: str = Field(min_length=8, max_length=64)
+    request_id: str = Field(min_length=8, max_length=64, pattern=REQUEST_ID_PATTERN)
     payload: SendPayload
-    expires_at: float  # UNIX 秒
+    expires_at: float = Field(allow_inf_nan=False)  # UNIX 秒
 
 
 class PrepareResponse(BaseModel):
@@ -55,7 +68,7 @@ class PrepareResponse(BaseModel):
 
 class CommitRequest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-    request_id: str
+    request_id: str = Field(max_length=64, pattern=REQUEST_ID_PATTERN)
     expected_digest: str
 
 

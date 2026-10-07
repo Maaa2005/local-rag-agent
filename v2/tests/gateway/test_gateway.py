@@ -132,9 +132,9 @@ def test_size_limit_contract_a(svc):
 
 
 def test_size_limit_contract_b(svc):
-    svc.prepare(make_req(rid="req-ok-b-01", text="b" * 1497, contract="B-spec-code@1"))
+    svc.prepare(make_req(rid="req-ok-b-01", text="b" * 1497, contract="B-csv-codegen@1"))
     with pytest.raises(PayloadTooLarge):
-        svc.prepare(make_req(rid="req-ng-b-01", text="b" * 1498, contract="B-spec-code@1"))
+        svc.prepare(make_req(rid="req-ng-b-01", text="b" * 1498, contract="B-csv-codegen@1"))
 
 
 @pytest.mark.parametrize("contract", ["C-x@1", "A-faq", "A@1", "", "Z-foo@2"])

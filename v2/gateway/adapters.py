@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable, Protocol
 
 from common.schemas import SendPayload
+from gateway.contracts import lookup
 
 
 class AdapterError(Exception):
@@ -86,20 +87,36 @@ class FakeAdapter:
         return self.reply
 
 
-def _split_messages(payload: SendPayload) -> tuple[str, list[dict]]:
-    system = "\n\n".join(m.content for m in payload.messages if m.role == "system")
-    users = [{"role": "user", "content": m.content} for m in payload.messages if m.role == "user"]
-    return system, users
+def _split_messages(payload: SendPayload) -> tuple[str | None, list[dict]]:
+    """先頭の system（最大 1 件）とそれ以降を分ける。連結・並び替えはしない。
+
+    構造は service._validate で検査済みだが、ここでも崩れていれば送らない。
+    """
+    msgs = list(payload.messages)
+    system = None
+    if msgs and msgs[0].role == "system":
+        system = msgs[0].content
+        msgs = msgs[1:]
+    if not msgs or any(m.role != "user" for m in msgs):
+        raise NotSentError("invalid message structure")
+    return system, [{"role": m.role, "content": m.content} for m in msgs]
+
+
+def _max_output_tokens(payload: SendPayload) -> int:
+    """契約の出力上限（文字数）から出力トークン上限を導出する。"""
+    spec = lookup(payload.contract)
+    if spec is None:
+        raise NotSentError("unknown contract")
+    return spec.max_output_tokens
 
 
 class ClaudeAdapter:
     """Anthropic Messages API。自動再試行なし。SDK は send 時に遅延 import。"""
 
     def __init__(self, model: str, key_path: str | Path = "/run/secrets/anthropic_api_key",
-                 max_tokens: int = 2048, timeout: float = 60.0) -> None:
+                 timeout: float = 60.0) -> None:
         self.model = model
         self.key_path = Path(key_path)
-        self.max_tokens = max_tokens
         self.timeout = timeout
 
     def send(self, payload: SendPayload) -> str:
@@ -107,14 +124,15 @@ class ClaudeAdapter:
             import anthropic  # noqa: PLC0415
         except ImportError:
             raise NotSentError("anthropic sdk not installed") from None
+        system, msgs = _split_messages(payload)
+        max_tokens = _max_output_tokens(payload)
         key = read_secret(self.key_path)
         try:
             client = anthropic.Anthropic(api_key=key, max_retries=0, timeout=self.timeout)
         except Exception:
             raise NotSentError("client init failed") from None
-        system, users = _split_messages(payload)
-        kwargs: dict = {"model": self.model, "max_tokens": self.max_tokens, "messages": users}
-        if system:
+        kwargs: dict = {"model": self.model, "max_tokens": max_tokens, "messages": msgs}
+        if system is not None:
             kwargs["system"] = system
         try:
             resp = client.messages.create(**kwargs)
@@ -137,14 +155,18 @@ class CodexAdapter:
             import openai  # noqa: PLC0415
         except ImportError:
             raise NotSentError("openai sdk not installed") from None
+        system, msgs = _split_messages(payload)
+        if system is not None:
+            msgs = [{"role": "system", "content": system}, *msgs]
+        max_tokens = _max_output_tokens(payload)
         key = read_secret(self.key_path)
         try:
             client = openai.OpenAI(api_key=key, max_retries=0, timeout=self.timeout)
         except Exception:
             raise NotSentError("client init failed") from None
-        msgs = [{"role": m.role, "content": m.content} for m in payload.messages]
         try:
-            resp = client.chat.completions.create(model=self.model, messages=msgs)
+            resp = client.chat.completions.create(model=self.model, messages=msgs,
+                                                  max_completion_tokens=max_tokens)
         except Exception as e:
             raise _classify(e, openai) from None
         return resp.choices[0].message.content or ""

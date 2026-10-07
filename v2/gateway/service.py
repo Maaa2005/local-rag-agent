@@ -16,12 +16,14 @@ from common.schemas import (
     payload_digest,
 )
 from gateway.adapters import Adapter, NotSentError, RejectedError
-from gateway.store import SendRecord, SendStore
+from gateway.contracts import ContractSpec, lookup
+from gateway.store import SendRecord, SendStore, StoreError
 
 log = logging.getLogger("gateway")
 
-# 契約種別ごとの送信本文合計の上限（文字数）
-CONTRACT_LIMITS: dict[str, int] = {"A": 2000, "B": 1500}
+# commit 後の記録（finish）の再試行。DB 書き込みだけを短く繰り返す。外部送信は再送しない。
+FINISH_ATTEMPTS = 3
+FINISH_BACKOFF_SECONDS = 0.05
 
 
 class GatewayError(Exception):
@@ -56,13 +58,12 @@ class NotFound(GatewayError):
     pass
 
 
-def contract_kind(contract: str) -> str:
-    """"A-faq-format@1" → "A"。未知なら UnknownContract。"""
-    head, sep, version = contract.partition("@")
-    kind = head.split("-", 1)[0]
-    if kind not in CONTRACT_LIMITS or not sep or not version or "-" not in head:
+def contract_spec(contract: str) -> ContractSpec:
+    """固定レジストリを完全一致で引く。未登録なら UnknownContract。"""
+    spec = lookup(contract)
+    if spec is None:
         raise UnknownContract("unknown contract")
-    return kind
+    return spec
 
 
 def body_chars(payload: SendPayload) -> int:
@@ -75,25 +76,38 @@ class GatewayService:
         store: SendStore,
         adapters: Mapping[str, Adapter],
         clock: Callable[[], float] = time.time,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.store = store
         self.adapters = dict(adapters)
         self.clock = clock
+        self.sleep = sleep
 
     # ---- 検査 ----
     def _validate(self, req: PrepareRequest) -> None:
         p = req.payload
-        kind = contract_kind(p.contract)
+        spec = contract_spec(p.contract)
+        if p.destination not in spec.destinations:
+            raise InvalidRequest("destination not allowed for contract")
         if not p.messages:
             raise InvalidRequest("empty messages")
-        if not any(m.role == "user" for m in p.messages):
+        # 構造: system は先頭に最大 1 件、残りは user のみ（assistant は契約 A/B に不要）
+        rest = p.messages[1:] if p.messages[0].role == "system" else p.messages
+        if not rest:
             raise InvalidRequest("no user message")
-        if body_chars(p) > CONTRACT_LIMITS[kind]:
-            raise PayloadTooLarge(f"body exceeds {CONTRACT_LIMITS[kind]} chars for contract {kind}")
+        if any(m.role != "user" for m in rest):
+            raise InvalidRequest("system message only allowed first")
+        if body_chars(p) > spec.payload_chars:
+            raise PayloadTooLarge(f"body exceeds {spec.payload_chars} chars for contract {spec.key}")
+        if p.max_output_chars > spec.output_chars:
+            raise InvalidRequest(f"max_output_chars exceeds {spec.output_chars} for contract {spec.key}")
         if p.destination not in self.adapters:
             raise InvalidRequest("destination not available")
-        if req.expires_at <= self.clock():
+        now = self.clock()
+        if req.expires_at <= now:
             raise Expired("already expired")
+        if req.expires_at > now + spec.max_ttl_seconds:
+            raise InvalidRequest(f"expires_at too far (max ttl {spec.max_ttl_seconds:.0f}s)")
 
     @staticmethod
     def _status(rec: SendRecord) -> StatusResponse:
@@ -149,17 +163,44 @@ class GatewayService:
             out = adapter.send(payload)
         except NotSentError as e:
             log.warning("send not_sent request_id=%s kind=%s", rec.request_id, type(e).__name__)
-            self.store.finish(rec.request_id, SendState.FAILED, FailureKind.not_sent)
+            ok = self._finish(rec.request_id, SendState.FAILED, FailureKind.not_sent)
         except RejectedError as e:
             log.warning("send rejected request_id=%s kind=%s", rec.request_id, type(e).__name__)
-            self.store.finish(rec.request_id, SendState.FAILED, FailureKind.rejected)
+            ok = self._finish(rec.request_id, SendState.FAILED, FailureKind.rejected)
         except Exception as e:  # noqa: BLE001 結果不明。自動再送しない
             log.warning("send unknown request_id=%s kind=%s", rec.request_id, type(e).__name__)
-            self.store.finish(rec.request_id, SendState.FAILED, FailureKind.unknown)
+            ok = self._finish(rec.request_id, SendState.FAILED, FailureKind.unknown)
         else:
             text = (out or "")[: payload.max_output_chars]
-            self.store.finish(rec.request_id, SendState.SUCCEEDED, None, text)
+            ok = self._finish(rec.request_id, SendState.SUCCEEDED, None, text)
+        if not ok:
+            # 記録できなかった。送信結果は呼び出し側に確定させず、結果不明として返す。
+            # DB 上は ATTEMPTING のまま残り、再起動時の recover_on_startup で FAILED/unknown になる。
+            return StatusResponse(request_id=rec.request_id, digest=rec.digest,
+                                  state=SendState.FAILED, failure=FailureKind.unknown)
         return self.status(rec.request_id)
+
+    def _finish(self, request_id: str, state: SendState, failure: FailureKind | None,
+                output_text: str | None = None) -> bool:
+        """finish を DB 書き込みだけ短く再試行する。記録できたら True。
+
+        rowcount != 1（ATTEMPTING でなかった等）はログのみで True を返す（再試行しても変わらない）。
+        ログには request_id と例外型名だけを出す（本文・出力は出さない）。
+        """
+        for attempt in range(1, FINISH_ATTEMPTS + 1):
+            try:
+                updated = self.store.finish(request_id, state, failure, output_text)
+            except StoreError as e:
+                log.warning("finish failed request_id=%s attempt=%d kind=%s",
+                            request_id, attempt, type(e.__cause__ or e).__name__)
+                if attempt < FINISH_ATTEMPTS:
+                    self.sleep(FINISH_BACKOFF_SECONDS * attempt)
+                continue
+            if updated != 1:
+                log.error("finish rowcount=%s request_id=%s", updated, request_id)
+            return True
+        log.error("finish gave up request_id=%s", request_id)
+        return False
 
     def status(self, request_id: str) -> StatusResponse:
         rec = self.store.get(request_id)
