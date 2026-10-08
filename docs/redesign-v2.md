@@ -63,7 +63,10 @@ flowchart LR
 | Clef | Cloudflare | 27B（約 55GB） | Apache-2.0 | transformers / llama.cpp（GGUF あり） | 画像入力あり。v1 の GPU には載らない |
 | Clef-flash | Cloudflare | 9B（Q4 量子化 6.49GB） | Apache-2.0 | llama.cpp（2026-10-03 対応マージ、テキストのみ）/ transformers | 6GB GPU では一部 CPU に逃がす必要あり |
 | Laya-multilingual | convai innovations | 322M | Apache-2.0 | transformers（CPU 可） | 日本語を含む 100 言語以上を明記。最大 8,192 トークン |
-| Kev（0.8B / 4B / 9B） | jaredpalmer | 0.8〜9B | Apache-2.0 | ローカル（Mac で動作例あり） | Qwen3.5 ベース・英語表記 |
+| Kev（0.8B / 4B / 9B） | jaredpalmer | 0.8〜9B | Apache-2.0 | transformers（bf16。GGUF なし） | Qwen3.5 ベース＋LoRA・英語のみ表記。4B でも bf16 で約 8GB と 6GB GPU に収まらず、同じ 9B 級なら Clef-flash を優先（2026-10-08 確認） |
+| d1（3B / omni-600M） | Liquid AI | 3.1B / 587M | LFM Open License v1.0 | llama.cpp（公式 GGUF: Q4_K_M 1.67GB・Q8_0 2.87GB）/ transformers | 2026-10-05 公開。日本語を対応言語に明記。提供元の Decision Index で小型最上位（自社測定）。**年商 1,000 万ドル以上の企業は商用利用不可**のため、導入先の規模次第で使えない。開発・比較（C6）用（2026-10-08 確認） |
+| pplx-decider-v1-27b | Perplexity | 27B | Apache-2.0 | transformers | 2026-10-01 公開。大構成の比較候補 |
+| StartLux-Decision（0.8B〜27B） | startlux-models | 0.8〜27B | CC-BY-NC-4.0 | llama.cpp（GGUF） | **非商用ライセンスのため採用しない** |
 | Tev1（0.8B / 4B） | Together AI | 0.8〜4.7B | 未記載 | ローカル | experimental。ライセンス未記載のため採用前に要確認 |
 | decider（0.8B / 2B / 4B） | Mapika | 0.8〜4B | Apache-2.0 | ローカル | 英語表記 |
 | JEV-9B / JEV-27B | autotrust | 9B / 27B | Apache-2.0 | ローカル | 英語表記 |
