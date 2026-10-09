@@ -253,7 +253,7 @@ Clef-flash の静的構成で生成 LLM を止めている間はローカル生�
 |---|---|---|
 | バックエンド | Python 3.11 / FastAPI | v1 の Dockerfile が 3.11。モデルの runtime は別に固定 |
 | 社内エージェントの制御 | 小さな自前の状態遷移 | 流れが固定で短く、監査しやすい。LangGraph は使わない |
-| ローカル LLM | vLLM ＋ Gemma 4 E2B AWQ-INT4 | v1 を継承。6GB で実測して判断 |
+| ローカル LLM | vLLM ＋ Gemma 4 E2B AWQ-INT4 | v1 を継承。6GB で実測して判断。比較候補（2026-10-09 調査）: sarashina2.2-3b-instruct（MIT・日本語特化・JMT-Bench 6.51）、Qwen3.5-2B/4B（Apache）、LFM2.5-2.6B（年商 1,000 万ドル以上は商用不可）。Gemma 4・Qwen3.5 との同条件の日本語公表値はないため v2 評価セットで実測して決める。Underdog Saluki 27B（Qwen3.8-27B の IQ2 GGUF・7.89GB・Apache・英語のみ・llama.cpp のみ）は 6GB に載らないため大構成の比較候補 |
 | 判断モデル | 共通アダプタ（`/v1/systemone` 互換）の裏で Laya-multilingual（transformers）と Clef-flash（llama.cpp）を比較 | 初版は C1・C2 に必要な型を優先 |
 | 6GB での配置 | 通常は生成 LLM を GPU、Laya・埋め込み・reranker を CPU。Clef-flash を使うときは生成 LLM を止める静的な Compose profile に切り替える | Clef-flash と生成 LLM の GPU 同居は必達にしない |
 | 埋め込み・検索 | multilingual-e5-large / Qdrant / bge-reranker-v2-m3 | v1 を継承。CPU での RAM と待ち時間も測る |
