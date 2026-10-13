@@ -55,6 +55,62 @@ flowchart LR
 - どのモデルを使うかは設定で切り替え、GPU の規模に合わせた構成を用意する
 - 判断ごとに、モデル名とバージョン・確率・確信度を監査ログに残す。`latest` ではなくバージョンを固定する
 
+### 判断モデルの HTTP I/F（2026-10-13 確定・Issue #5）
+
+実装は `v2/judge/http_adapter.py`、試験は `v2/tests/judge/test_http_if.py`。
+
+要求（`POST {base_url}/v1/systemone`）:
+
+```json
+{"model": "<固定した名前>", "context": "<判定対象テキスト>",
+ "questions": [{"id": "route", "type": "choice", "prompt": "...", "choices": ["code", "local", "A", "B", "human", "reject"]}]}
+```
+
+応答:
+
+```json
+{"model": "<同じ名前>", "revision": "<モデルの版>", "truncated": false,
+ "answers": [{"id": "route", "answer": "A", "probs": {"code": 0.02, "local": 0.05, "A": 0.85, "B": 0.03, "human": 0.03, "reject": 0.02}}]}
+```
+
+質問の 3 型とラベル:
+
+| 型 | 質問に足す項目 | probs のキー | answer の型 |
+|---|---|---|---|
+| `noul` | なし | `yes` / `no` | 文字列 |
+| `choice` | `choices`（文字列の配列） | choices の全要素 | 文字列 |
+| `score` | `min` / `max`（整数） | min〜max の整数を文字列にしたもの | 整数 |
+
+検証規則（1 つでも外れたら不正な応答として扱う）:
+
+1. `revision` は空でない文字列。無いと監査記録（F9）とモデル比較（C6）を再現できない
+2. `model` を返す場合は要求と一致すること。別のモデルの判定を頼んだモデルの判定として記録しない。返さない場合は要求した名前で記録する
+3. `truncated` は真偽値（省略時は false）。true の判定は使わない（C1 は人に回す、C2 は保留）
+4. 送った質問の id ごとに答えがちょうど 1 件。重複・欠落は不正。質問にない id の答えは無視する
+5. `probs` は質問の全ラベルを過不足なく持ち、各値は 0〜1 の有限な数（真偽値は不可）、合計は 1±0.01。`answer` は最大確率のラベル（同率なら最大のどれでもよい）
+
+タイムアウト:
+
+- アダプタの HTTP タイムアウト `timeout_s`（既定 10 秒）と、`guarded_c1` / `guarded_c2` の打ち切り（呼び出し側の `c1_timeout_s` / `c2_timeout_s`）の 2 重。どちらに掛かっても C1 は人に回す、C2 は保留
+- 2 段構えにするときは、guard の打ち切りを前段と後段の HTTP タイムアウトの合計以上にする。短いと後段の判定が出る前に保留になる
+
+エラー時の扱い:
+
+- 2xx 以外・JSON 不正・接続失敗・タイムアウト・上の検証違反は、すべて例外として guard まで上げ、C1 は `human`、C2 は `hold` に倒す。理由は監査ログに残る
+- 再試行しない。同じ判定を二度聞いて都合のよい方を採ることを防ぐ
+- リダイレクトに従わない。判定対象を社内の base_url 以外へ流さない
+
+2 段構え（6GB 構成で前段 Laya-multilingual、迷ったときだけ後段 Clef-flash）:
+
+| 役割 | 後段に回す条件 | 後段に回さない |
+|---|---|---|
+| C1（`CascadeC1Router`） | 前段の最大確率が `escalate_below` 未満、または切り捨て | 前段の例外（後段を代わりにすると前段の障害が判定の質の低下として隠れる） |
+| C2（`CascadeC2Gate`） | 前段が hold、または切り捨て | 前段の block（後段で覆さない）・前段の例外 |
+
+- 後段の判定理由に「escalated from <前段モデル>@<版>」と前段の判定を残す
+- 後段も迷う場合: C1 は後段の `min_confidence`（未満なら `human`）、C2 は後段の hold がそのまま保留になる
+- 閾値（`block_at` / `allow_at` / `escalate_below` / `min_confidence`）は Issue #1 の 6GB 実測で決める。それまでは既定値（`block_at=0.5` / `allow_at=0.1`、C1 の確信度下限なし）
+
 ### 候補モデル（2026-10-05 時点、Hugging Face で実在を確認）
 
 | モデル | 提供元 | 大きさ | ライセンス | 動かし方 | 備考 |

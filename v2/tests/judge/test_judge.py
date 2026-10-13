@@ -10,7 +10,7 @@ from common.schemas import C1Decision, C2Verdict, Message, SendPayload
 from evalharness.run_v2_eval import evaluate, load_cases, main
 from judge.base import C2Verdict as JC2Verdict  # 質問の版を持つ判定
 from judge.base import GUARD_QUESTION_VERSION, C1Router, C2Gate, guarded_c1, guarded_c2, question_version
-from judge.http_adapter import C1_QUESTION_VERSION, C2_QUESTION_VERSION, HttpC1Router, HttpC2Gate
+from judge.http_adapter import C1_QUESTION_VERSION, C2_QUESTION_VERSION, ROUTES, HttpC1Router, HttpC2Gate
 from judge.rules import RuleC1Router, RuleC2Gate
 
 
@@ -178,6 +178,11 @@ def mock(handler):
     return httpx.MockTransport(handler)
 
 
+def route_probs(top: str, p: float = 0.9) -> dict[str, float]:
+    rest = (1 - p) / (len(ROUTES) - 1)
+    return {r: (p if r == top else rest) for r in ROUTES}
+
+
 def test_http_c1_parses_and_records_revision():
     seen = {}
 
@@ -185,7 +190,7 @@ def test_http_c1_parses_and_records_revision():
         seen["path"] = req.url.path
         seen["body"] = json.loads(req.content)
         return httpx.Response(200, json={"model": "laya-multilingual", "revision": "abc123", "answers": [
-            {"id": "route", "answer": "B", "probs": {"B": 0.9, "A": 0.1}}]})
+            {"id": "route", "answer": "B", "probs": route_probs("B")}]})
 
     d = HttpC1Router("http://judge.internal", "laya-multilingual", transport=mock(h)).route(
         "u", "q", {"contract": "B-csv-codegen@1"})

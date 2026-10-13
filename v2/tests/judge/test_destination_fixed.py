@@ -16,7 +16,7 @@ import pytest
 
 from judge.base import C1Decision, guarded_c1, is_guard_stop
 from judge.destination import CONTRACTS_PATH, lookup_contract, resolve_destination
-from judge.http_adapter import HttpC1Router
+from judge.http_adapter import ROUTES, HttpC1Router
 from judge.rules import RuleC1Router
 from orchestrator.policy import JST, check_eligibility, load_policy
 
@@ -144,6 +144,11 @@ def test_guard_non_external_route_passes_through():
 
 # ---- HTTP 版 C1 の truncated ----
 
+def route_probs(top: str, p: float = 0.9) -> dict[str, float]:
+    rest = (1 - p) / (len(ROUTES) - 1)
+    return {r: (p if r == top else rest) for r in ROUTES}
+
+
 def _http(body):
     def h(req: httpx.Request):
         return httpx.Response(200, json=body)
@@ -152,7 +157,7 @@ def _http(body):
 
 def test_http_c1_truncated_reflected_and_held():
     body = {"model": "laya", "revision": "r1", "truncated": True,
-            "answers": [{"id": "route", "answer": "A", "probs": {"A": 0.9}}]}
+            "answers": [{"id": "route", "answer": "A", "probs": route_probs("A")}]}
     d = _http(body).route("u", "x", {"contract": A})
     assert d.truncated is True and d.destination == "claude"
     g = guarded_c1(_http(body), "u", "x", A_INPUT, 5.0, 4000)
@@ -161,14 +166,14 @@ def test_http_c1_truncated_reflected_and_held():
 
 def test_http_c1_destination_from_contract_not_model():
     body = {"model": "laya", "revision": "r1",
-            "answers": [{"id": "route", "answer": "B", "probs": {"B": 0.9}},
+            "answers": [{"id": "route", "answer": "B", "probs": route_probs("B")},
                         {"id": "destination", "answer": "claude", "probs": {"claude": 0.9}}]}
     d = _http(body).route("u", "x", {"contract": B, "destination_hint": "claude"})
     assert (d.route, d.destination, d.truncated) == ("B", "codex", False)
 
 
 def test_http_c1_unknown_contract_has_no_destination_and_is_held():
-    body = {"model": "laya", "revision": "r1", "answers": [{"id": "route", "answer": "A", "probs": {"A": 0.9}}]}
+    body = {"model": "laya", "revision": "r1", "answers": [{"id": "route", "answer": "A", "probs": route_probs("A")}]}
     d = _http(body).route("u", "x", {"contract": "A-faq-format@2"})
     assert d.destination is None
     g = guarded_c1(_http(body), "u", "x", {"contract": "A-faq-format@2"}, 5.0, 4000)
