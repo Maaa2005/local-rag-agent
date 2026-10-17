@@ -109,7 +109,8 @@ services:
   judge-laya:
     <<: *hardening
     profiles: ["laya"]
-    # 判断モデル（Laya-multilingual・CPU）。共通アダプタ（/v1/systemone 互換）は未実装のためプレースホルダ。
+    # 判断モデル（Laya-multilingual・CPU）。/v1/systemone の shim は judge/laya_server.py（依存は requirements-laya.txt）。
+    # 2026-10-17 の実測で C1・C2 とも不採用（docs/redesign-v2.md）のため image 化せずプレースホルダのまま。
     image: python:3.11-slim
     command: ["python", "-c", "import time; print('judge-laya placeholder', flush=True); time.sleep(10**9)"]
     user: "10004:10004"

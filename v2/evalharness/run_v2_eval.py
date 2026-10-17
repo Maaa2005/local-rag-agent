@@ -96,7 +96,8 @@ class DelayedGate:
         return self.inner.check(payload)
 
 
-def make_impls(c1: str, c2: str, base_url: str | None, c1_model: str, c2_model: str) -> tuple[C1Router, C2Gate]:
+def make_impls(c1: str, c2: str, base_url: str | None, c1_model: str, c2_model: str,
+               timeout_s: float = 10.0) -> tuple[C1Router, C2Gate]:
     from judge.rules import RuleC1Router, RuleC2Gate
 
     def need_url() -> str:
@@ -108,12 +109,13 @@ def make_impls(c1: str, c2: str, base_url: str | None, c1_model: str, c2_model: 
         r1: C1Router = RuleC1Router()
     else:
         from judge.http_adapter import HttpC1Router
-        r1 = HttpC1Router(need_url(), c1_model)
+        # 通信の待ち時間も guard と同じにする（guard が先に止めても裏で通信が残らないように）
+        r1 = HttpC1Router(need_url(), c1_model, timeout_s=timeout_s)
     if c2 == "rules":
         g2: C2Gate = RuleC2Gate()
     else:
         from judge.http_adapter import HttpC2Gate
-        g2 = HttpC2Gate(need_url(), c2_model)
+        g2 = HttpC2Gate(need_url(), c2_model, timeout_s=timeout_s)
     return r1, g2
 
 
@@ -148,9 +150,12 @@ def evaluate(cases: list[dict[str, Any]], router: C1Router, gate: C2Gate, *, tim
             "expected_stop": case["expected_stop"], "expected_outcome": case["expected_outcome"],
             "data_class": case["data_class"], "condition": cond or None,
             "c1_model": dec.model, "c1_revision": dec.revision, "c1_reason": dec.reason,
+            "c1_question_version": dec.question_version, "c1_truncated": dec.truncated, "c1_probs": dec.probs or None,
             "c2": verdict.decision if verdict else None, "c2_reason": verdict.reason if verdict else None,
             "c2_model": verdict.model if verdict else None, "c2_revision": verdict.revision if verdict else None,
             "c2_truncated": verdict.truncated if verdict else None,
+            "c2_question_version": verdict.question_version if verdict else None,
+            "c2_prob_block": verdict.prob_block if verdict else None,
             "judge_sent": sent, "c1_sec": round(t_c1, 4), "c2_sec": round(t_c2, 4) if t_c2 is not None else None,
         })
     return {"summary": summarize(rows), "cases": rows}
@@ -239,7 +244,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(lines))
         return 0
 
-    router, gate = make_impls(a.c1, a.c2, a.base_url, a.c1_model, a.c2_model)
+    router, gate = make_impls(a.c1, a.c2, a.base_url, a.c1_model, a.c2_model, timeout_s=a.timeout)
     res = evaluate(load_cases(a.cases), router, gate, timeout_s=a.timeout, max_input_chars=a.max_input_chars)
     l1 = a.c1 if a.c1 == "rules" else f"{a.c1}:{a.c1_model}"
     l2 = a.c2 if a.c2 == "rules" else f"{a.c2}:{a.c2_model}"

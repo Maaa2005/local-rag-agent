@@ -78,7 +78,7 @@ flowchart LR
 | 型 | 質問に足す項目 | probs のキー | answer の型 |
 |---|---|---|---|
 | `noul` | なし | `yes` / `no` | 文字列 |
-| `choice` | `choices`（文字列の配列） | choices の全要素 | 文字列 |
+| `choice` | `choices`（文字列の配列）。任意で `descriptions`（{ラベル: 説明}。A / B などラベルだけで意味が伝わらない選択肢に付ける） | choices の全要素 | 文字列 |
 | `score` | `min` / `max`（整数） | min〜max の整数を文字列にしたもの | 整数 |
 
 検証規則（1 つでも外れたら不正な応答として扱う）:
@@ -100,7 +100,7 @@ flowchart LR
 - 再試行しない。同じ判定を二度聞いて都合のよい方を採ることを防ぐ
 - リダイレクトに従わない。判定対象を社内の base_url 以外へ流さない
 
-2 段構え（6GB 構成で前段 Laya-multilingual、迷ったときだけ後段 Clef-flash）:
+2 段構え（6GB 構成で前段 Laya-multilingual、迷ったときだけ後段 Clef-flash）。前段の Laya は 2026-10-17 の実測で不採用（下の「Laya の初期採否」）。仕組みは前段のモデルを差し替えても使える:
 
 | 役割 | 後段に回す条件 | 後段に回さない |
 |---|---|---|
@@ -110,6 +110,38 @@ flowchart LR
 - 後段の判定理由に「escalated from <前段モデル>@<版>」と前段の判定を残す
 - 後段も迷う場合: C1 は後段の `min_confidence`（未満なら `human`）、C2 は後段の hold がそのまま保留になる
 - 閾値（`block_at` / `allow_at` / `escalate_below` / `min_confidence`）は Issue #1 の 6GB 実測で決める。それまでは既定値（`block_at=0.5` / `allow_at=0.1`、C1 の確信度下限なし）
+
+### Laya-multilingual の shim（2026-10-17）
+
+Laya 付属の `laya-serve` は応答の形が上の I/F と違う（答えが質問 id の辞書・`revision` が無い・切り捨てが `usage` の中）。そのため `v2/judge/laya_server.py` で `Agent.system_one` を直接呼び、I/F の形に詰め替える。依存は `v2/requirements-laya.txt`、試験は `v2/tests/judge/test_laya_server.py`。
+
+- choice: `descriptions` を Laya の criteria（「ラベル: 説明」）として渡す。説明と選択肢は合わせて head_max_len（既定 192 トークン）に収める
+- noul: Laya の P(true) を `yes`、1 − P(true) を `no` にする
+- `answer` は Laya の選んだものではなく、返す `probs` の最大から選択肢の順で出し直す（Laya は確率を小数 4 桁に丸めるので同点があり得る）
+- 切り捨て: `usage.truncated`・`truncated_questions`・選択肢の畳み込み・`usage` が読めない、のどれかで `truncated: true`
+- `revision` は `<モデルの sha>+laya-shim@1`。起動時に読み込んだ版が `JUDGE_MODEL_REVISION` と一致しなければ起動しない
+- `max_len` の既定は学習時と同じ 1024。encoder は 8,192 位置まで読めるが、1024 を超える長さでの判定の質は確かめていない。超えた入力は切り捨て扱いで human / hold になる
+- `score` 型は未対応（422）
+
+### Laya の初期採否（2026-10-17・不採用）
+
+Mac（mps）で v2 評価ケース 39 件（架空データ）を判断層評価に通した。結果は `evaluation/v2/results/2026-10-17-laya/`。
+
+| C1 | C2 | C1 経路正答 | C2 検出（stop=C2） | 誤遮断 | 誤送信（判断層） |
+|---|---|---|---|---|---|
+| rules | rules | 34/39 | 8/10 | 1/10 | 2/22 |
+| Laya | rules | 25/39 | 7/10 | 1/10 | 2/22 |
+| rules | Laya | 34/39 | 10/10 | 10/10 | 0/22 |
+| Laya | Laya | 25/39 | 9/10 | 8/10 | 0/22 |
+
+- C1: 宛先正答 19/26（rules は 26/26）。経路の誤り 14 件のうち 4 件は確率 0.85 以上（V031 code→local 0.96 など）で、`min_confidence` で人に回しても残る。契約 A の手順試験 4 件（V081〜084）は同じ確率で reject。外部宛先への誤経路は 0 件
+- C2: 許可ケースも禁止ケースも p_block が 0.958〜0.999。「全部止める」だけなので、検出 10/10 は合格に数えない（V083 は C2 タイムアウトの試験で、検出側に数えたのは遅延注入の結果であり Laya の判定ではない）
+- C2 の質問文を 4 通りに変えた試験（rules の C1 で組んだ送信内容。止めるべき 9 件と送ってよい 10 件）でも AUC は 0.32〜0.48（0.5 が当て推量）。事前に決めた基準「AUC 0.8 以上かつ送ってよい側の最大 < 止めるべき側の最小」を満たさない
+- max_len 1024 と 8192 で 4 通りとも結果は同じ（入力は約 300 字）。長さは原因ではない
+- 判定: C1・C2 とも Laya は使わない。10/18 の判断どおり Clef-flash の静的構成へ進む
+- 言える範囲: この質問文・この shim 設定・架空 39 件（C2 は 19 件）での結果。Laya 一般の性能ではない
+
+C2 が全部止める理由（2 段まで）: C2 の質問は 1 問に 8 種類の禁止情報（金額や日付の実データ・社内のシステム名/列名・指示の注入など）を並べている。ところが送ってよいケースの送信内容にも、承認済みの説明文に入っている「経費精算システム」「翌月 10 日」や列名 date/category/amount、システム指示が含まれる。質問の文面どおりなら「含む」が正しく、正解ラベル（送ってよい）と質問がずれている。短い基準で学習した小型モデルは、業務文書ならほぼ何でも「含む」と答える。このずれは Clef-flash でも誤遮断を生むので、未解決の表に残す。
 
 ### 候補モデル（2026-10-05 時点、Hugging Face で実在を確認）
 
@@ -258,7 +290,8 @@ Clef-flash の静的構成で生成 LLM を止めている間はローカル生�
 
 | 項目 | 確認方法・期限 | だめだった場合 |
 |---|---|---|
-| 日本語の C1・C2 に Laya が使えるか | 許可・禁止・保留、長文の末尾、否定、指示注入を含むケースで 10/18 に判断 | Clef-flash の静的構成を試す |
+| 日本語の C1・C2 に Laya が使えるか | 10/17 に判断済み: 不採用（「Laya の初期採否」） | Clef-flash の静的構成を試す |
+| C2 の質問と正解ラベルのずれ | 送ってよい送信内容にも承認済みの業務語（システム名・期日・列名）が入る。承認済み部分を C2 の対象から外すか、質問を「承認済みの説明文にない禁止情報」に絞るかを、Clef-flash の実測前に二者協議で決める | 決まるまで C2 の誤遮断の数字は質問の問題とモデルの問題を分けずに報告する |
 | Clef-flash が 6GB＋ホスト RAM で実用になるか | 生成 LLM を止めて起動・入力長・RAM/VRAM・待ち時間を測る | 対象機能を制限。起動しただけで採用済みにしない |
 | Docker/WSL で分離が成立するか | ホスト・frontend 経由を含めて双方向に試験 | 最小の遮断を追加。残る経路を「分離済み」と書かない |
 | 契約 A・B に業務上の価値があるか | 入力・送信本文・期待出力・拒否例を各 1 組作る | 用途・入力枠を修正。契約は増やさない |
@@ -309,7 +342,7 @@ Clef-flash の静的構成で生成 LLM を止めている間はローカル生�
 |---|---|---|
 | バックエンド | Python 3.11 / FastAPI | v1 の Dockerfile が 3.11。モデルの runtime は別に固定 |
 | 社内エージェントの制御 | 小さな自前の状態遷移 | 流れが固定で短く、監査しやすい。LangGraph は使わない |
-| ローカル LLM | vLLM ＋ Gemma 4 E2B AWQ-INT4 | v1 を継承。6GB で実測して判断。比較候補（2026-10-09 調査）: sarashina2.2-3b-instruct（MIT・日本語特化・JMT-Bench 6.51）、Qwen3.5-2B/4B（Apache）、LFM2.5-2.6B（年商 1,000 万ドル以上は商用不可）。Gemma 4・Qwen3.5 との同条件の日本語公表値はないため v2 評価セットで実測して決める。Underdog Saluki 27B（Qwen3.8-27B の IQ2 GGUF・7.89GB・Apache・英語のみ・llama.cpp のみ）は 6GB に載らないため大構成の比較候補 |
+| ローカル LLM | vLLM ＋ Gemma 4 E2B AWQ-INT4 | v1 を継承。6GB で実測して判断。比較候補（2026-10-09 調査）: sarashina2.2-3b-instruct（MIT・日本語特化・JMT-Bench 6.51）、Qwen3.5-2B/4B（Apache）、LFM2.5-2.6B（年商 1,000 万ドル以上は商用不可）。Gemma 4・Qwen3.5 との同条件の日本語公表値はないため v2 評価セットで実測して決める。Underdog Saluki 27B（Qwen3.8-27B の IQ2 GGUF・7.89GB・Apache・英語のみ・llama.cpp のみ）は 6GB に載らないため大構成の比較候補。2026-10-17 確認: DeepSeek-V4.1-Flash-1017（同日公開・763B・MIT）は社内サーバ級、Qwen3.8-Flash-Next（125B）を一般 PC で動かす Strata は VRAM 12GB＋RAM 32GB 以上が要件（Mac は 32GB で実測・それ未満は未検証と同リポの docs/MAC.md に明記）で、どちらも 6GB 構成・Mac 16GB には載らない。Qwen3.8 系の最小は 27B で小型版はなく、6GB の候補は変わらない。Strata は OpenAI 互換 API を出すため、12GB 以上の構成ならこの欄の差し替えだけで比較できる |
 | 判断モデル | 共通アダプタ（`/v1/systemone` 互換）の裏で Laya-multilingual（transformers）と Clef-flash（llama.cpp）を比較 | 初版は C1・C2 に必要な型を優先 |
 | 6GB での配置 | 通常は生成 LLM を GPU、Laya・埋め込み・reranker を CPU。Clef-flash を使うときは生成 LLM を止める静的な Compose profile に切り替える | Clef-flash と生成 LLM の GPU 同居は必達にしない |
 | 埋め込み・検索 | multilingual-e5-large / Qdrant / bge-reranker-v2-m3 | v1 を継承。CPU での RAM と待ち時間も測る |
