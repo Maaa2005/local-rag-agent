@@ -43,7 +43,7 @@ C2_PROMPT_VERSION = "c2-forbidden@1"
 # 送る質問セット。文言を変えたら *_PROMPT_VERSION を上げる（上げ忘れてもハッシュで区別される）
 # descriptions はラベルだけでは意味の伝わらない選択肢（A / B など）の説明。判断モデルは「ラベル: 説明」を
 # 選択肢として読む。質問の版のハッシュに入るので、説明を変えれば版も変わる。Laya は説明と選択肢を
-# 合わせて 192 トークン（head_max_len の既定）に収めるため短く保つ
+# 合わせて head_max_len（Laya-multilingual の設定では 256 トークン。設定が無いときの既定は 192）に収めるため短く保つ
 C1_QUESTIONS: tuple[dict[str, Any], ...] = (
     {"id": "route", "type": "choice", "prompt": "この依頼の処理経路はどれか", "choices": ROUTES,
      "descriptions": {

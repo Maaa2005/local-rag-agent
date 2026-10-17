@@ -115,7 +115,7 @@ flowchart LR
 
 Laya 付属の `laya-serve` は応答の形が上の I/F と違う（答えが質問 id の辞書・`revision` が無い・切り捨てが `usage` の中）。そのため `v2/judge/laya_server.py` で `Agent.system_one` を直接呼び、I/F の形に詰め替える。依存は `v2/requirements-laya.txt`、試験は `v2/tests/judge/test_laya_server.py`。
 
-- choice: `descriptions` を Laya の criteria（「ラベル: 説明」）として渡す。説明と選択肢は合わせて head_max_len（既定 192 トークン）に収める
+- choice: `descriptions` を Laya の criteria（「ラベル: 説明」）として渡す。説明と選択肢は合わせて head_max_len（Laya-multilingual の設定 rl_agent_config.json では 256 トークン。設定が無いときのライブラリ既定は 192）に収める
 - noul: Laya の P(true) を `yes`、1 − P(true) を `no` にする
 - `answer` は Laya の選んだものではなく、返す `probs` の最大から選択肢の順で出し直す（Laya は確率を小数 4 桁に丸めるので同点があり得る）
 - 切り捨て: `usage.truncated`・`truncated_questions`・選択肢の畳み込み・`usage` が読めない、のどれかで `truncated: true`
