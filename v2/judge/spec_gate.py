@@ -15,7 +15,7 @@ C2Gate の I/F（check(payload)）に合わせるには Bound(gate, rendered) �
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any, Protocol, Sequence
 
 from common.provenance import RenderedMessage, mismatch
 from common.schemas import SendPayload
@@ -66,11 +66,15 @@ class SpecC2Gate:
                          question_version=self.question_version, context_sha256=req.context_sha256)
 
 
+class RenderedGate(Protocol):
+    def check_rendered(self, payload: SendPayload, rendered: Sequence[RenderedMessage]) -> C2Verdict: ...
+
+
 @dataclass(frozen=True)
 class Bound:
     """出所区分つきの部分を束ねて C2Gate（check(payload)）として渡すための包み。"""
 
-    gate: SpecC2Gate
+    gate: RenderedGate
     rendered: tuple[RenderedMessage, ...]
 
     def check(self, payload: SendPayload) -> C2Verdict:

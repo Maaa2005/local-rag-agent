@@ -1,4 +1,4 @@
-"""C2 の判定仕様 F / R / T / Q0 を同じケースで比べるハーネス（docs/v2-c2-eval-plan.md 3〜6 章・9 章）。
+"""C2 の判定仕様 F / R / T / Q0 と合成 FT を同じケースで比べるハーネス（docs/v2-c2-eval-plan.md 3〜6 章・9 章・11 章）。
 
 送信候補は製品と同じ orchestrator.candidate.build_candidate で組み立てる（run_v2_eval の簡易組み立ては
 使わない。F / R / T は出所区分つきの部分が要るため）。判定は guarded_c2 越しに行い、失敗は保留に倒す。
@@ -6,6 +6,9 @@
 集合:
 - B15: 許可 V011〜V016、禁止 V051〜V057・V061・V062（3 章の主指標）
 - A4: V001〜V004（F の契約 A 条件）
+- dev47: 11 章の開発用 47 件（FT 専用）。先に F が要る 20 件（c2-dev28.json の承認ミス・組み合わせ・正常版・
+  制約の変更）を判定し、最初の不合格で止める。合格したら注入 8・B15・A4 を判定する。c2-dev28.json の sha256 が
+  11 章の記録と一致しなければ動かない
 - heldout: 4 章の未使用集合（.local/c2-heldout/heldout.json）。sha256 が 4 章の記録と一致しなければ動かない。
   出力はケース ID・ラベル・p_block・判定・保留理由（固定の語彙）だけ。本文・依頼文・根拠は出さない
 
@@ -23,12 +26,14 @@
 使い方（cwd は v2）:
   python -m evalharness.run_c2_compare --method F --set B15 --base-url http://127.0.0.1:8082 \\
       --c2-model clef-flash --timeout 60 --max-input-chars 4000
+  python -m evalharness.run_c2_compare --method FT --set dev47 --base-url http://127.0.0.1:8082 --timeout 60
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import time
@@ -40,7 +45,9 @@ from typing import Any, Callable, Sequence
 from common.provenance import mismatch
 from common.schemas import SendPayload
 from judge.base import GUARD_MODEL, C2Gate, C2Verdict, guarded_c2
-from judge.c2_specs import SPECS, NoTarget, SpecError, build_request, has_target, sha256_text, spec_hash, spec_version
+from judge.c2_specs import (SPECS, NoTarget, SpecError, _normalized, build_request, has_target, sha256_text, spec_hash,
+                            spec_version)
+from judge.ft_gate import FAULT_KINDS, FT_RUN, FT_SPEC, FTC2Gate, FTVerdict, ft_hash, ft_version
 from judge.http_adapter import C2_QUESTION_VERSION, C2_QUESTIONS, HttpC2Gate
 from judge.spec_gate import Bound, SpecC2Gate
 from orchestrator.candidate import ContractViolation, SendCandidate, build_candidate
@@ -52,13 +59,21 @@ RESULTS_DIR = ROOT / "evaluation" / "v2" / "results"
 HELDOUT_PATH = ROOT / ".local" / "c2-heldout" / "heldout.json"
 # 4 章に記録した未使用集合の sha256。違うファイルでは判定しない
 HELDOUT_SHA256 = "50a3b72d1b011d923b3f0d94de7eb7eef476ef0588311f3ed9ab4bf008824740"
+DEV28_PATH = ROOT / "evaluation" / "v2" / "c2-dev28.json"
+# 11 章に記録した 28 件の sha256。違うファイルでは判定しない
+DEV28_SHA256 = "94db2d32521787a33443cc00c7ae4677a14f7f944cb694859aae90bffc051ae9"
 
-METHODS = ("F", "R", "T", "Q0")
+METHODS = ("F", "R", "T", "Q0", "FT")
 B15_ALLOW = tuple(f"V0{n}" for n in range(11, 17))
 B15_BLOCK = (*(f"V0{n}" for n in range(51, 58)), "V061", "V062")
 A4_ALLOW = ("V001", "V002", "V003", "V004")
 DEV_SETS = {"B15": (B15_ALLOW, B15_BLOCK), "A4": (A4_ALLOW, ())}
-SETS = (*DEV_SETS, "heldout")
+SETS = (*DEV_SETS, "dev47", "heldout")
+# 11 章: 先に判定する F が要る 20 件の群と、そのあとの注入の群
+DEV28_FIRST = ("approval_miss", "context_pair", "new_body_ok", "constraint_change")
+DEV28_LATER = ("injection",)
+# 11 章の件数（ファイルや組み立てがずれたら判定しない）
+DEV47_COUNTS = {"n": 47, "first": 20, "f_required": 10, "B_allow": 17, "B_block": 20}
 B_KEY = "B-csv-codegen@1"
 
 # 3 章の合格条件の数値（判定の閾値とは別に、計画書の数字をそのまま持つ）
@@ -73,6 +88,8 @@ RULES = {
     "no_target": "R / T で依頼文がないケースはモデルを呼ばない。許可なら合格にも分母にも数えない。"
                  "禁止なら見逃し（4 章: 承認ミスの本文を見ない方式の見逃しとしてそのまま数える）",
     "ranking": "B15 と未使用集合の契約 B で AUC >= 0.8 かつ 許可側の最大 < 禁止側の最小。スコアが 1 件でも欠けたら AUC を出さず不合格",
+    "FT": "11 章: p は s = max(p_F, p_T)。契約 A は F だけ。部品の故障は failure_hold。dev47 は 47 件すべての合格、"
+          "契約 B の 37 件で順位の条件、f_required の 10 件で F も正常に採点され p_F > 0.1。F が要る 20 件の最初の不合格で止める",
 }
 
 
@@ -84,6 +101,7 @@ class Item:
     candidate: SendCandidate | None
     violation: str | None = None
     group: str | None = None
+    f_required: bool = False
 
 
 # --- 実装の版 ---------------------------------------------------------------
@@ -103,6 +121,8 @@ def method_version(method: str) -> tuple[str, str]:
     """(判定仕様の版, ファイル名に使う短い hash)。Q0 は http_adapter の質問の版。"""
     if method == "Q0":
         return C2_QUESTION_VERSION, C2_QUESTION_VERSION.split("#", 1)[1]
+    if method == "FT":
+        return ft_version(), ft_hash()[:12]
     return spec_version(method), spec_hash(method)[:12]
 
 
@@ -168,6 +188,63 @@ def load_heldout_items(path: Path, pol: Policy, expected_sha256: str | None = No
     return items, sha
 
 
+def load_dev28_items(path: Path, pol: Policy, expected_sha256: str | None = None) -> tuple[list[Item], str]:
+    """11 章の 28 件。組み立ては作成時（文字数を数えたとき）と同じ。文字数が記録と違えば判定しない。"""
+    expected_sha256 = expected_sha256 or DEV28_SHA256
+    raw = path.read_bytes()
+    sha = hashlib.sha256(raw).hexdigest()
+    if sha != expected_sha256:
+        raise SystemExit(f"dev28 sha256 {sha} != recorded {expected_sha256}")
+    doc = json.loads(raw.decode("utf-8"))
+    if doc.get("format") != "c2-dev@1":
+        raise SystemExit("dev28 format")
+    bodies = doc["bodies"]
+    items = []
+    for x in doc["cases"]:
+        contract = pol.contracts[x["contract"]]
+        bid = x["body_id"]
+        if bid in bodies:
+            b = bodies[bid]
+            approved = ApprovedText(key=bid, kind=b["kind"], body=b["body"], sha256=sha256_text(b["body"]),
+                                    approver="dev", purpose="dev", destinations=contract.destinations,
+                                    expires=date(2099, 12, 31), contracts=(contract.key,), source=None, source_level=0)
+        elif bid in pol.approved:
+            approved = pol.approved[bid]
+        else:
+            raise SystemExit(f"{x['id']}: unknown body {bid}")
+        inp: dict[str, Any] = {"contract": contract.key, "options": x["options"]}
+        if x["free_text"] is not None:
+            inp["free_text"] = x["free_text"]
+        cand, why = _candidate(pol, x["id"], "dev", inp, approved, contract.destinations[0])
+        if cand is not None:
+            chars = sum(len(m.content) for m in cand.payload.messages)
+            ft_chars = None if x["free_text"] is None else len(x["free_text"])
+            if chars != x["payload_chars"] or ft_chars != x["free_text_chars"]:
+                raise SystemExit(f"{x['id']}: payload/free_text chars differ from the file")
+        items.append(Item(x["id"], x["label"], contract.key, cand, why, x["group"], bool(x["f_required"])))
+    return items, sha
+
+
+def load_dev47_items(pol: Policy, cases_path: Path, dev28_path: Path,
+                     dev28_sha256: str | None = None) -> tuple[list[Item], list[Item], str]:
+    """(先に判定する F が要る 20 件, 残りの 27 件, 28 件の sha256)。並びは 11 章の順番。"""
+    d28, sha = load_dev28_items(dev28_path, pol, dev28_sha256)
+    first = [it for it in d28 if it.group in DEV28_FIRST]
+    later = [it for it in d28 if it.group in DEV28_LATER]
+    if len(first) + len(later) != len(d28):
+        raise SystemExit("dev28 has an unknown group")
+    for name in ("B15", "A4"):
+        later += [Item(it.id, it.label, it.contract, it.candidate, it.violation, name)
+                  for it in load_dev_items(name, pol, cases_path)]
+    allx = [*first, *later]
+    b = [it for it in allx if it.contract == B_KEY]
+    counts = {"n": len(allx), "first": len(first), "f_required": sum(it.f_required for it in allx),
+              "B_allow": sum(it.label == "allow" for it in b), "B_block": sum(it.label == "block" for it in b)}
+    if counts != DEV47_COUNTS:
+        raise SystemExit(f"dev47 counts {counts} != {DEV47_COUNTS}")
+    return first, later, sha
+
+
 # --- 判定 --------------------------------------------------------------------
 
 def _q0_context(payload: SendPayload) -> str:
@@ -178,6 +255,16 @@ def _q0_context(payload: SendPayload) -> str:
 def expected_context_sha256(method: str, cand: SendCandidate) -> str | None:
     if method == "Q0":
         return sha256_text(_q0_context(cand.payload))
+    if method == "FT":
+        # judge.ft_gate と同じ式（部品ごとの context の sha256 を正規化した JSON の sha256）
+        targets = FT_SPEC["targets"].get(cand.payload.contract)
+        if not isinstance(targets, list):
+            return None
+        try:
+            parts = {m: build_request(m, cand.payload.contract, cand.rendered).context_sha256 for m in targets}
+        except (NoTarget, SpecError):
+            return None
+        return sha256_text(_normalized(parts))
     try:
         return build_request(method, cand.payload.contract, cand.rendered).context_sha256
     except (NoTarget, SpecError):
@@ -187,13 +274,25 @@ def expected_context_sha256(method: str, cand: SendCandidate) -> str | None:
 def make_gate(method: str, base_url: str, model: str, timeout_s: float, **kw: Any) -> Any:
     if method == "Q0":
         return HttpC2Gate(base_url, model, timeout_s=timeout_s, **kw)
+    if method == "FT":
+        return FTC2Gate(base_url, model, timeout_s=timeout_s, **kw)
     return SpecC2Gate(base_url, model, method, timeout_s=timeout_s, **kw)
+
+
+FT_FAULT = re.compile(r"^c2-FT@1 fault (.+)$")
+FT_TOKEN = re.compile(rf"(F|T|gate):({'|'.join(FAULT_KINDS)})")
 
 
 def reason_code(v: C2Verdict) -> str:
     """保留理由の固定の語彙（未使用集合の出力はこれだけ）。"""
     r = v.reason
     if v.model == GUARD_MODEL:
+        m = FT_FAULT.match(r)
+        if m:
+            tokens = m.group(1).split(" ")
+            if all(FT_TOKEN.fullmatch(t) for t in tokens):
+                return "failure_hold:" + "+".join(tokens)
+            return "failure_hold:other"
         if r.startswith("C2 timeout"):
             return "failure_hold:timeout"
         if r.startswith("C2 error"):
@@ -223,7 +322,8 @@ def bucket_of(code: str, decision: str | None) -> str:
 
 
 def judge_item(method: str, item: Item, gate: Any, *, timeout_s: float, max_input_chars: int) -> dict[str, Any]:
-    rec: dict[str, Any] = {"id": item.id, "label": item.label, "contract": item.contract, "group": item.group}
+    rec: dict[str, Any] = {"id": item.id, "label": item.label, "contract": item.contract, "group": item.group,
+                           "f_required": item.f_required}
     if item.candidate is None:
         rec.update(p=None, decision="hold", reason=f"contract violation: {item.violation}",
                    reason_code="contract_violation", bucket="failure_hold")
@@ -231,7 +331,7 @@ def judge_item(method: str, item: Item, gate: Any, *, timeout_s: float, max_inpu
     cand = item.candidate
     rec.update(payload_digest=cand.digest, reconstruction_ok=mismatch(cand.rendered, cand.payload.messages) is None,
                expected_context_sha256=expected_context_sha256(method, cand))
-    if method != "Q0" and not has_target(method, cand.rendered):
+    if method in SPECS and not has_target(method, cand.rendered):
         # モデルを呼ばない（2 章）
         rec.update(p=None, decision=None, reason="no target", reason_code="no_target", bucket="no_target",
                    context_sha256=None, context_match=None, elapsed_s=0.0)
@@ -246,6 +346,10 @@ def judge_item(method: str, item: Item, gate: Any, *, timeout_s: float, max_inpu
                question_version=v.question_version, context_sha256=sent,
                context_match=None if sent is None else sent == rec["expected_context_sha256"],
                elapsed_s=round(time.perf_counter() - t0, 3))
+    if method == "FT":
+        # F の寄与を別に記録する（11 章）。全体のタイムアウトなどで部品の記録がなければ None
+        comps = v.components if isinstance(v, FTVerdict) and v.components is not None else {}
+        rec.update(p_F=comps.get("F", {}).get("p"), p_T=comps.get("T", {}).get("p"), components=comps or None)
     return rec
 
 
@@ -283,6 +387,18 @@ def ranking(recs: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return out
 
 
+def f_scored(rec: dict[str, Any]) -> bool:
+    """F 自身が正常に採点され p_F > 0.1（11 章の f_required）。"""
+    f = (rec.get("components") or {}).get("F")
+    return bool(f) and f["fault"] is None and f["p"] is not None and f["p"] > PASS_ALLOW_MAX
+
+
+def dev47_failed(rec: dict[str, Any]) -> bool:
+    """F が要る 20 件の停止の条件: 不合格・F の条件を満たさない・context の不一致。"""
+    return (case_passed(rec) is not True or (rec["f_required"] and not f_scored(rec))
+            or rec.get("context_match") is not True)
+
+
 def summarize(set_name: str, recs: Sequence[dict[str, Any]]) -> dict[str, Any]:
     buckets: dict[str, dict[str, int]] = {}
     for r in recs:
@@ -307,18 +423,34 @@ def summarize(set_name: str, recs: Sequence[dict[str, Any]]) -> dict[str, Any]:
             g = groups.setdefault(f"{r['group']}/{r['label']}", {"passed": 0, "failed": 0, "excluded": 0})
             g["excluded" if v is None else "passed" if v else "failed"] += 1
         s["by_group"] = groups
+    elif set_name == "dev47":
+        s["f_required_failed"] = [r["id"] for r in recs if r["f_required"] and not f_scored(r)]
+        s["context_unchecked"] = [r["id"] for r in recs if r.get("context_match") is not True]
+        complete = len(recs) == DEV47_COUNTS["n"]
+        s["ranking_B"] = ranking([r for r in recs if r["contract"] == B_KEY]) if complete else None
+        groups = {}
+        for r, v in zip(recs, verdicts):
+            g = groups.setdefault(f"{r['group']}/{r['label']}", {"passed": 0, "failed": 0, "excluded": 0})
+            g["excluded" if v is None else "passed" if v else "failed"] += 1
+        s["by_group"] = groups
+        ok = (ok and complete and not s["f_required_failed"] and not s["context_unchecked"]
+              and s["ranking_B"]["passed"])
     # 1 件も数えられない（R / T の A4 はすべて対象なし）ときは合否を出さない
     s["passed"] = ok if any(v is not None for v in verdicts) else None
     return s
 
 
 HELDOUT_FIELDS = ("id", "label", "p", "decision", "reason")
+HELDOUT_FT_FIELDS = (*HELDOUT_FIELDS, "p_F", "p_T")
 
 
-def heldout_view(rec: dict[str, Any]) -> dict[str, Any]:
-    """未使用集合の出力。保留理由は固定の語彙だけ（本文・例外の文面を出さない）。"""
-    return {"id": rec["id"], "label": rec["label"], "p": rec["p"], "decision": rec["decision"],
-            "reason": rec["reason_code"]}
+def heldout_view(rec: dict[str, Any], ft: bool = False) -> dict[str, Any]:
+    """未使用集合の出力。保留理由は固定の語彙だけ（本文・例外の文面を出さない）。FT は p_F・p_T を足す（11 章）。"""
+    out = {"id": rec["id"], "label": rec["label"], "p": rec["p"], "decision": rec["decision"],
+           "reason": rec["reason_code"]}
+    if ft:
+        out.update(p_F=rec.get("p_F"), p_T=rec.get("p_T"))
+    return out
 
 
 # --- 実行 --------------------------------------------------------------------
@@ -328,35 +460,66 @@ def run(args: argparse.Namespace, *, git: Callable[[], tuple[str, list[str]]] = 
     head, dirty = git()
     if dirty:
         raise SystemExit("uncommitted changes; commit before measuring:\n" + "\n".join(dirty))
+    ft = args.method == "FT"
+    if ft and (args.timeout != FT_RUN["budget_s"] or args.c2_model != FT_RUN["model"]):
+        raise SystemExit(f"FT runs only with {FT_RUN} (11 章)")
+    if args.set == "dev47" and not ft:
+        raise SystemExit("dev47 is for FT only")
     pol = policy or load_policy()
-    heldout_sha = None
+    heldout_sha = dev28_sha = None
+    later: list[Item] = []
     if args.set == "heldout":
         items, heldout_sha = load_heldout_items(Path(args.heldout), pol)
+    elif args.set == "dev47":
+        items, later, dev28_sha = load_dev47_items(pol, Path(args.cases), Path(args.dev28))
     else:
         items = load_dev_items(args.set, pol, Path(args.cases))
     version, short = method_version(args.method)
     gate = make_gate(args.method, args.base_url, args.c2_model, args.timeout, **(gate_kw or {}))
     started = datetime.now(timezone.utc)
-    recs = [judge_item(args.method, it, gate, timeout_s=args.timeout, max_input_chars=args.max_input_chars)
-            for it in items]
-    summary = summarize(args.set, recs)
+    recs: list[dict[str, Any]] = []
+    stopped_at = None
+    aborted: BaseException | None = None
+    try:
+        for it in items:
+            recs.append(judge_item(args.method, it, gate, timeout_s=args.timeout,
+                                   max_input_chars=args.max_input_chars))
+            if args.set == "dev47" and dev47_failed(recs[-1]):
+                stopped_at = it.id  # F が要る 20 件の最初の不合格で止める（11 章）
+                break
+        if stopped_at is None:
+            for it in later:
+                recs.append(judge_item(args.method, it, gate, timeout_s=args.timeout,
+                                       max_input_chars=args.max_input_chars))
+        summary = summarize(args.set, recs)
+    except Exception as e:  # noqa: BLE001  途中で落ちても、判定済みの記録は残す
+        aborted = e
+        summary = {"n": len(recs), "aborted": type(e).__name__, "passed": False}
+    if args.set == "dev47":
+        summary["stopped_at"] = stopped_at
+    if ft:
+        spec: Any = {"ft": FT_SPEC, "components": {m: SPECS[m] for m in FT_SPEC["components"]}}
+    else:
+        spec = list(C2_QUESTIONS) if args.method == "Q0" else SPECS[args.method]
     header = {
         "format": "c2-compare@1", "method": args.method, "set": args.set, "spec_version": version,
-        "spec_hash": None if args.method == "Q0" else spec_hash(args.method),
-        "spec": list(C2_QUESTIONS) if args.method == "Q0" else SPECS[args.method], "rules": RULES,
+        "spec_hash": None if args.method == "Q0" else ft_hash() if ft else spec_hash(args.method),
+        "spec": spec, "ft_run": FT_RUN if ft else None, "rules": RULES,
         "git_head": head, "c2_model": args.c2_model, "base_url": args.base_url, "timeout_s": args.timeout,
         "max_input_chars": args.max_input_chars, "pass_allow_max": PASS_ALLOW_MAX, "auc_min": AUC_MIN,
         "started_at": started.isoformat(), "finished_at": datetime.now(timezone.utc).isoformat(),
         "cases_sha256": None if heldout_sha else hashlib.sha256(Path(args.cases).read_bytes()).hexdigest(),
-        "heldout_sha256": heldout_sha,
+        "heldout_sha256": heldout_sha, "dev28_sha256": dev28_sha,
     }
-    cases = [heldout_view(r) for r in recs] if heldout_sha else recs
+    cases = [heldout_view(r, ft) for r in recs] if heldout_sha else recs
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"c2-{args.method}-{args.set}-{short}-{started.strftime('%Y%m%dT%H%M%SZ')}.json"
     with path.open("x", encoding="utf-8") as f:  # 既存の結果は上書きしない
         json.dump({"header": header, "summary": summary, "cases": cases}, f, ensure_ascii=False, indent=2)
         f.write("\n")
+    if aborted is not None:
+        raise aborted
     return path, summary
 
 
@@ -366,6 +529,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--set", choices=SETS, required=True)
     ap.add_argument("--cases", default=str(CASES_PATH))
     ap.add_argument("--heldout", default=str(HELDOUT_PATH))
+    ap.add_argument("--dev28", default=str(DEV28_PATH))
     ap.add_argument("--base-url", required=True)
     ap.add_argument("--c2-model", default="clef-flash")
     ap.add_argument("--timeout", type=float, default=60.0)

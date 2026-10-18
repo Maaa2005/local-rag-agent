@@ -10,7 +10,9 @@ import httpx
 import pytest
 
 from evalharness import run_c2_compare as h
-from judge.c2_specs import A_KEY, B_KEY, spec_version
+from judge.base import GUARD_MODEL, GUARD_REVISION, C2Verdict
+from judge.c2_specs import A_KEY, B_KEY, build_request, spec_version
+from judge.ft_gate import FT_RUN, FT_SPEC, ft_hash, ft_version
 from orchestrator.policy import load_policy
 
 POL = load_policy()
@@ -33,9 +35,10 @@ class Server:
                                                      for q in body["questions"]]})
 
 
-def run(tmp_path, method, set_name, p_of, *, git=CLEAN, extra=(), out="out"):
+def run(tmp_path, method, set_name, p_of, *, git=CLEAN, extra=(), out="out", timeout=None):
     srv = Server(p_of)
-    args = h.parse_args(["--method", method, "--set", set_name, "--base-url", "http://j", "--timeout", "5",
+    timeout = timeout or ("60" if method == "FT" else "5")
+    args = h.parse_args(["--method", method, "--set", set_name, "--base-url", "http://j", "--timeout", timeout,
                          "--out-dir", str(tmp_path / out), *extra])
     path, summary = h.run(args, git=git, gate_kw={"transport": httpx.MockTransport(srv)}, policy=POL)
     return path, summary, json.loads(path.read_text(encoding="utf-8")), srv
@@ -210,3 +213,167 @@ def test_git_state_ignores_only_untracked_results(tmp_path, monkeypatch):
     (tmp_path / "a.txt").write_text("b", encoding="utf-8")
     (tmp_path / "new.py").write_text("", encoding="utf-8")
     assert sorted(h.git_state(tmp_path)[1]) == [" M a.txt", "?? new.py"]
+
+
+# --- C2-FT@1（11 章）----------------------------------------------------------
+
+FIRST, LATER, _ = h.load_dev47_items(POL, h.CASES_PATH, h.DEV28_PATH)
+ALL47 = [*FIRST, *LATER]
+
+
+def f_ctx(it):
+    return build_request("F", it.contract, it.candidate.rendered).context
+
+
+def t_ctx(it):
+    return build_request("T", it.contract, it.candidate.rendered).context
+
+
+F_LABELS: dict[str, set[str]] = {}
+for _it in ALL47:
+    F_LABELS.setdefault(f_ctx(_it), set()).add(_it.label)
+F_LABEL = {c: next(iter(ls)) for c, ls in F_LABELS.items()}
+T_CTXS = {t_ctx(it) for it in ALL47 if it.contract == B_KEY}
+
+
+def ft_p(_i, ctx):
+    """禁止は F で高く、許可は F・T とも低い。知らない context は 500。"""
+    if ctx in F_LABEL:
+        return 0.8 if F_LABEL[ctx] == "block" else 0.02
+    return 0.02 if ctx in T_CTXS else None
+
+
+def test_dev47_contexts_identify_the_label():
+    # 1 つの F の context に許可と禁止は乗らず、T の context とも重ならない（モックの前提）
+    # 同じ F の context は A4 の許可 3 件（V001・V003・V004）だけ
+    assert all(len(ls) == 1 for ls in F_LABELS.values()) and not (set(F_LABELS) & T_CTXS)
+    assert len(F_LABELS) == 45
+    assert [it.id for it in FIRST] == [f"D{i:02d}" for i in (*range(1, 17), *range(25, 29))]
+    assert [it.id for it in LATER[:8]] == [f"D{i:02d}" for i in range(17, 25)]
+    assert [it.id for it in LATER[8:]] == [*h.B15_ALLOW, *h.B15_BLOCK, *h.A4_ALLOW]
+
+
+@pytest.mark.parametrize("set_name,n,posts", [("B15", 15, 30), ("A4", 4, 4)])
+def test_ft_dev_sets_record_components(tmp_path, set_name, n, posts):
+    _, s, doc, srv = run(tmp_path, "FT", set_name, ft_p)
+    hd = doc["header"]
+    assert hd["spec_version"] == ft_version() and hd["spec_hash"] == ft_hash() and hd["ft_run"] == FT_RUN
+    assert hd["spec"]["ft"] == FT_SPEC and set(hd["spec"]["components"]) == {"F", "T"}
+    assert len(doc["cases"]) == n and len(srv.posts) == posts and s["passed"]
+    for r in doc["cases"]:
+        assert r["context_match"] is True and r["question_version"] == ft_version()
+        assert r["p_F"] == r["components"]["F"]["p"]
+        assert r["p_T"] == (r["components"]["T"]["p"] if r["contract"] == B_KEY else None)
+        assert r["p"] == max(x for x in (r["p_F"], r["p_T"]) if x is not None)
+
+
+def test_ft_t_fault_is_a_fixed_reason_code(tmp_path):
+    t0 = t_ctx(LATER[8])  # B15 の最初の許可
+    _, s, doc, _ = run(tmp_path, "FT", "B15", lambda i, c: None if c == t0 else ft_p(i, c))
+    r = doc["cases"][0]
+    assert r["reason_code"] == "failure_hold:T:error" and r["bucket"] == "failure_hold"
+    assert r["p"] is None and r["p_F"] == 0.02 and r["p_T"] is None
+    assert r["id"] in s["case_failed"] and not s["passed"]
+
+
+def test_reason_code_for_ft_faults():
+    v = lambda reason: C2Verdict(decision="hold", reason=reason, model=GUARD_MODEL,  # noqa: E731
+                                 revision=GUARD_REVISION, truncated=False, question_version=ft_version())
+    assert h.reason_code(v("c2-FT@1 fault F:error T:timeout")) == "failure_hold:F:error+T:timeout"
+    assert h.reason_code(v("c2-FT@1 fault gate:revision")) == "failure_hold:gate:revision"
+    assert h.reason_code(v("c2-FT@1 fault F:bogus")) == "failure_hold:other"
+    assert h.reason_code(v("c2-FT@1 fault F:error 本文")) == "failure_hold:other"
+
+
+def test_ft_runs_only_with_the_fixed_settings(tmp_path):
+    with pytest.raises(SystemExit, match="FT runs only"):
+        run(tmp_path, "FT", "B15", ft_p, timeout="5")
+    with pytest.raises(SystemExit, match="FT runs only"):
+        run(tmp_path, "FT", "B15", ft_p, extra=("--c2-model", "other"))
+    with pytest.raises(SystemExit, match="dev47 is for FT only"):
+        run(tmp_path, "F", "dev47", ft_p)
+    assert not (tmp_path / "out").exists()
+
+
+def test_dev28_sha_and_chars_are_checked(tmp_path, monkeypatch):
+    monkeypatch.setattr(h, "DEV28_SHA256", "0" * 64)
+    with pytest.raises(SystemExit, match="dev28 sha256"):
+        h.load_dev28_items(h.DEV28_PATH, POL)
+    doc = json.loads(h.DEV28_PATH.read_text(encoding="utf-8"))
+    doc["cases"][0]["payload_chars"] += 1
+    p = tmp_path / "dev28.json"
+    p.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(SystemExit, match="chars differ"):
+        h.load_dev28_items(p, POL, hashlib.sha256(p.read_bytes()).hexdigest())
+
+
+def test_dev47_all_pass(tmp_path):
+    path, s, doc, srv = run(tmp_path, "FT", "dev47", ft_p)
+    assert [r["id"] for r in doc["cases"]] == [it.id for it in ALL47] and s["n"] == 47
+    assert len(srv.posts) == sum(2 if it.contract == B_KEY else 1 for it in ALL47)
+    assert s["passed"] is True and s["stopped_at"] is None and s["case_failed"] == []
+    assert s["f_required_failed"] == [] and s["context_unchecked"] == []
+    assert s["ranking_B"] == {"n_allow": 17, "n_block": 20, "auc": 1.0, "allow_max": 0.02, "block_min": 0.8,
+                              "separated": True, "passed": True, "missing": []}
+    assert sum(r["f_required"] for r in doc["cases"]) == 10
+    assert doc["header"]["dev28_sha256"] == h.DEV28_SHA256 and doc["header"]["set"] == "dev47"
+
+
+def test_dev47_stops_at_the_first_failure_of_the_first_20(tmp_path):
+    bad = FIRST[4]
+    want = 0.02 if bad.label == "block" else 0.8
+    _, s, doc, _ = run(tmp_path, "FT", "dev47", lambda i, c: want if c == f_ctx(bad) else ft_p(i, c))
+    assert s["stopped_at"] == bad.id and len(doc["cases"]) == 5 and s["passed"] is False
+    assert s["ranking_B"] is None and s["case_failed"] == [bad.id]
+
+
+def test_dev47_stops_when_f_alone_does_not_see_it(tmp_path):
+    # 全体では遮断（T が高い）でも、f_required の件で F が低ければ不合格（11 章の 5）
+    bad = next(it for it in FIRST if it.f_required and it.contract == B_KEY)
+    seen = {"f": False}
+
+    def p_of(i, c):
+        if c == f_ctx(bad):
+            seen["f"] = True
+            return 0.02
+        if seen["f"]:
+            seen["f"] = False
+            return 0.8  # 直後の T
+        return ft_p(i, c)
+
+    _, s, doc, _ = run(tmp_path, "FT", "dev47", p_of)
+    r = doc["cases"][-1]
+    assert r["id"] == bad.id and r["decision"] == "block" and r["p_F"] == 0.02 and r["p_T"] == 0.8
+    assert s["stopped_at"] == bad.id and s["case_failed"] == [] and s["f_required_failed"] == [bad.id]
+    assert s["passed"] is False
+
+
+def test_dev47_keeps_the_partial_file_when_it_crashes(tmp_path, monkeypatch):
+    def boom(*_a, **_k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(h, "summarize", boom)
+    with pytest.raises(RuntimeError):
+        run(tmp_path, "FT", "dev47", ft_p)
+    (f,) = (tmp_path / "out").iterdir()
+    doc = json.loads(f.read_text(encoding="utf-8"))
+    assert doc["summary"] == {"n": 47, "aborted": "RuntimeError", "passed": False, "stopped_at": None}
+    assert len(doc["cases"]) == 47
+
+
+def test_heldout_ft_output_is_restricted(tmp_path, monkeypatch):
+    p = heldout_file(tmp_path)
+    monkeypatch.setattr(h, "HELDOUT_SHA256", hashlib.sha256(p.read_bytes()).hexdigest())
+    path, s, doc, srv = run(tmp_path, "FT", "heldout", leak_p, extra=("--heldout", str(p)))
+    assert len(srv.posts) == 5  # H1 は F だけ、H2・H3 は F と T、H4 は契約違反で呼ばない
+    assert all(set(r) == set(h.HELDOUT_FT_FIELDS) for r in doc["cases"])
+    assert {r["id"]: (r["decision"], r["reason"]) for r in doc["cases"]} == {
+        "H1": ("block", "scored"), "H2": ("allow", "scored"), "H3": ("block", "scored"),
+        "H4": ("hold", "contract_violation")}
+    assert doc["cases"][0]["p_T"] is None and doc["cases"][2]["p_F"] == 0.9
+    text = path.read_text(encoding="utf-8")
+    for secret in (LEAK_BODY, LEAK_TEXT, "ダミーの売上表", "長長長"):
+        assert secret not in text
+    cases = json.dumps(doc["cases"], ensure_ascii=False)
+    assert "components" not in cases and "context_sha256" not in cases
+    assert s["case_failed"] == ["H4"] and not s["passed"]
