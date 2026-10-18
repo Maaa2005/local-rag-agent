@@ -116,14 +116,30 @@ R と T は承認済み本文を判定しない。そのため 4 の承認ミス
 
 | 項目 | 値 |
 |---|---|
-| モデルの revision（Hugging Face のスナップショット） | 未定 |
-| 量子化とファイル（名前と sha256） | 未定 |
-| 推論系（llama.cpp の commit） | 未定 |
-| context 長・入力上限（文字数） | 未定 |
-| GPU に置く層数・ホスト RAM | 未定 |
-| p_yes の求め方（yes/no トークンの確率の取り方） | 未定 |
-| 乱数・温度 | 未定 |
-| タイムアウト | 未定 |
+| モデルの revision（Hugging Face のスナップショット） | 元の重み `Cloudflare/clef-flash` @ `8b2e5fd17c09fd49bc2880b805d5323ec7ff4ff3`。GGUF は `ggml-org/Clef-Flash-GGUF` @ `6b4fe4c59098479652d94f0fe11a40facbebd1ec` |
+| 量子化とファイル（名前と sha256） | Q4_K_M・`Clef-Flash-Q4_K_M.gguf`（6,486,448,288 バイト）・sha256 `3626116623ca8d89641952471fac9ce12af84fb3517520029a2ac6f5146868a2` |
+| 推論系（llama.cpp の commit） | llama.cpp b11669（commit `620d2225c`）。Homebrew の llama.cpp 0.7.0 と ggml 0.27.0 を `brew pin` で固定。判断モデルの I/F へは `v2/judge/clef_server.py`（`clef-shim@1`、commit 34760f7）で写す |
+| context 長・入力上限（文字数） | `-c 8192 -b 8192 -ub 8192`。判定対象は guard の `max_input_chars` 4000 字まで（超えたら保留）。日本語は実測で 1 字あたり 0.94〜1.0 トークン。プロンプト全体が 8192 トークンを超えると llama-server は切り捨てずにエラーを返し、shim は 500 → 保留にする。保留は不合格として数える |
+| GPU に置く層数・ホスト RAM | `-ngl 999`（33 層すべて）。Apple M5・統一メモリ 16GB の Metal で、GPU 側は約 7.3GB（重み 5,629 MiB・計算 1,843 MiB）、CPU 側は約 1.2GB（mapped 546 MiB・計算 640 MiB）。RTX 3050（6GB）の値は別に測る（#1）。この結果をそのまま当てはめない |
+| p_yes の求め方（yes/no トークンの確率の取り方） | トークンの確率は自分で取らない。llama-server の `/v1/systemone` の noul の値（P(true)）を `clef-shim@1` が `probs.yes` に、`1 - P(true)` を `probs.no` に写す。choice は `probabilities` をそのまま写し、answer は最大の確率から出し直す（同点は選択肢の順で先のもの） |
+| 乱数・温度 | 生成しない（`output_tokens` は 0）ので乱数を使わない。確率の温度は GGUF に指定が無いので、コードの既定の 1.0。同じ入力で再起動の前後とも同じ値になった（実測） |
+| タイムアウト | shim → llama-server は 50 秒（超えたら 504）。アダプタと guard は 60 秒（`run_v2_eval --timeout 60`）。タイムアウトは不合格として数える。実測の推論時間は 1 トークンあたり約 2.8ms で、7,255 トークンで 21.8 秒 |
+
+起動の手順（社内ゾーンのみ。どちらも 127.0.0.1 で待ち受ける）:
+
+```
+llama-server -m <Clef-Flash-Q4_K_M.gguf> --host 127.0.0.1 --port 8081 -c 8192 -b 8192 -ub 8192 -np 1 -ngl 999 \
+  --alias clef-flash --no-webui --offline
+JUDGE_UPSTREAM=http://127.0.0.1:8081 JUDGE_MODEL_PATH=<gguf> JUDGE_MODEL_SHA256=<上の sha256> \
+  JUDGE_MODEL_REVISION=ggml-org/Clef-Flash-GGUF@6b4fe4c/Q4_K_M JUDGE_LLAMA_BUILD=b11669-620d2225c \
+  python -m judge.clef_server --host 127.0.0.1 --port 8082
+```
+
+評価を回すときは、C2 に `--c2 http --base-url http://127.0.0.1:8082 --c2-model clef-flash --timeout 60 --max-input-chars 4000` を渡す（`--timeout` の既定 2 秒では足りない）。
+
+- 1 要求につき 1 問だけを送る。Clef は 1 要求の質問をまとめて 1 つのプロンプトで判断するので、質問を足すと他の質問の答えも変わる。shim は 2 問以上を 422 で断る
+- shim は、起動時に `/props`（ファイル・build・`n_ctx`・slot 数・alias）と重みの sha256 を照合する。要求ごとにも `/props` を照合し、違えば答えない。結果に残る revision は `ggml-org/Clef-Flash-GGUF@6b4fe4c/Q4_K_M;sha256=3626116623ca8d89;llama.cpp=b11669-620d2225c;n_ctx=8192+clef-shim@1`
+- `-ub` は `/props` に出ないので照合できない。小さすぎても長い入力がエラー（保留）になるだけで、答えの値は変わらない
 
 この表は、測定より前に別の commit で埋める。その commit より前に測った結果は、比較に数えない。
 
