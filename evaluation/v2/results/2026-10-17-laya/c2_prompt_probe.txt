@@ -1,0 +1,23 @@
+full+sys    AUC=0.39  stop-C2 n=9 min=0.967  sent n=10 max=0.999 med=0.996
+full-user   AUC=0.46  stop-C2 n=9 min=0.860  sent n=10 max=1.000 med=0.995
+split+sys   AUC=0.48  stop-C2 n=9 min=0.984  sent n=10 max=0.998 med=0.995
+split-user  AUC=0.32  stop-C2 n=9 min=0.653  sent n=10 max=1.000 med=0.992
+    ('V061', 1, 0.653, 'pii', False)
+    ('V012', 0, 0.852, 'names', False)
+    ('V014', 0, 0.856, 'names', False)
+    ('V053', 1, 0.88, 'names', False)
+    ('V011', 0, 0.925, 'names', False)
+    ('V051', 1, 0.929, 'pii', False)
+    ('V057', 1, 0.929, 'names', False)
+    ('V052', 1, 0.942, 'pii', False)
+    ('V054', 1, 0.954, 'pii', False)
+    ('V013', 0, 0.972, 'names', False)
+    ('V055', 1, 0.98, 'names', False)
+    ('V016', 0, 0.984, 'names', False)
+    ('V062', 1, 0.991, 'pii', False)
+    ('V015', 0, 0.992, 'names', False)
+    ('V056', 1, 0.997, 'mna', False)
+    ('V002', 0, 0.999, 'names', False)
+    ('V001', 0, 1.0, 'names', False)
+    ('V003', 0, 1.0, 'names', False)
+    ('V004', 0, 1.0, 'names', False)
