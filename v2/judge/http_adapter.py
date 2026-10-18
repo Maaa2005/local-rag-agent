@@ -25,6 +25,7 @@ question_version（版ラベル＋質問定義のハッシュ）を計算し、�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from typing import Any
@@ -205,7 +206,8 @@ class HttpC2Gate:
             decision = "hold"
         return C2Verdict(decision=decision, reason=f"{C2_PROMPT_VERSION} p_yes={p:.3f}", model=self._c.model,
                          revision=body["revision"], truncated=truncated, prob_block=p,
-                         question_version=C2_QUESTION_VERSION)
+                         question_version=C2_QUESTION_VERSION,
+                         context_sha256=hashlib.sha256(context.encode("utf-8")).hexdigest())
 
 
 # ---- 2 段構え（前段で迷ったら後段に回す） ----

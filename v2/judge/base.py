@@ -38,6 +38,8 @@ class C1Decision(schemas.C1Decision):
 
 class C2Verdict(schemas.C2Verdict):
     question_version: str = Field(min_length=1)
+    # 判断モデルに送った context の sha256（docs/v2-c2-eval-plan.md 6 章）。モデルに送っていない判定は None
+    context_sha256: str | None = None
 
 
 def question_version(label: str, spec: Any) -> str:

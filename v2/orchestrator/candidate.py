@@ -7,7 +7,8 @@ from typing import Any, Mapping
 
 from pydantic import BaseModel, ConfigDict
 
-from common.schemas import Message, SendPayload, payload_digest
+from common.provenance import Part, Rendered, RenderedMessage, reconstruct
+from common.schemas import SendPayload, payload_digest
 from orchestrator.policy import ApprovedText, Contract
 
 A_SYSTEM = (
@@ -33,6 +34,8 @@ class SendCandidate(BaseModel):
     approved_sha256: str
     payload: SendPayload
     digest: str
+    # payload.messages を出所区分つきの部分に分けたもの（C2 の判定仕様 F が使う）。Gateway には渡さない
+    rendered: tuple[RenderedMessage, ...]
     created_at: datetime
 
 
@@ -51,20 +54,30 @@ def _check_options(contract: Contract, options: Any) -> dict[str, str]:
     return dict(options)
 
 
-def _render(contract: Contract, approved: ApprovedText, opts: Mapping[str, str], free_text: str | None) -> tuple[Message, ...]:
+def _render(contract: Contract, approved: ApprovedText, opts: Mapping[str, str], free_text: str | None) -> Rendered:
+    """送信本文を出所区分つきの部分として組み立てる。部分をつないだものが SendPayload.messages になる。"""
+    def t(text: str) -> Part:
+        return Part(source="template", text=text)
+
     if contract.template == "A-faq-format/1":
         user = (
-            f"文体: {opts['文体']}\n"
-            f"長さ: {opts['長さ']}\n"
-            "形式: 質問と回答の組を3〜5個\n"
-            "\n"
-            "説明文:\n"
-            f"{approved.body}"
+            t("文体: "), Part(source="option", text=opts["文体"]),
+            t("\n長さ: "), Part(source="option", text=opts["長さ"]),
+            t("\n形式: 質問と回答の組を3〜5個\n\n説明文:\n"),
+            Part(source="approved", text=approved.body),
         )
-        return (Message(role="system", content=A_SYSTEM), Message(role="user", content=user))
+        return (RenderedMessage(role="system", parts=(Part(source="system", text=A_SYSTEM),)),
+                RenderedMessage(role="user", parts=user))
     if contract.template == "B-csv-codegen/1":
-        user = f"言語: {opts['言語']}\n仕様:\n{approved.body}\n依頼:\n{free_text}"
-        return (Message(role="system", content=B_SYSTEM), Message(role="user", content=user))
+        if free_text is None:
+            raise ContractViolation(f"契約 {contract.key} のテンプレートは依頼文が要る")
+        user = (
+            t("言語: "), Part(source="option", text=opts["言語"]),
+            t("\n仕様:\n"), Part(source="approved", text=approved.body),
+            t("\n依頼:\n"), Part(source="free_text", text=free_text),
+        )
+        return (RenderedMessage(role="system", parts=(Part(source="system", text=B_SYSTEM),)),
+                RenderedMessage(role="user", parts=user))
     raise ContractViolation(f"未知のテンプレート: {contract.template}")
 
 
@@ -89,7 +102,8 @@ def build_candidate(
             raise ContractViolation("依頼文が空")
         if len(free_text) > contract.free_text_max:
             raise ContractViolation(f"依頼文が {len(free_text)} 字で上限 {contract.free_text_max} 字を超える")
-    messages = _render(contract, approved, opts, free_text)
+    rendered = _render(contract, approved, opts, free_text)
+    messages = reconstruct(rendered)
     total = sum(len(m.content) for m in messages)
     if total > contract.payload_chars:
         raise ContractViolation(f"送信本文が {total} 字で上限 {contract.payload_chars} 字を超える")
@@ -107,5 +121,6 @@ def build_candidate(
         approved_sha256=approved.sha256,
         payload=payload,
         digest=payload_digest(payload),
+        rendered=rendered,
         created_at=now,
     )
