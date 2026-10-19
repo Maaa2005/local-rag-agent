@@ -145,6 +145,16 @@ def main() -> int:
     chunks = run_on_shared_loop(build_index(), 1800)
     print(f"索引: 文書 {len(doc_level)} 件 / チャンク {chunks} 件 / {time.monotonic() - t0:.0f} 秒", flush=True)
 
+    # リランカーは初回の rerank で読み込まれる（初回はダウンロード込み）。検索の上限 30 秒に読み込みを
+    # 含めないよう先に読んでおく。かかった秒は warmup_s として結果に残す（合否には使わない）
+    warmup_s = None
+    if settings.rerank_enabled:
+        from app.services.reranker import _load_model as load_reranker
+        t0 = time.monotonic()
+        load_reranker()
+        warmup_s = round(time.monotonic() - t0, 1)
+        print(f"リランカー読み込み: {warmup_s} 秒（{settings.rerank_model}）", flush=True)
+
     # 生の検索結果を記録するため、v1 の retrieve を包んだモジュールを BackendRetriever に渡す（クラスは本物のまま）
     import app.services.retriever as v1_retriever
 
@@ -290,7 +300,7 @@ def main() -> int:
               f"生成 中央 {statistics.median(g_s):.2f} / 最大 {max(g_s):.2f} 秒")
 
     out = a.work / "rag_check_result.json"
-    out.write_text(json.dumps({"label": a.label, "rerank": a.rerank, "ok": rep.ok, "checks": rep.items,
+    out.write_text(json.dumps({"label": a.label, "rerank": a.rerank, "warmup_s": warmup_s, "ok": rep.ok, "checks": rep.items,
                                "timings": timings}, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"\n総合: {'PASS' if rep.ok else 'FAIL'}（結果: {out}。本文は入れていない）")
     return 0 if rep.ok else 1
