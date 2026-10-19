@@ -85,7 +85,10 @@ def numeric_conclusion_ok(answer: str, expected_conclusion: str) -> bool:
 
 # ─── 集計 ────────────────────────────────────────────────────────
 def percentile(values: Sequence[float], p: float) -> float:
-    """p ∈ [0,100] のパーセンタイル (線形補間)。空なら 0。"""
+    """p ∈ [0,100] のパーセンタイル (線形補間)。空なら 0。
+
+    無限大 (回答に失敗した問の時間) が混ざっても NaN にしない。
+    """
     if not values:
         return 0.0
     s = sorted(values)
@@ -94,7 +97,7 @@ def percentile(values: Sequence[float], p: float) -> float:
     k = (len(s) - 1) * (p / 100.0)
     f = int(k)
     c = min(f + 1, len(s) - 1)
-    if f == c:
+    if f == c or k == f or s[f] == s[c]:
         return s[f]
     return s[f] + (s[c] - s[f]) * (k - f)
 

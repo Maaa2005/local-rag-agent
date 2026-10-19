@@ -103,7 +103,7 @@ def test_report_8gb_conversion_passes_under_15s():
         {"vllm": [_make_result(first_token_latency=2.0, total_latency=12.0, retrieval_latency=0.5)]},
         judge_name="j", dataset_size=1,
     )
-    assert "| vllm | 0.50s | 2.00s | 12.00s | 13.76s ✓ | 0/1 | 13.76s |" in md
+    assert "| vllm | 0/1 | 0.50s | 2.00s ✓ | 12.00s ✓ | 13.76s ✓ | 0/1 | 13.76s |" in md
 
 
 def test_report_8gb_conversion_fails_when_t4_is_under_15s():
@@ -112,7 +112,7 @@ def test_report_8gb_conversion_fails_when_t4_is_under_15s():
         {"vllm": [_make_result(first_token_latency=2.0, total_latency=14.0)]},
         judge_name="j", dataset_size=1,
     )
-    assert "14.00s | 16.12s ✗ | 1/1 | 16.12s |" in md
+    assert "| 14.00s ✓ | 16.12s ✗ | 1/1 | 16.12s |" in md
 
 
 # ─── N 数値の境目 (docs/v2-light-model-plan.md の N) ───────────────
@@ -138,3 +138,36 @@ def test_report_shows_numeric_section_only_with_n_rows():
 
     md = render_report({"vllm": [_make_result()]}, judge_name="j", dataset_size=1)
     assert "数値の境目" not in md
+
+
+# ─── 失敗の数え方 (docs/v2-light-model-plan.md) ──────────────────────
+def test_failed_answer_stays_in_denominator():
+    # 回答に失敗した問は外さず、点は 0・時間は ∞ として数える
+    rows = [_make_result(id="Q001"), _make_result(id="Q002", error="run_failed: timeout")]
+    md = render_report({"vllm": rows}, judge_name="j", dataset_size=2)
+    assert "| vllm | 1/2 | 0.50 ✗ |" in md  # 回答の失敗 1/2・Recall@5 は (1 + 0) / 2
+    assert "| ∞ ✗ | ∞ ✗ |" in md  # FTL p95・Total p50
+    assert "| vllm | 1/2 | 0.00s | ∞ ✗ | ∞ ✗ | ∞ ✗ | 1/2 | ∞ |" in md  # P の表
+
+
+def test_failed_answer_on_refusal_question_counts_as_not_refused():
+    from evaluation.reporter import _aggregate
+
+    rows = [
+        _make_result(id="Q001", category="permission_test"),
+        _make_result(id="Q002", category="permission_test", error="run_failed: boom"),
+    ]
+    assert _aggregate(rows)["refusal_rate"] == 0.5
+
+
+def test_judge_failure_makes_verdict_undecided_but_keeps_latency():
+    rows = [_make_result(error="judge_failed: bad json", total_latency=3.0)]
+    md = render_report({"vllm": rows}, judge_name="j", dataset_size=1)
+    assert "未判定（採点役の失敗 1 問）" in md
+    assert "| vllm | 0/1 |" in md
+    assert "3.00s ✓" in md
+
+
+def test_no_judge_run_has_no_overall_verdict():
+    md = render_report({"vllm": [_make_result()]}, judge_name=None, dataset_size=1)
+    assert "| 採点なし |" in md

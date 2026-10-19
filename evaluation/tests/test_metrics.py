@@ -78,6 +78,14 @@ def test_percentile_empty():
     assert metrics.percentile([], 50) == 0.0
 
 
+def test_percentile_with_infinity_is_not_nan():
+    # 回答に失敗した問は ∞ で入る。補間で NaN にならないこと
+    inf = float("inf")
+    assert metrics.percentile([1, 2, inf], 50) == 2
+    assert metrics.percentile([1, inf], 50) == inf
+    assert metrics.percentile([1, inf, inf], 95) == inf
+
+
 def test_mean_empty():
     assert metrics.mean([]) == 0.0
 
