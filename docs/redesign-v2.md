@@ -314,6 +314,14 @@ Clef-flash の静的構成で生成 LLM を止めている間はローカル生�
 | F9 | 監査記録: 判断モデル・revision・質問の版・結果・確率、承認者と対象、実際の送信内容、要求 ID、送信結果を対応付けて残す | 拡張 |
 | F10 | 評価ハーネス: 固定ケースで各指標を測り、C6 のモデル比較を再現できる | 拡張 |
 
+RAG 接続（F2・F3。2026-10-19 実装、Mac で偽のモジュールを使った試験まで。実 Qdrant・vLLM での確認は未）:
+
+- 入口は `v2/integration/ask.py` の `ask`。自由質問を `guarded_c1` に通し（契約入力は None）、`local` のときだけ `orchestrator/local_answer.py` の `answer_locally` に進む。`code` は F7 が未実装のため保留、`A`/`B` は契約の入口からしか送らないため保留、`reject` は拒否
+- `answer_locally` は Gateway を引数に取らず、検索結果を送信候補に入れない。利用者の閲覧レベルを検索の前に渡し（v1 の Qdrant フィルタと SQLite 再検証）、返ってきた根拠もレベルで再確認する。レベルが不明・超過の根拠は捨て、捨てた件数を監査に残す
+- 未登録の利用者・検索失敗・根拠 0 件・生成失敗・空の回答は保留（outcome `held`）。回答できたら outcome `answered`。閲覧は依頼者本人で、かつ根拠の最高レベル以上の利用者に限る
+- 監査には件数・document_id・字数だけを残す。質問・根拠・回答の本文は残さない
+- v1 との接続は `orchestrator/rag_backend.py`。`app.services.retriever.retrieve` と `app.services.llm.stream_answer` を呼ばれた時点で import する（backend/ を PYTHONPATH に入れる）。LLM には根拠のファイル名だけを渡し、フルパスは渡さない
+
 ### 非機能要求
 
 | # | 要求 |

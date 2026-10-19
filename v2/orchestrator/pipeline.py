@@ -24,8 +24,9 @@ from orchestrator.audit_store import AuditSink, persist_run
 from orchestrator.candidate import ContractViolation, SendCandidate, build_candidate
 from orchestrator.policy import ApprovedText, Contract, Policy, check_eligibility, load_policy
 
-Outcome = Literal["sent", "held", "rejected"]
-StoppedAt = Literal["C1", "eligibility", "contract", "C2", "confirm", "digest", "none"]
+# answered はローカル回答（orchestrator.local_answer）だけが使う。外部送信の経路では使わない
+Outcome = Literal["sent", "held", "rejected", "answered"]
+StoppedAt = Literal["C1", "eligibility", "contract", "C2", "confirm", "digest", "retrieve", "generate", "none"]
 
 PREPARE_TTL = timedelta(minutes=10)
 
