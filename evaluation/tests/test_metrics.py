@@ -105,3 +105,33 @@ def test_extract_json_with_preamble():
 def test_extract_json_malformed_returns_empty():
     assert _extract_json("not json at all") == {}
     assert _extract_json("{ broken json") == {}
+
+
+# ─── 数値の境目の結論行 ─────────────────────────────────────────
+@pytest.mark.parametrize(
+    "answer, expected",
+    [
+        ("10万円を超えないため部門長の承認は不要です [1]。\n結論: 不要", "不要"),
+        ("説明 [1]\n結論: 必要 [1]", "必要"),
+        ("説明\n結論：受理されない。", "受理されない"),
+        ("説明\n**結論: 「支給される」**", "支給される"),
+        # 本文に両方の語があっても最後の結論行で決まる
+        ("超える場合は必要ですが、今回は不要です。\n結論: 不要", "不要"),
+        ("結論: 必要\n見直した結果\n結論: 不要", "不要"),
+    ],
+)
+def test_final_conclusion_reads_last_line(answer, expected):
+    assert metrics.final_conclusion(answer) == expected
+    assert metrics.numeric_conclusion_ok(answer, expected)
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "10万円を超えないため不要です。",  # 結論行が無い
+        "説明\n結論:",  # 中身が空
+        "説明\n結論: 必要または不要",  # 両方
+    ],
+)
+def test_numeric_conclusion_fails_without_single_label(answer):
+    assert not metrics.numeric_conclusion_ok(answer, "不要")

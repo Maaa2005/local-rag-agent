@@ -61,6 +61,28 @@ def correctness_keyword_score(answer: str, expected_keywords: Sequence[str]) -> 
     return hits / len(expected_keywords)
 
 
+# ─── 数値の境目 (N: evaluation/v2/numeric_boundary.jsonl) ─────────────
+# 回答の最後の「結論: X」行だけを見る。本文に両方の語が出ても
+# (「超える場合は必要ですが、今回は不要です」) 結論行で判定できるようにするため。
+_CONCLUSION_LINE = re.compile(r"^[\s*#>\-]*結論\s*[:：]\s*(.*)$")
+_CITATION = re.compile(r"\[\d+\]")
+
+
+def final_conclusion(answer: str) -> str | None:
+    """最後の「結論: X」行の X。引用番号 [n]・太字の *・括弧「」・句点は落とす。無ければ None。"""
+    for line in reversed(answer.splitlines()):
+        m = _CONCLUSION_LINE.match(line)
+        if m:
+            value = _CITATION.sub("", m.group(1)).strip(" \t*「」。.")
+            return value or None
+    return None
+
+
+def numeric_conclusion_ok(answer: str, expected_conclusion: str) -> bool:
+    """結論行が期待どおりか (完全一致)。結論行が無い・両方書いた等は False。"""
+    return final_conclusion(answer) == expected_conclusion
+
+
 # ─── 集計 ────────────────────────────────────────────────────────
 def percentile(values: Sequence[float], p: float) -> float:
     """p ∈ [0,100] のパーセンタイル (線形補間)。空なら 0。"""
