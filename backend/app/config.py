@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import secrets
 from typing import Any
 
@@ -33,6 +34,20 @@ class Settings(BaseSettings):
     # dense+sparse+RRF で取得する候補数。retrieval_top_k より多めに取り、
     # リランク後に retrieval_top_k 件へ絞り込む。
     rerank_candidates: int = 30
+
+    # 埋め込み・リランカーを動かす場所。既定は CPU で VRAM を LLM 専用にする。
+    # GPU 8〜12GB で LLM と同居させる場合は "cuda" (または "cuda:N") にする。
+    # CPU のリランクは候補 30 件で検索上限 30 秒を超えた (Issue #7 の B)。
+    embed_device: str = "cpu"
+    rerank_device: str = "cpu"
+
+    @field_validator("embed_device", "rerank_device")
+    @classmethod
+    def _check_device(cls, v: str) -> str:
+        # reranker はロード失敗時に元の順序へ黙って戻るため、書き間違いは起動時に止める
+        if not re.fullmatch(r"cpu|mps|cuda(:\d+)?", v):
+            raise ValueError(f"device は cpu / mps / cuda / cuda:N のいずれか: {v!r}")
+        return v
 
     watched_path: str = "/watched"
     data_dir: str = "/app/data"

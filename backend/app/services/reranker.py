@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
 def _load_model() -> CrossEncoder:
-    # CPU で動作させ VRAM を LLM 専用にする (embedder.py と同じ方針)
-    return CrossEncoder(settings.rerank_model, device="cpu")
+    # 既定は CPU (VRAM を LLM 専用にする)。GPU に載せる場合は rerank_device で切り替える
+    return CrossEncoder(settings.rerank_model, device=settings.rerank_device)
 
 
 def _rerank_sync(question: str, chunks: list[dict]) -> list[dict]:
