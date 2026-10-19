@@ -29,3 +29,6 @@ class QuestionResult:
     faithfulness: float = 0.0
     answer_relevance: float = 0.0
     context_relevance: float = 0.0
+    # 後から別の実行で採点するための材料 (evaluation/rejudge.py が読む)
+    retrieved_chunks: list[dict] = field(default_factory=list)
+    expected_answer_keywords: list[str] = field(default_factory=list)

@@ -3,6 +3,11 @@
 使用例:
     python -m evaluation.run_eval --provider vllm --judge vllm
     python -m evaluation.run_eval --provider vllm --no-judge
+    python -m evaluation.run_eval --judge-from evaluation/results/<ts>/raw.jsonl
+
+候補を比べるときは採点を 2 回に分ける: 候補ごとに --no-judge で回答を保存し、
+採点役だけを vLLM に載せ直してから --judge-from で全候補を同じ採点役で採点する
+(--judge だけだと候補自身が自分の答えを採点する)。
 
 ジャッジもローカル LLM (vllm) を用いる。社内文書を含む評価を外部 API に
 送らないため、外部プロバイダはジャッジにも使わない。
@@ -80,6 +85,11 @@ async def evaluate_question(
             item["question"], item["user_access_level"], provider_name
         )
         res.retrieved_sources = sources
+        res.retrieved_chunks = [
+            {"source_file": c.get("source_file", ""), "content": c.get("content", "")}
+            for c in chunks
+        ]
+        res.expected_answer_keywords = item.get("expected_answer_keywords", [])
         res.answer = answer
         res.first_token_latency = ftl
         res.total_latency = total
@@ -142,6 +152,40 @@ async def evaluate_provider(
     return results
 
 
+# ─── 保存済み回答の採点 (2 回目) ───────────────────────────────
+async def _judge_from(saved: Path, judge_name: str, report: str | None) -> None:
+    from evaluation.rejudge import judge_saved, load_saved_results
+
+    groups = load_saved_results(saved)
+    n = sum(len(rs) for rs in groups.values())
+    print(f"Loaded {n} saved answers ({len(groups)} runs) from {saved}")
+    judge_provider = await _resolve_provider(judge_name)
+    await judge_saved(groups, judge_provider)
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    out_dir = Path(__file__).resolve().parent / "results" / f"{ts}-judged"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    raw_path = out_dir / "raw.jsonl"
+    with raw_path.open("w", encoding="utf-8") as f_raw:
+        for label, rs in groups.items():
+            for r in rs:
+                row = {**asdict(r), "run_label": label}
+                f_raw.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    from evaluation.reporter import render_report
+    dataset_size = max(len(rs) for rs in groups.values()) if groups else 0
+    md = render_report(
+        groups,
+        judge_name=f"{judge_name} ({settings.llm_model})",
+        dataset_size=dataset_size,
+    )
+    report_path = Path(report) if report else (out_dir / "report.md")
+    report_path.write_text(md, encoding="utf-8")
+    print(f"\nSaved answers:  {saved}")
+    print(f"Report written: {report_path}")
+    print(f"Raw results:    {raw_path}")
+
+
 # ─── メイン ─────────────────────────────────────────────────────
 async def main():
     parser = argparse.ArgumentParser(description="RAG evaluation runner")
@@ -160,7 +204,20 @@ async def main():
             " 'both' は rerank on/off の両方を実行しレポートに並記する"
         ),
     )
+    parser.add_argument(
+        "--judge-from",
+        help=(
+            "--no-judge で保存した raw.jsonl を、--judge の採点役だけで採点する"
+            " (回答は作り直さない。全候補を同じ採点役で採点するため)"
+        ),
+    )
     args = parser.parse_args()
+
+    if args.judge_from:
+        if args.provider or args.all or args.no_judge or args.rerank:
+            parser.error("--judge-from は --provider/--all/--no-judge/--rerank と併用しない")
+        await _judge_from(Path(args.judge_from), args.judge, args.report)
+        return
 
     if args.dataset:
         global DATASET
@@ -229,7 +286,8 @@ async def main():
                     rs = await evaluate_provider(name, dataset, judge_provider, not args.no_judge)
                     all_results[f"{name}{suffix}"] = rs
                     for r in rs:
-                        f_raw.write(json.dumps(asdict(r), ensure_ascii=False) + "\n")
+                        row = {**asdict(r), "run_label": f"{name}{suffix}"}
+                        f_raw.write(json.dumps(row, ensure_ascii=False) + "\n")
         finally:
             settings.rerank_enabled = original_rerank_enabled
 

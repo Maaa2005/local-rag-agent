@@ -144,6 +144,9 @@ cd backend
 
 # 性能・機械的メトリクスのみ (LLM-judge をスキップ)
 .venv/bin/python ../evaluation/run_eval.py --provider vllm --no-judge
+
+# 保存した回答を別の実行で採点 (採点役を VLLM_BASE_URL / LLM_MODEL に載せてから)
+.venv/bin/python ../evaluation/run_eval.py --judge-from ../evaluation/results/<ts>/raw.jsonl
 ```
 
 `--provider` には `vllm` 以外指定できない（他プロバイダはレジストリ未登録

@@ -39,4 +39,5 @@ cd backend
 
 - `--rerank on|off|both`: Cross-Encoder リランクの有無を切り替え。`both` は 2 回評価しレポートに並記。未指定なら `settings.rerank_enabled` を尊重
 - `--no-judge`: LLM-as-a-Judge をスキップ（検索メトリクスのみ）
+- `--judge-from <raw.jsonl>`: `--no-judge` で保存した回答を、`--judge` の採点役だけで採点する。候補を比べるときは候補ごとに `--no-judge` で回答を保存し、採点役のモデルを vLLM に載せ直してから全候補をこれで採点する（`--judge` だけだと候補が自分の答えを採点する）
 - 評価基準・合格ラインは `CRITERIA.md` を参照
