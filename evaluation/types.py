@@ -17,8 +17,10 @@ class QuestionResult:
     user_access_level: int
     retrieved_sources: list[str] = field(default_factory=list)
     answer: str = ""
+    # 時間は質問を受けた時点から測る (検索込み・evaluation/timing.py)
     first_token_latency: float = 0.0
     total_latency: float = 0.0
+    retrieval_latency: float = 0.0  # 検索だけ。この欄より前の raw.jsonl では 0.0
     error: str | None = None
     # メトリクス
     recall_at_5: float = 0.0

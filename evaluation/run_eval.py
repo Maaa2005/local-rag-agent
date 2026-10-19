@@ -24,7 +24,6 @@ import argparse
 import asyncio
 import json
 import sys
-import time
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +42,7 @@ from app.services.providers import (  # noqa: E402
 from app.services.retriever import retrieve  # noqa: E402
 
 from evaluation import judges, metrics  # noqa: E402
+from evaluation.timing import TimedAnswer, timed_answer  # noqa: E402
 from evaluation.types import QuestionResult  # noqa: E402
 
 DATASET = Path(__file__).resolve().parent / "dataset.jsonl"
@@ -54,20 +54,12 @@ def load_dataset() -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
-async def _collect_answer_and_chunks(question: str, level: int, provider_name: str):
-    """retriever で取得 → stream_answer で生成し、レイテンシも計測。"""
-    chunks = await retrieve(question, level)
-    sources = [c.get("source_file", "") for c in chunks]
+async def _collect_answer_and_chunks(question: str, level: int, provider_name: str) -> TimedAnswer:
+    """retriever で取得 → stream_answer で生成し、レイテンシも計測 (検索込み・evaluation/timing.py)。"""
+    def _stream(q: str, chunks: list[dict]):
+        return stream_answer(q, chunks, provider_name=provider_name)
 
-    t0 = time.perf_counter()
-    first_token: float | None = None
-    buf: list[str] = []
-    async for tok in stream_answer(question, chunks, provider_name=provider_name):
-        if first_token is None:
-            first_token = time.perf_counter() - t0
-        buf.append(tok)
-    total = time.perf_counter() - t0
-    return chunks, sources, "".join(buf), (first_token or total), total
+    return await timed_answer(retrieve, _stream, question, level)
 
 
 async def evaluate_question(
@@ -81,9 +73,11 @@ async def evaluate_question(
         user_access_level=item["user_access_level"],
     )
     try:
-        chunks, sources, answer, ftl, total = await _collect_answer_and_chunks(
+        t = await _collect_answer_and_chunks(
             item["question"], item["user_access_level"], provider_name
         )
+        chunks, answer = t.chunks, t.answer
+        sources = [c.get("source_file", "") for c in chunks]
         res.retrieved_sources = sources
         res.retrieved_chunks = [
             {"source_file": c.get("source_file", ""), "content": c.get("content", "")}
@@ -91,8 +85,9 @@ async def evaluate_question(
         ]
         res.expected_answer_keywords = item.get("expected_answer_keywords", [])
         res.answer = answer
-        res.first_token_latency = ftl
-        res.total_latency = total
+        res.first_token_latency = t.first_token_latency
+        res.total_latency = t.total_latency
+        res.retrieval_latency = t.retrieval_latency
 
         # M1, M2, M6, M7, M8
         res.recall_at_5 = metrics.recall_at_k(sources, item.get("expected_sources", []), k=5)

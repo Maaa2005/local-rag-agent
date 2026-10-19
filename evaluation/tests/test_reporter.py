@@ -87,3 +87,29 @@ def test_dataset_has_permission_and_hallucination_cases():
     cats = [r["category"] for r in rows]
     assert "permission_test" in cats
     assert "hallucination_test" in cats
+
+
+# ─── 8GB カードへの換算 (docs/v2-light-model-plan.md の P) ─────────
+def test_8gb_conversion_scales_only_generation():
+    from evaluation.reporter import predicted_8gb_total
+
+    r = _make_result(first_token_latency=2.0, total_latency=12.0)
+    assert abs(predicted_8gb_total(r) - (2.0 + 10.0 * 320 / 272)) < 1e-9
+
+
+def test_report_8gb_conversion_passes_under_15s():
+    # 2 + 1.18 × 10 = 13.76 秒
+    md = render_report(
+        {"vllm": [_make_result(first_token_latency=2.0, total_latency=12.0, retrieval_latency=0.5)]},
+        judge_name="j", dataset_size=1,
+    )
+    assert "| vllm | 0.50s | 2.00s | 12.00s | 13.76s ✓ | 0/1 | 13.76s |" in md
+
+
+def test_report_8gb_conversion_fails_when_t4_is_under_15s():
+    # T4 では 14 秒で CRITERIA の 15 秒以内だが、2 + 1.18 × 12 = 16.12 秒で 8GB 換算は超える
+    md = render_report(
+        {"vllm": [_make_result(first_token_latency=2.0, total_latency=14.0)]},
+        judge_name="j", dataset_size=1,
+    )
+    assert "14.00s | 16.12s ✗ | 1/1 | 16.12s |" in md

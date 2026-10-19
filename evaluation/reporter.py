@@ -23,6 +23,17 @@ THRESHOLDS = {
     "total_p50":       ("≤ 15.0s", lambda v: v <= 15.0),
 }
 
+# docs/v2-light-model-plan.md の P: T4 で測った時間を 8GB カード (RTX 4060) の時間に換算する。
+# 文章を作る速さはメモリ帯域で決まるので、生成の部分 (最初の文字〜完了) だけに 320÷272 GB/s を掛ける。
+# 検索と入力の処理 (質問〜最初の文字) は 4060 の方が遅くならないので、そのまま足す。
+T4_TO_8GB_DECODE = 320 / 272
+TARGET_TOTAL_LIMIT = 15.0
+
+
+def predicted_8gb_total(r) -> float:
+    """T4 で測った 1 問の完了時間を 8GB カードの完了時間に換算する。"""
+    return r.first_token_latency + T4_TO_8GB_DECODE * (r.total_latency - r.first_token_latency)
+
 
 def _aggregate(results: list) -> dict:
     """1 プロバイダの QuestionResult 配列を集計。"""
@@ -126,6 +137,35 @@ def render_report(
             f"| {_check_secs('ftl_p95', agg['ftl_p95'])} "
             f"| {_check_secs('total_p50', agg['total_p50'])} "
             f"| {verdict} |"
+        )
+    lines.append("")
+
+    # ─── 8GB カードへの換算 (T4 で測ったときだけ意味がある) ───────────
+    lines.append("## 8GB カードへの換算（T4 で測ったときだけ使う）")
+    lines.append("")
+    lines.append(
+        f"8GB 換算 = 最初の文字まで + {T4_TO_8GB_DECODE:.2f} × (最初の文字〜完了)。"
+        "線は換算後の中央値 ≤ 15 秒（docs/v2-light-model-plan.md の P）。"
+    )
+    lines.append("")
+    lines.append("| Provider | 検索 p50 | 最初の文字 p50 | 完了 p50（測定値） | 完了 p50（8GB 換算） | 8GB 換算で 15 秒超 | 8GB 換算の最大 |")
+    lines.append("|---|---|---|---|---|---|---|")
+    for name, results in all_results.items():
+        nonerror = [r for r in results if not r.error]
+        if not nonerror:
+            lines.append(f"| {name} | NO DATA | | | | | |")
+            continue
+        pred = [predicted_8gb_total(r) for r in nonerror]
+        pred_p50 = metrics.percentile(pred, 50)
+        over = sum(1 for v in pred if v > TARGET_TOTAL_LIMIT)
+        lines.append(
+            f"| {name} "
+            f"| {metrics.percentile([r.retrieval_latency for r in nonerror], 50):.2f}s "
+            f"| {metrics.percentile([r.first_token_latency for r in nonerror], 50):.2f}s "
+            f"| {metrics.percentile([r.total_latency for r in nonerror], 50):.2f}s "
+            f"| {pred_p50:.2f}s {'✓' if pred_p50 <= TARGET_TOTAL_LIMIT else '✗'} "
+            f"| {over}/{len(pred)} "
+            f"| {max(pred):.2f}s |"
         )
     lines.append("")
 
