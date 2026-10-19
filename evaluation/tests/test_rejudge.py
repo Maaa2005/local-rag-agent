@@ -134,3 +134,12 @@ def test_judge_saved_marks_judge_failure(tmp_path):
     r = groups["vllm+rerank_off"][0]
     assert r.error == "judge_failed: judge down"
     assert r.faithfulness == 0.0
+
+
+def test_load_keeps_numeric_conclusion(tmp_path):
+    p = tmp_path / "raw.jsonl"
+    _write(p, [_row("N01", expected_conclusion="必要", conclusion_ok=False)])
+
+    r = load_saved_results(p)["vllm+rerank_off"][0]
+
+    assert (r.expected_conclusion, r.conclusion_ok) == ("必要", False)

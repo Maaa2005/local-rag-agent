@@ -71,6 +71,7 @@ async def evaluate_question(
         question=item["question"],
         category=item.get("category", ""),
         user_access_level=item["user_access_level"],
+        expected_conclusion=item.get("expected_conclusion"),
     )
     try:
         t = await _collect_answer_and_chunks(
@@ -98,6 +99,9 @@ async def evaluate_question(
             res.refusal_correct = metrics.is_refusal(answer)
         else:
             res.refusal_correct = True  # 適用外
+        # N: 回答に失敗した問は conclusion_ok が None のまま残り、レポートでは不一致に数える
+        if res.expected_conclusion is not None:
+            res.conclusion_ok = metrics.numeric_conclusion_ok(answer, res.expected_conclusion)
 
         # M3, M4, M5 (judge)
         if do_judge and judge_provider is not None:

@@ -35,6 +35,19 @@ def predicted_8gb_total(r) -> float:
     return r.first_token_latency + T4_TO_8GB_DECODE * (r.total_latency - r.first_token_latency)
 
 
+def conclusion_tally(results: list) -> tuple[int, int, list[str]] | None:
+    """N の問 (expected_conclusion あり) の (結論が合った数, 問数, 合わなかった ID)。
+
+    回答に失敗した問 (conclusion_ok が None) も合わなかった側に数え、分母から外さない。
+    N の問が無ければ None。
+    """
+    rows = [r for r in results if r.expected_conclusion is not None]
+    if not rows:
+        return None
+    missed = [r.id for r in rows if r.conclusion_ok is not True]
+    return len(rows) - len(missed), len(rows), missed
+
+
 def _aggregate(results: list) -> dict:
     """1 プロバイダの QuestionResult 配列を集計。"""
     if not results:
@@ -168,6 +181,22 @@ def render_report(
             f"| {max(pred):.2f}s |"
         )
     lines.append("")
+
+    # ─── N 数値の境目 (N の問を流したときだけ出す) ──────────────────
+    tallies = {name: conclusion_tally(rs) for name, rs in all_results.items()}
+    if any(t is not None for t in tallies.values()):
+        lines.append("## N 数値の境目（最後の「結論: X」行が正解と一致した数）")
+        lines.append("")
+        lines.append("線は全問一致（docs/v2-light-model-plan.md の N）。回答に失敗した問も不一致に数える。")
+        lines.append("")
+        lines.append("| Provider | 一致 | 合わなかった問 |")
+        lines.append("|---|---|---|")
+        for name, t in tallies.items():
+            if t is None:
+                continue
+            ok, n, missed = t
+            lines.append(f"| {name} | {ok}/{n} {'✓' if ok == n else '✗'} | {', '.join(missed) or '—'} |")
+        lines.append("")
 
     # ─── 合格基準凡例 ─────────────────────────────────────────
     lines.append("## 合格基準")

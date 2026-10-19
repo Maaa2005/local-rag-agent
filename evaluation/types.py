@@ -31,6 +31,9 @@ class QuestionResult:
     faithfulness: float = 0.0
     answer_relevance: float = 0.0
     context_relevance: float = 0.0
+    # N (数値の境目): 正解の結論と、最後の「結論: X」行が合ったか。N 以外の問では両方 None
+    expected_conclusion: str | None = None
+    conclusion_ok: bool | None = None
     # 後から別の実行で採点するための材料 (evaluation/rejudge.py が読む)
     retrieved_chunks: list[dict] = field(default_factory=list)
     expected_answer_keywords: list[str] = field(default_factory=list)

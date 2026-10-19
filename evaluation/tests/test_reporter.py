@@ -113,3 +113,28 @@ def test_report_8gb_conversion_fails_when_t4_is_under_15s():
         judge_name="j", dataset_size=1,
     )
     assert "14.00s | 16.12s ✗ | 1/1 | 16.12s |" in md
+
+
+# ─── N 数値の境目 (docs/v2-light-model-plan.md の N) ───────────────
+def test_conclusion_tally_counts_failed_answers_as_miss():
+    from evaluation.reporter import conclusion_tally
+
+    rows = [
+        _make_result(id="N01", expected_conclusion="必要", conclusion_ok=True),
+        _make_result(id="N02", expected_conclusion="不要", conclusion_ok=False),
+        _make_result(id="N03", expected_conclusion="必要", conclusion_ok=None, error="run_failed: boom"),
+        _make_result(id="Q001"),  # N 以外の問は数えない
+    ]
+    assert conclusion_tally(rows) == (1, 3, ["N02", "N03"])
+
+
+def test_report_shows_numeric_section_only_with_n_rows():
+    n_rows = [
+        _make_result(id="N01", expected_conclusion="必要", conclusion_ok=True),
+        _make_result(id="N02", expected_conclusion="不要", conclusion_ok=True),
+    ]
+    md = render_report({"vllm": n_rows}, judge_name="j", dataset_size=2)
+    assert "| vllm | 2/2 ✓ | — |" in md
+
+    md = render_report({"vllm": [_make_result()]}, judge_name="j", dataset_size=1)
+    assert "数値の境目" not in md
