@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import sys
+import time
 import types
 
 import pytest
@@ -134,6 +136,7 @@ def fake_backend(monkeypatch):
 
     async def retrieve(question, user_access_level):
         calls["retrieve"] = (question, user_access_level)
+        calls.setdefault("loops", []).append(asyncio.get_running_loop())
         return [
             {"content": "本文A", "source_file": "/srv/watch/経理部/keihi.md", "score": 0.9, "access_level": 1,
              "document_id": "d1", "chunk_index": 3},
@@ -143,6 +146,7 @@ def fake_backend(monkeypatch):
 
     async def stream_answer(question, chunks):
         calls["stream"] = (question, chunks)
+        calls.setdefault("loops", []).append(asyncio.get_running_loop())
         for t in ["締め日は", "25日", " [1]"]:
             yield t
 
@@ -174,6 +178,44 @@ def test_backend_end_to_end_drops_unknown_level(fake_backend):
     res = answer_locally(MANAGER, "q", POLICY, BackendRetriever("fake_retriever"), BackendGenerator("fake_llm"))
     assert res.run.outcome == "answered" and res.sources == ("keihi.md",)
     assert [r["document_id"] for r in fake_backend["stream"][1]] == ["d1"]
+
+
+def test_backend_reuses_one_loop_across_questions(fake_backend):
+    # v1 は AsyncQdrantClient を使い回すため、2 問目以降も同じループで動かないと失敗する
+    r, g = BackendRetriever("fake_retriever"), BackendGenerator("fake_llm")
+    for _ in range(2):
+        assert answer_locally(MANAGER, "q", POLICY, r, g).run.outcome == "answered"
+    loops = fake_backend["loops"]
+    assert len(loops) == 4 and all(lp is loops[0] for lp in loops)
+
+
+def test_backend_callable_from_running_loop(fake_backend):
+    async def inside():
+        return BackendRetriever("fake_retriever").retrieve("q", 1)
+    assert [c.document_id for c in asyncio.run(inside())] == ["d1", "d2"]
+
+
+def test_backend_timeout_is_held(monkeypatch):
+    async def slow_retrieve(question, user_access_level):
+        await asyncio.sleep(5)
+        return []
+
+    async def slow_stream(question, chunks):
+        await asyncio.sleep(5)
+        yield "x"
+
+    r = types.ModuleType("slow_retriever")
+    r.retrieve = slow_retrieve
+    g = types.ModuleType("slow_llm")
+    g.stream_answer = slow_stream
+    monkeypatch.setitem(sys.modules, "slow_retriever", r)
+    monkeypatch.setitem(sys.modules, "slow_llm", g)
+    t0 = time.monotonic()
+    res = answer_locally(GENERAL, "q", POLICY, BackendRetriever("slow_retriever", timeout_s=0.1), FakeGenerator())
+    assert res.run.outcome == "held" and res.run.stopped_at == "retrieve" and "TimeoutError" in res.run.reason
+    res = answer_locally(GENERAL, "q", POLICY, FakeRetriever([ch(1)]), BackendGenerator("slow_llm", timeout_s=0.1))
+    assert res.run.outcome == "held" and res.run.stopped_at == "generate" and "TimeoutError" in res.run.reason
+    assert time.monotonic() - t0 < 2
 
 
 def test_backend_import_failure_is_held():

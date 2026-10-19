@@ -320,7 +320,7 @@ RAG 接続（F2・F3。2026-10-19 実装、Mac で偽のモジュールを使っ
 - `answer_locally` は Gateway を引数に取らず、検索結果を送信候補に入れない。利用者の閲覧レベルを検索の前に渡し（v1 の Qdrant フィルタと SQLite 再検証）、返ってきた根拠もレベルで再確認する。レベルが不明・超過の根拠は捨て、捨てた件数を監査に残す
 - 未登録の利用者・検索失敗・根拠 0 件・生成失敗・空の回答は保留（outcome `held`）。回答できたら outcome `answered`。閲覧は依頼者本人で、かつ根拠の最高レベル以上の利用者に限る
 - 監査には件数・document_id・字数だけを残す。質問・根拠・回答の本文は残さない
-- v1 との接続は `orchestrator/rag_backend.py`。`app.services.retriever.retrieve` と `app.services.llm.stream_answer` を呼ばれた時点で import する（backend/ を PYTHONPATH に入れる）。LLM には根拠のファイル名だけを渡し、フルパスは渡さない
+- v1 との接続は `orchestrator/rag_backend.py`。`app.services.retriever.retrieve` と `app.services.llm.stream_answer` を呼ばれた時点で import する（backend/ を PYTHONPATH に入れる）。v1 は Qdrant のクライアントを使い回すため、専用スレッドの 1 本のイベントループを共有して呼ぶ。上限時間は検索 30 秒・生成 180 秒で、超えたら保留。LLM には根拠のファイル名だけを渡し、フルパスは渡さない
 
 ### 非機能要求
 
