@@ -100,10 +100,11 @@ UIは `http://localhost:3000`。backend / Qdrant / vLLM はホストへ公開せ
 `evaluation/` に50問のデータセットと、それが接地している架空企業のコーパスを同梱しています。「答えられること」だけでなく「答えてはいけないこと」を測るのが主眼で、権限外文書への質問8問とコーパスに存在しない事項への質問8問は、拒否できて初めて正解になります。
 
 ```bash
-cd backend && .venv/bin/python ../evaluation/run_eval.py --rerank both   # リランカー有無のA/B
+# repo ルートから -m で呼ぶ（run_eval.py を直接呼ぶと evaluation/types.py が標準の types を隠して起動しない）
+backend/.venv/bin/python -m evaluation.run_eval --rerank both   # リランカー有無のA/B
 ```
 
-テストは backend 136 / evaluation 85 が通ります。データセットのキーワードと出典が実際にコーパス本文へ接地しているかも、テストで機械的に担保しています。
+テストは backend 153 / evaluation 299 が通ります（2026-10-20 時点）。データセットのキーワードと出典が実際にコーパス本文へ接地しているかも、テストで機械的に担保しています。
 
 ## GPU実機での検証結果 (2026-07-28)
 
