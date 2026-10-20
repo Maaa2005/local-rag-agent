@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import faulthandler
 import json
 import sys
 from dataclasses import asdict
@@ -254,7 +255,7 @@ async def _judge_from(
 
 
 # ─── メイン ─────────────────────────────────────────────────────
-async def main():
+async def _main():
     parser = argparse.ArgumentParser(description="RAG evaluation runner")
     parser.add_argument("--provider", help="単一プロバイダ名 (例: vllm)")
     parser.add_argument("--all", action="store_true", help="利用可能な全プロバイダを評価")
@@ -429,5 +430,23 @@ async def main():
     print(f"Run meta:       {out_dir / run_meta.META_NAME}")
 
 
+async def main():
+    try:
+        await _main()
+    finally:
+        # aiosqlite 0.20.0 (requirements の版) は接続を閉じないとワーカスレッドが残り、
+        # main が終わってもプロセスが終わらない (2026-10-20 Colab の測定で 62 問を終えたまま止まった)
+        from app.database import close_db
+        from app.services.qdrant import close_client
+
+        await close_client()
+        await close_db()
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    finally:
+        sys.stdout.flush()
+        # それでも終了処理が止まったら、60 秒後に全スレッドのスタックを出して rc=1 で終わる (例外で抜けた時も)
+        faulthandler.dump_traceback_later(60, exit=True)

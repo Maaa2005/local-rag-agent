@@ -157,6 +157,34 @@ def test_interrupt_keeps_written_rows_and_marks_failed(tmp_path, monkeypatch, ru
     assert not (out / "report.md").exists()
 
 
+@pytest.mark.parametrize("fail_on", [None, "止まる"])
+def test_db_and_qdrant_are_closed_even_on_failure(tmp_path, monkeypatch, run_eval, fail_on):
+    # aiosqlite 0.20.0 は接続を閉じないとプロセスが終わらない (2026-10-20 Colab で 62 問を終えて止まった)
+    import app.database
+    import app.services.qdrant
+
+    a = _jsonl(tmp_path / "a.jsonl", [_item("Q001", "あ"), _item("Q002", "止まる")])
+    _install_fakes(monkeypatch, run_eval, fail_on=fail_on)
+    closed = []
+
+    async def close_db():
+        closed.append("db")
+
+    async def close_client():
+        closed.append("qdrant")
+
+    monkeypatch.setattr(app.database, "close_db", close_db)
+    monkeypatch.setattr(app.services.qdrant, "close_client", close_client)
+    argv = ["--provider", "vllm", "--no-judge", "--dataset", str(a), "--out-dir", str(tmp_path / "run1")]
+
+    if fail_on:
+        with pytest.raises(KeyboardInterrupt):
+            _run(monkeypatch, run_eval, argv)
+    else:
+        _run(monkeypatch, run_eval, argv)
+    assert sorted(closed) == ["db", "qdrant"]
+
+
 def test_non_empty_out_dir_is_refused(tmp_path, monkeypatch, run_eval):
     a = _jsonl(tmp_path / "a.jsonl", [_item("Q001")])
     _install_fakes(monkeypatch, run_eval)
