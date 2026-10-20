@@ -6,11 +6,15 @@
 - GPU の記録は起動と実行の両方の区間で見て、記録の無い区間があれば「未確認」(None)
 - 試運転の確かめは、取れなかった項目を True にしない
 - ノートが組む run_eval の引数を run_eval 本体が受け付け、--judge-from に GPU の記録が写る
+- 試運転ノート (step05_trial.ipynb) の全セルが Python として読め、step05 に無い名前を使わない
 """
 from __future__ import annotations
 
+import ast
 import io
 import json
+import re
+from pathlib import Path
 
 import pytest
 
@@ -319,3 +323,46 @@ def test_notebook_argv_runs_through_run_eval(tmp_path, monkeypatch, run_eval):  
     assert meta["source_run_meta"]["gpu_mem"]["peak_mib"] == 7000
     assert meta["source_run_meta"]["trial_checks"]["ok"] is True
     assert all(r["faithfulness"] == 1.0 for r in _rows(judged / "raw.jsonl"))
+
+
+# ─── 試運転ノート ──────────────────────────────────────────────
+NOTEBOOK = Path(__file__).resolve().parents[1] / "colab" / "step05_trial.ipynb"
+
+
+def _notebook_code() -> list[str]:
+    """コードセルを、! のシェル行 (\\ の継続行を含む) を pass に替えた Python として返す。"""
+    nb = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    cells = []
+    for c in nb["cells"]:
+        if c["cell_type"] != "code":
+            continue
+        out, cont = [], False
+        for line in "".join(c["source"]).splitlines():
+            body = line.lstrip()
+            if cont or body.startswith(("!", "%")):
+                out.append("" if cont else line[: len(line) - len(body)] + "pass")
+                cont = line.rstrip().endswith("\\")
+                continue
+            out.append(line)
+        cells.append("\n".join(out))
+    return cells
+
+
+def test_trial_notebook_cells_parse_and_use_existing_names():
+    cells = _notebook_code()
+    assert len(cells) >= 8
+    for i, src in enumerate(cells):
+        ast.parse(src, filename=f"step05_trial.ipynb セル {i}")
+    used = set(re.findall(r"\bs5\.(\w+)", "\n".join(cells)))
+    assert {"vllm_argv", "eval_cmd", "judge_cmd", "gpu_mem_record", "trial_checks", "attach_to_run_meta"} <= used
+    assert sorted(n for n in used if not hasattr(step05, n)) == []
+
+
+def test_trial_notebook_states_what_it_skips():
+    nb = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    text = "".join("".join(c["source"]) for c in nb["cells"])
+    assert "合否には使わない" in text
+    assert "llama-server" in text                      # 計画 6 はやらないと書いてある
+    assert "flow-check-only" in text                   # 採点役は代役
+    assert "evaluation.judge_precheck" in text
+    assert nb["metadata"]["colab"]["gpuType"] == "T4"
