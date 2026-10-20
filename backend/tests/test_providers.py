@@ -45,6 +45,49 @@ def test_get_provider_raises_for_unknown():
         asyncio.run(get_provider("anthropic"))
 
 
+
+# ─── vLLM の usage チャンク ──────────────────────────────────
+def test_vllm_stream_skips_usage_chunk_and_keeps_usage():
+    """include_usage の最後のチャンク（choices が空・usage あり）で落ちず、usage を残す。"""
+    from types import SimpleNamespace as NS
+    from app.services.providers.vllm_provider import VLLMProvider
+
+    def chunk(text):
+        return NS(choices=[NS(delta=NS(content=text))], usage=None)
+
+    usage = NS(prompt_tokens=321, completion_tokens=7)
+    sent = {}
+
+    async def fake_stream():
+        for c in (chunk("回"), chunk(None), chunk("答"), NS(choices=[], usage=usage)):
+            yield c
+
+    async def create(**kwargs):
+        sent.update(kwargs)
+        return fake_stream()
+
+    p = VLLMProvider("http://127.0.0.1:1/v1", "local-llm")
+    p._client = NS(chat=NS(completions=NS(create=create)))
+    p.last_usage = "前回の値"
+
+    async def collect():
+        return [t async for t in p.stream([{"role": "user", "content": "?"}])]
+
+    assert asyncio.run(collect()) == ["回", "答"]
+    assert sent["stream_options"] == {"include_usage": True}
+    assert p.last_usage is usage
+
+    # usage が来なければ前回の値を残さない
+    async def no_usage():
+        yield chunk("x")
+
+    async def create2(**kwargs):
+        return no_usage()
+
+    p._client = NS(chat=NS(completions=NS(create=create2)))
+    assert asyncio.run(collect()) == ["x"]
+    assert p.last_usage is None
+
 # ─── isolated DB ─────────────────────────────────────────────
 @pytest.fixture()
 def isolated_db(tmp_path, monkeypatch):

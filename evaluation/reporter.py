@@ -48,6 +48,26 @@ def conclusion_tally(results: list) -> tuple[int, int, list[str]] | None:
     return len(rows) - len(missed), len(rows), missed
 
 
+# V: --max-model-len = 入力トークンの最大 + 回答の上限 を 512 の倍数に切り上げる (docs/v2-light-model-plan.md の V)。
+# 入力トークン数はトークナイザで変わるので、候補ごとに測った値で決める
+ANSWER_MAX_TOKENS = 1024  # settings.llm_max_tokens と同じ
+MODEL_LEN_STEP = 512
+
+
+def needed_max_model_len(results: list) -> tuple[int | None, str | None, int | None, list[str]]:
+    """(入力トークンの最大, その問, 必要な max-model-len, トークン数が無い問) を返す。
+
+    1 問でもトークン数が無ければ必要値は None (その問の入力が最大かもしれず、足りるか分からないため)。
+    """
+    known = [r for r in results if getattr(r, "prompt_tokens", None) is not None]
+    missing = [r.id for r in results if getattr(r, "prompt_tokens", None) is None]
+    if not known:
+        return None, None, None, missing
+    top = max(known, key=lambda r: r.prompt_tokens)
+    needed = -(-(top.prompt_tokens + ANSWER_MAX_TOKENS) // MODEL_LEN_STEP) * MODEL_LEN_STEP
+    return top.prompt_tokens, top.id, (None if missing else needed), missing
+
+
 INF = float("inf")
 
 
@@ -242,6 +262,29 @@ def render_report(
                 continue
             ok, n, missed = t
             lines.append(f"| {name} | {ok}/{n} {'✓' if ok == n else '✗'} | {', '.join(missed) or '—'} |")
+        lines.append("")
+
+    # ─── V の max-model-len (トークン数を記録した実行があるときだけ出す) ───────
+    if any(getattr(r, "prompt_tokens", None) is not None for rs in all_results.values() for r in rs):
+        lines.append("## max-model-len の必要値（docs/v2-light-model-plan.md の V）")
+        lines.append("")
+        lines.append(
+            f"必要値 = 入力トークンの最大 + 回答の上限 {ANSWER_MAX_TOKENS:,} を {MODEL_LEN_STEP} の倍数に切り上げ。"
+            "トークナイザで入力の数が変わるので、候補ごとにこの値を使う。トークン数が無い問が 1 つでもあれば「不明」。"
+        )
+        lines.append("")
+        lines.append("| Provider | 入力トークンの最大 | その問 | 必要な max-model-len | トークン数が無い問 |")
+        lines.append("|---|---|---|---|---|")
+        for name, results in all_results.items():
+            top, top_id, needed, missing = needed_max_model_len(results)
+            shown = ", ".join(missing[:10]) + (" …" if len(missing) > 10 else "")
+            lines.append(
+                f"| {name} "
+                f"| {f'{top:,}' if top is not None else '—'} "
+                f"| {top_id or '—'} "
+                f"| {f'{needed:,}' if needed is not None else '不明'} "
+                f"| {f'{len(missing)} 問（{shown}）' if missing else '—'} |"
+            )
         lines.append("")
 
     # ─── 合格基準凡例 ─────────────────────────────────────────

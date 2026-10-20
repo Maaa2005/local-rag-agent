@@ -171,3 +171,41 @@ def test_judge_failure_makes_verdict_undecided_but_keeps_latency():
 def test_no_judge_run_has_no_overall_verdict():
     md = render_report({"vllm": [_make_result()]}, judge_name=None, dataset_size=1)
     assert "| 採点なし |" in md
+
+
+# ─── V: max-model-len の必要値 ─────────────────────────────────
+def test_needed_max_model_len_rounds_up_to_512():
+    from evaluation.reporter import needed_max_model_len
+
+    rows = [_make_result(id="Q001", prompt_tokens=1200), _make_result(id="Q002", prompt_tokens=3000)]
+    # 3000 + 1024 = 4024 → 4096
+    assert needed_max_model_len(rows) == (3000, "Q002", 4096, [])
+    # ちょうど 512 の倍数なら切り上げない: 3072 + 1024 = 4096
+    assert needed_max_model_len([_make_result(prompt_tokens=3072)])[2] == 4096
+    # 1 つ超えたら次の段: 3073 + 1024 = 4097 → 4608
+    assert needed_max_model_len([_make_result(prompt_tokens=3073)])[2] == 4608
+
+
+def test_needed_max_model_len_unknown_when_any_row_lacks_tokens():
+    from evaluation.reporter import needed_max_model_len
+
+    rows = [_make_result(id="Q001", prompt_tokens=3000), _make_result(id="Q002", error="run_failed: x")]
+    assert needed_max_model_len(rows) == (3000, "Q001", None, ["Q002"])
+    assert needed_max_model_len([_make_result(id="Q003")]) == (None, None, None, ["Q003"])
+
+
+def test_report_shows_max_model_len_section_only_with_tokens():
+    old = render_report({"vllm": [_make_result()]}, judge_name=None, dataset_size=1)
+    assert "max-model-len の必要値" not in old
+
+    rows = [_make_result(id="Q001", prompt_tokens=3000), _make_result(id="Q002", prompt_tokens=1200)]
+    md = render_report({"vllm": rows}, judge_name=None, dataset_size=2)
+    assert "| vllm | 3,000 | Q001 | 4,096 | — |" in md
+    # 節は合格基準の凡例より前
+    assert md.index("max-model-len の必要値") < md.index("## 合格基準")
+
+
+def test_report_max_model_len_section_marks_unknown():
+    rows = [_make_result(id="Q001", prompt_tokens=3000), _make_result(id="Q002")]
+    md = render_report({"vllm": rows}, judge_name=None, dataset_size=2)
+    assert "| vllm | 3,000 | Q001 | 不明 | 1 問（Q002） |" in md

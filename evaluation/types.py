@@ -37,3 +37,7 @@ class QuestionResult:
     # 後から別の実行で採点するための材料 (evaluation/rejudge.py が読む)
     retrieved_chunks: list[dict] = field(default_factory=list)
     expected_answer_keywords: list[str] = field(default_factory=list)
+    # 回答 1 回の入力・出力トークン数 (vLLM の usage)。max-model-len を候補ごとに決めるため。
+    # 取れなかった問とこの欄より前の raw.jsonl では None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
