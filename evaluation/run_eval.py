@@ -163,6 +163,35 @@ async def evaluate_provider(
     return results
 
 
+async def _index_status() -> dict:
+    """検索が見る索引の数 (evaluation/colab/corpus_index.py の count_index)。数えられなければ止める。"""
+    from evaluation.colab.corpus_index import count_index
+
+    try:
+        return await count_index()
+    except Exception as exc:
+        raise SystemExit(
+            f"索引を数えられない (QDRANT_URL={settings.qdrant_url} / DATA_DIR={settings.data_dir}): "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+
+
+def _check_index(index: dict) -> None:
+    """検索で通る文書が 1 件も無ければ止める。
+
+    索引と評価で DATA_DIR・QDRANT_URL・QDRANT_COLLECTION が 1 つでもずれると、点はあっても
+    documents 行で全部はじかれ、全問の根拠が消えてモデルの失敗に見える。
+    削除済み文書の点が残る本番の索引もあるので、一部だけ合わないのは記録に残すだけで止めない。
+    """
+    if index["matched"] == 0:
+        raise SystemExit(
+            f"検索で通る文書が 0 件: {index} (DATA_DIR={settings.data_dir} / QDRANT_URL={settings.qdrant_url})。"
+            " 索引を作った時の index.json の env と環境変数を揃える"
+        )
+    if index["matched"] < index["qdrant_documents"]:
+        print(f"[warn] 点はあるが documents 行が無い文書がある: {index}", flush=True)
+
+
 def _prepare_out_dir(out_dir: str | None, suffix: str = "") -> Path:
     """--out-dir があればそこ (空でなければ拒否)、無ければ results/<UTC ts><suffix>。"""
     if out_dir:
@@ -319,6 +348,10 @@ async def main():
     else:
         rerank_modes = [args.rerank == "on"]
 
+    # 索引の確かめ。出力先を作る前に止める
+    index = await _index_status()
+    _check_index(index)
+
     # 出力先。実行条件は最初の問を流す前に書く (途中で落ちても条件が残る)
     out_dir = _prepare_out_dir(args.out_dir)
     report_path = Path(args.report) if args.report else (out_dir / "report.md")
@@ -337,6 +370,7 @@ async def main():
         git=run_meta.git_info(ROOT),
         vllm=run_meta.fetch_vllm_models(settings.vllm_base_url) if uses_vllm else None,
     )
+    meta["index"] = index
     run_meta.write_run_meta(out_dir, meta)
 
     original_rerank_enabled = settings.rerank_enabled

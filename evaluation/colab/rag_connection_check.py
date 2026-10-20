@@ -13,7 +13,6 @@ v1 の設定は環境変数で上書きする（.env は使わない）。app �
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import signal
@@ -24,7 +23,7 @@ import types
 import uuid
 from pathlib import Path
 
-LEVELS = {"general": 1, "manager": 2, "executive": 3}
+from corpus_index import LEVELS, index_corpus  # 同じフォルダ（スクリプトとして流すので sys.path[0]）
 
 # C1 はルール判定。自由質問は local に回る言い回しにしてある（start で確かめる）
 TWO_IN_A_ROW = [
@@ -97,8 +96,6 @@ def main() -> int:
 
     # ここから下は環境変数を入れた後で import する（app.database は import 時に DATA_DIR を読む）
     from app.config import settings
-    from app.database import db, init_db
-    from app.services.indexer import ensure_collection, index_document
     from integration.ask import ask
     from judge.rules import RuleC1Router
     from orchestrator.audit_store import AuditStore
@@ -118,31 +115,8 @@ def main() -> int:
         return 2
 
     # ---- 索引: v1 と同じく documents 行（SQLite 再検証の正）を入れてから Qdrant に載せる。全部共有ループで ----
-    corpus = a.repo / "evaluation" / "corpus"
-    doc_level: dict[str, int] = {}
-    doc_name: dict[str, str] = {}
-
-    async def build_index() -> int:
-        await init_db()
-        await ensure_collection()
-        n = 0
-        now = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
-        for folder, level in LEVELS.items():
-            for f in sorted((corpus / folder).glob("*.md")):
-                text = f.read_text(encoding="utf-8")
-                doc_id = str(uuid.uuid4())
-                src = f"/watched/{folder}/{f.name}"
-                await db.execute(
-                    "INSERT INTO documents (id, source_path, file_hash, access_level, file_type, status, "
-                    "unclassified, index_version, created_at, updated_at) VALUES (?, ?, ?, ?, '.md', 'done', 0, 1, ?, ?)",
-                    (doc_id, src, hashlib.sha256(text.encode()).hexdigest(), level, now, now),
-                )
-                n += await index_document(doc_id, text, src, level, 1)
-                doc_level[doc_id], doc_name[doc_id] = level, f.name
-        return n
-
     t0 = time.monotonic()
-    chunks = run_on_shared_loop(build_index(), 1800)
+    chunks, doc_level, doc_name = run_on_shared_loop(index_corpus(a.repo / "evaluation" / "corpus"), 1800)
     print(f"索引: 文書 {len(doc_level)} 件 / チャンク {chunks} 件 / {time.monotonic() - t0:.0f} 秒", flush=True)
 
     # リランカーは初回の rerank で読み込まれる（初回はダウンロード込み）。検索の上限 30 秒に読み込みを

@@ -4,6 +4,7 @@
 - 回答のトークン数 (vLLM の usage) が、採点役が同じインスタンスで usage を上書きしても回答の値で残る
 - raw.jsonl は 1 問ごとに書き足され、途中で落ちてもそこまでの行と run_meta.json (failed) が残る
 - --dataset の繰り返し・--ids・--meta・--out-dir が run_meta.json に残る
+- 検索で通る文書が 0 件の索引なら、出力先を作る前に止まる。数えた索引は run_meta.json に残る
 """
 from __future__ import annotations
 
@@ -52,7 +53,10 @@ class _FakeProvider:
         self.last_usage = None
 
 
-def _install_fakes(monkeypatch, run_eval, fail_on=None):
+GOOD_INDEX = {"collection": "c", "points": 10, "documents": 2, "qdrant_documents": 2, "matched": 2}
+
+
+def _install_fakes(monkeypatch, run_eval, fail_on=None, index=GOOD_INDEX):
     provider = _FakeProvider()
 
     async def get_provider(name):
@@ -78,12 +82,16 @@ def _install_fakes(monkeypatch, run_eval, fail_on=None):
     async def init_db():
         return None
 
+    async def index_status():
+        return dict(index)
+
     import app.database
 
     monkeypatch.setattr(run_eval, "get_provider", get_provider)
     monkeypatch.setattr(run_eval, "_collect_answer_and_chunks", collect)
     monkeypatch.setattr(run_eval.judges, "judge", judge)
     monkeypatch.setattr(app.database, "init_db", init_db)
+    monkeypatch.setattr(run_eval, "_index_status", index_status)
     monkeypatch.setattr(
         run_eval.run_meta, "fetch_vllm_models", lambda url, **kw: {"url": url, "error": "offline"}
     )
@@ -127,6 +135,7 @@ def test_tokens_survive_judge_and_meta_is_written(tmp_path, monkeypatch, run_eva
     assert meta["extras"] == {"gpu": "T4", "gpu_util": "0.80"}
     assert meta["rerank_modes"] == [False]
     assert meta["vllm"]["error"] == "offline"
+    assert meta["index"] == GOOD_INDEX
     assert (out / "report.md").exists()
 
 
@@ -160,6 +169,37 @@ def test_non_empty_out_dir_is_refused(tmp_path, monkeypatch, run_eval):
             "--provider", "vllm", "--no-judge", "--dataset", str(a), "--out-dir", str(out),
         ])
     assert (out / "raw.jsonl").read_text(encoding="utf-8") == "前の結果\n"
+
+
+def test_index_with_no_matched_documents_stops_before_out_dir(tmp_path, monkeypatch, run_eval):
+    a = _jsonl(tmp_path / "a.jsonl", [_item("Q001")])
+    other = {"collection": "c", "points": 10, "documents": 2, "qdrant_documents": 2, "matched": 0}
+    _install_fakes(monkeypatch, run_eval, index=other)
+    out = tmp_path / "run1"
+
+    with pytest.raises(SystemExit, match="0 件"):
+        _run(monkeypatch, run_eval, [
+            "--provider", "vllm", "--no-judge", "--dataset", str(a), "--out-dir", str(out),
+        ])
+    assert not out.exists()
+
+
+def test_partial_match_warns_but_runs(capsys, run_eval):
+    run_eval._check_index({"collection": "c", "points": 10, "documents": 2, "qdrant_documents": 3, "matched": 2})
+    assert "[warn]" in capsys.readouterr().out
+    run_eval._check_index(GOOD_INDEX)
+    assert capsys.readouterr().out == ""
+
+
+def test_index_status_failure_stops_with_location(monkeypatch, run_eval):
+    import evaluation.colab.corpus_index as ci
+
+    async def broken():
+        raise ConnectionError("refused")
+
+    monkeypatch.setattr(ci, "count_index", broken)
+    with pytest.raises(SystemExit, match="QDRANT_URL=.*ConnectionError: refused"):
+        asyncio.run(run_eval._index_status())
 
 
 @pytest.mark.parametrize(
