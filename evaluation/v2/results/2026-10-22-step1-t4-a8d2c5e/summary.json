@@ -1,0 +1,108 @@
+{
+  "step": "1",
+  "source": "Colab の画面に残ったセル出力から写した（実行後にランタイムが切れ、/content/step1 と zip は回収できなかった）",
+  "notebook": "evaluation/colab/step1_measure.ipynb @ a8d2c5e",
+  "ran_at_jst": "2026-10-22 17:15-17:46",
+  "gpu": "Tesla T4",
+  "compute_cap": "7.5",
+  "total_mib": 15360,
+  "baseline_mib": 0,
+  "vllm": "0.32.0",
+  "model": "sbintuitions/sarashina2.2-3b-instruct-v0.1",
+  "model_revision": "4f3626fb1b64b3e97c908e67f27b2d627ba2a999",
+  "dtype": "float16",
+  "embedding": "intfloat/multilingual-e5-large (CPU)",
+  "rerank": "off",
+  "index": {
+    "documents": 13,
+    "chunks": 40,
+    "seconds": 118.9
+  },
+  "measure": {
+    "max_model_len": 8192,
+    "gpu_util": 0.85,
+    "max_prompt_tokens": 1686,
+    "max_id": "N07",
+    "n": 62,
+    "rc": 0,
+    "needed_max_model_len": 3072,
+    "dtype": "float16"
+  },
+  "n_questions": 62,
+  "runs": [
+    {
+      "label": "8GB",
+      "gpu_util": 0.5,
+      "started": false,
+      "peak_mib": 7785,
+      "budget_mib": 7680,
+      "error": "ValueError: No available memory for the cache blocks（重みを載せた時点で KV キャッシュの余地なし）",
+      "ok": null
+    },
+    {
+      "label": "12GB",
+      "gpu_util": 0.76,
+      "started": true,
+      "peak_mib": 11557,
+      "budget_mib": 11776,
+      "all_answered": true,
+      "longest_ok": true,
+      "no_oom": true,
+      "no_preemption": true,
+      "within_budget": true,
+      "ok": true,
+      "missing": [],
+      "run_seconds": 331
+    }
+  ],
+  "judge": {
+    "model": "stelterlab/phi-4-AWQ",
+    "revision": "075b93fe5ab0d2e86004a5d68c7575ec3bb5a88b",
+    "role": "real-judge",
+    "quant": "AWQ 4bit",
+    "max_model_len": 8192,
+    "gpu_util": 0.85,
+    "started": true,
+    "ready_seconds": 288,
+    "precheck": "fail",
+    "precheck_rc": 1,
+    "precheck_lines": [
+      "faithfulness: faithful > unsupported: 1.0 vs 1.0 → False",
+      "faithfulness: faithful > opposite: 1.0 vs 1.0 → False",
+      "faithfulness: faithful > partial: 1.0 vs 1.0 → False",
+      "answer_relevance: faithful > refusal: 1.0 vs 1.0 → False"
+    ],
+    "broken_scores": "なし",
+    "skipped": "採点役の確認が fail なので採点しない（回答は run_* に残る）"
+  },
+  "judged": {},
+  "g0": {
+    "rerank": "off",
+    "fault_timeout": 15,
+    "budget": "12GB",
+    "gpu_util": 0.76,
+    "max_model_len": 3072,
+    "rc": 0,
+    "ok": true,
+    "checks": [
+      "[PASS] 2 権限外の文書が出ない: 7 問 / 漏れ なし / 不明ID なし / held 0 問",
+      "[PASS] 2b 上位ユーザーには上位文書が出る（対照）",
+      "[PASS] 4 vLLM 固まる: held/generate TimeoutError / 15.5 秒（上限 15 秒）",
+      "[PASS] 4 vLLM 固まる の後に戻る: 12.9 秒",
+      "[PASS] 4 Qdrant 固まる: held/retrieve / 5.5 秒",
+      "[PASS] 4 Qdrant 固まる の後に戻る: 13.1 秒",
+      "[PASS] 4 vLLM 停止: held/generate APIConnectionError / 1.8 秒",
+      "[PASS] 4 Qdrant 停止: held/retrieve / 0.5 秒",
+      "[PASS] 3 監査に本文が残らない: run 17 件 / 本文 51 個 / 0 個",
+      "[INFO] 5 時間（回答できた 13 問）: 検索 中央 0.48 / 最大 0.53 秒, 生成 中央 6.09 / 最大 12.65 秒"
+    ]
+  },
+  "lost": [
+    "run_12GB/raw.jsonl",
+    "run_12GB/report.md",
+    "run_12GB/run_meta.json",
+    "judge_precheck.json",
+    "vllm_*.log",
+    "step1_results.zip"
+  ]
+}
