@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import statistics
 import time
 import urllib.request
 from pathlib import Path
@@ -110,6 +111,28 @@ def judge_failures(raw_path: Path) -> dict:
     rows = _read_rows(raw_path) if Path(raw_path).exists() else []
     bad = [r.get("id") for r in rows if str(r.get("error") or "").startswith("judge_failed")]
     return {"n_rows": len(rows), "judge_failed": bad}
+
+
+NUMERIC_FIELDS = ("first_token_latency", "total_latency", "retrieval_latency", "prompt_tokens", "completion_tokens",
+                  "recall_at_5", "mrr", "correctness", "permission_ok", "refusal_correct", "conclusion_ok",
+                  "faithfulness", "answer_relevance", "context_relevance")
+
+
+def numbers_only(raw_path: Path) -> dict:
+    """raw.jsonl から問 ID・数値・失敗の有無だけを抜き出し、時間の中央値と最大を付ける。
+
+    質問・回答・チャンクの本文は入れない (セルの出力に全部出してもランタイムが切れても数値が残るように)。
+    """
+    rows = _read_rows(raw_path)
+    per = [{"id": r.get("id"), "category": r.get("category"), "error": (str(r["error"])[:80] if r.get("error") else None),
+            **{k: r.get(k) for k in NUMERIC_FIELDS if k in r}} for r in rows]
+    ok = [r for r in rows if not r.get("error")]
+    times = {}
+    for k in ("first_token_latency", "total_latency", "retrieval_latency"):
+        vals = sorted(float(r[k]) for r in ok if isinstance(r.get(k), (int, float)))
+        if vals:
+            times[k] = {"median": round(statistics.median(vals), 3), "max": round(vals[-1], 3), "n": len(vals)}
+    return {"n_rows": len(rows), "n_error": len(rows) - len(ok), "times": times, "rows": per}
 
 
 # ─── GPU メモリの記録 ──────────────────────────────────────────

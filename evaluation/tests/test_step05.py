@@ -433,3 +433,19 @@ def test_step1_notebook_gates_scoring_and_runs_g0_last():
     summary_at = next(i for i, c in enumerate(cells) if "summary.json" in c)
     assert judge_at < g0_at < summary_at              # G0 は両サーバーを落とすので採点の後
     assert '"--rerank", "off"' in cells[g0_at]
+
+
+def test_numbers_only_drops_text_and_summarises_times(tmp_path):
+    raw = tmp_path / "raw.jsonl"
+    rows = [{"id": "Q1", "category": "c", "question": "本文", "answer": "回答", "retrieved_chunks": [{"content": "x"}],
+             "error": None, "total_latency": 2.0, "first_token_latency": 1.0, "retrieval_latency": 0.5, "faithfulness": 1.0},
+            {"id": "Q2", "category": "c", "question": "本文", "answer": "回答", "error": None, "total_latency": 6.0,
+             "first_token_latency": 3.0, "retrieval_latency": 0.7},
+            {"id": "Q3", "category": "c", "question": "本文", "answer": "", "error": "timeout", "total_latency": 99.0}]
+    raw.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    out = step05.numbers_only(raw)
+    assert out["n_rows"] == 3 and out["n_error"] == 1
+    assert out["times"]["total_latency"] == {"median": 4.0, "max": 6.0, "n": 2}  # 失敗した問は時間に入れない
+    text = json.dumps(out, ensure_ascii=False)
+    assert "本文" not in text and "回答" not in text and "content" not in text
+    assert out["rows"][2] == {"id": "Q3", "category": "c", "error": "timeout", "total_latency": 99.0}
