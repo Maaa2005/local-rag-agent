@@ -152,11 +152,13 @@
 | TinySwallow-1.5B-Instruct | TAID で蒸留（教師 Qwen2.5-32B-Instruct・生徒 Qwen2.5-1.5B-Instruct） | Apache 2.0（Qwen）と Gemma Terms of Use の両方に従う | — |
 | llm-jp-4-8b-thinking | MT-Bench JA: 考える量 low 7.23 / medium 7.54 | Apache 2.0 | 考える過程の分だけ遅い。考える量を下げて P に収まるか。切り替え方は公式の cookbook |
 | NVIDIA-Nemotron-Nano-9B-v2-Japanese | Nejumi Leaderboard 4 の TOTAL_AVG 0.711（同じ表で Qwen3-8B は 0.690） | NVIDIA Nemotron Open Model License | 考える過程が既定で ON。公式の動作確認機に T4 は無い。12GB 向け |
+| Underdog-Saluki-27B-1.0（`ConwayResearch/...`・5acfd92） | Qwen3.8-27B の 2bit 版。GGUF `IQ2-mix` 7.36 GiB（元は約 54GB）。公式の Underdog Bench 88/120・AIME は元の 82〜85% | Apache 2.0 | 本人が 10/09 に X で共有。普通の llama.cpp で動く（vLLM ではない）。重みだけで 8GB 予算 7,680 MiB にほぼ届くので、8GB では GPU に全部は載らない見込み。12GB 向け。考える過程が既定で ON（`enable_thinking: false` で切る）。日本語の公式の数字は無い。T4 の速さは未計測で、27B の 2bit は 3B より生成が遅い見込み |
 
 外す物:
 
 - LLM-jp-4 32B MoE: 軽くない。
 - Qwen3-Swallow 30B-A3B: 4bit でも重みが約 17GB で 12GB に載らない見込み。
+- Qwen3.8-27B-S-mirai（本人が X で共有・2.4bit・11GB）: 投稿の 12GB・70 tok/s は専用に改造した実行系での値で、普通の llama.cpp では 38 tok/s。断る向きを消す追加ファイルは任意（使わなければ影響なし）。Saluki と同じ元モデルで、普通の llama.cpp で動く Saluki を先に見る。
 
 ### 実行系
 
