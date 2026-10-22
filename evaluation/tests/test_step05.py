@@ -425,10 +425,15 @@ def test_step1_notebook_gates_scoring_and_runs_g0_last():
     cells = _notebook_code(STEP1_NOTEBOOK)
     code = "\n".join(cells)
     assert 'MODEL = "sbintuitions/sarashina2.2-3b-instruct-v0.1"' in code
-    assert 'JUDGE_MODEL = "stelterlab/phi-4-AWQ"' in code
+    # 採点役は候補と別の系統を上から順に試し、確認を最初に通った物で採点（phi-4 は 10/22 に全部満点で外した）
+    assert '("casperhansen/mistral-nemo-instruct-2407-awq", "c83b6438e13051ad1c0f5683635705ee83bb8772")' in code
+    assert '"stelterlab/phi-4-AWQ"' not in code
     assert '"real-judge"' in code and "flow-check-only" not in code
-    assert 'JUDGE["precheck"] != "pass"' in code      # 採点役の確認に通らなければ採点しない
+    assert 'trial["precheck"] != "pass"' in code      # 採点役の確認に通らなければその採点役では採点しない
     judge_at = next(i for i, c in enumerate(cells) if "s5.judge_cmd" in c)
+    dump_at = next(i for i, c in enumerate(cells) if "ANSWERS_B64_BEGIN" in c)
+    measure_at = next(i for i, c in enumerate(cells) if "P_{budget}_JSON" in c)
+    assert measure_at < dump_at < judge_at            # 回答の控えは測定の後・採点の前
     g0_at = next(i for i, c in enumerate(cells) if "rag_connection_check.py" in c)
     summary_at = next(i for i, c in enumerate(cells) if "summary.json" in c)
     assert judge_at < g0_at < summary_at              # G0 は両サーバーを落とすので採点の後
