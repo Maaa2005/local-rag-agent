@@ -93,6 +93,25 @@ def trial_ids(longest_id: str | None) -> list[str]:
     return ids
 
 
+def dataset_ids(repo: Path, datasets=DATASETS) -> list[str]:
+    """データセットの全問の ID (Step 1 の「全問回答」の確かめに使う)。重複があれば止める。"""
+    ids = [r["id"] for d in datasets for r in _read_rows(Path(repo) / d)]
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    if dup:
+        raise ValueError(f"ID が重複している: {dup}")
+    return ids
+
+
+def judge_failures(raw_path: Path) -> dict:
+    """採点した raw.jsonl のうち、採点役の呼び出しが落ちた問 (error が judge_failed で始まる)。
+
+    長すぎて採点役が受け付けない要求もここに出る。1 問でもあれば、その回の Q は読まない。
+    """
+    rows = _read_rows(raw_path) if Path(raw_path).exists() else []
+    bad = [r.get("id") for r in rows if str(r.get("error") or "").startswith("judge_failed")]
+    return {"n_rows": len(rows), "judge_failed": bad}
+
+
 # ─── GPU メモリの記録 ──────────────────────────────────────────
 def parse_smi_mib(stdout: str) -> int:
     """`nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits` の 1 行目を MiB の整数にする。"""
@@ -285,7 +304,7 @@ def _tri(values: list[bool | None]) -> bool | None:
 
 
 def trial_checks(raw_path: Path, expected_ids: list[str], longest_id: str | None, gpu_mem: dict,
-                 preempt_delta: float | None, log_scan: dict) -> dict:
+                 preempt_delta: float | None, log_scan: dict, note: str = TRIAL_NOTE) -> dict:
     """§1 V の合格の条件を試運転の範囲で確かめる。取れなかった項目は None (未確認) で、True にしない。"""
     rows = {r["id"]: r for r in _read_rows(raw_path)} if Path(raw_path).exists() else {}
     answered = [i for i in expected_ids if i in rows and not rows[i].get("error")]
@@ -306,5 +325,5 @@ def trial_checks(raw_path: Path, expected_ids: list[str], longest_id: str | None
         **checks,
         "missing": [i for i in expected_ids if i not in answered],
         "ok": _tri(list(checks.values())),
-        "note": TRIAL_NOTE,
+        "note": note,
     }

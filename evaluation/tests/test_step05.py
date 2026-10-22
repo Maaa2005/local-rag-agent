@@ -7,6 +7,7 @@
 - 試運転の確かめは、取れなかった項目を True にしない
 - ノートが組む run_eval の引数を run_eval 本体が受け付け、--judge-from に GPU の記録が写る
 - 試運転ノート (step05_trial.ipynb) の全セルが Python として読め、step05 に無い名前を使わない
+- Step 1 の部品: 全問の ID・採点役の失敗の数え方・Step 1 ノート (step1_measure.ipynb) の約束
 """
 from __future__ import annotations
 
@@ -329,9 +330,9 @@ def test_notebook_argv_runs_through_run_eval(tmp_path, monkeypatch, run_eval):  
 NOTEBOOK = Path(__file__).resolve().parents[1] / "colab" / "step05_trial.ipynb"
 
 
-def _notebook_code() -> list[str]:
+def _notebook_code(path: Path = NOTEBOOK) -> list[str]:
     """コードセルを、! のシェル行 (\\ の継続行を含む) を pass に替えた Python として返す。"""
-    nb = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
+    nb = json.loads(path.read_text(encoding="utf-8"))
     cells = []
     for c in nb["cells"]:
         if c["cell_type"] != "code":
@@ -366,3 +367,69 @@ def test_trial_notebook_states_what_it_skips():
     assert "flow-check-only" in text                   # 採点役は代役
     assert "evaluation.judge_precheck" in text
     assert nb["metadata"]["colab"]["gpuType"] == "T4"
+
+
+# ─── Step 1 ────────────────────────────────────────────────────
+STEP1_NOTEBOOK = NOTEBOOK.with_name("step1_measure.ipynb")
+
+
+def test_dataset_ids_covers_both_datasets_without_duplicates():
+    repo = Path(__file__).resolve().parents[2]
+    ids = step05.dataset_ids(repo)
+    assert len(ids) == 62 and len(set(ids)) == 62
+    assert {"Q001", "N01", "N12"} <= set(ids)
+
+
+def test_dataset_ids_stops_on_duplicates(tmp_path):
+    for name in ("a.jsonl", "b.jsonl"):
+        (tmp_path / name).write_text(json.dumps({"id": "X1"}) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="X1"):
+        step05.dataset_ids(tmp_path, datasets=("a.jsonl", "b.jsonl"))
+
+
+def test_judge_failures_counts_only_judge_errors(tmp_path):
+    raw = tmp_path / "raw.jsonl"
+    rows = [{"id": "Q1", "error": None}, {"id": "Q2", "error": "judge_failed: context length"},
+            {"id": "Q3", "error": "timeout"}, {"id": "Q4"}]
+    raw.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    assert step05.judge_failures(raw) == {"n_rows": 4, "judge_failed": ["Q2"]}
+    assert step05.judge_failures(tmp_path / "none.jsonl") == {"n_rows": 0, "judge_failed": []}
+
+
+def test_trial_checks_note_can_be_replaced(tmp_path):
+    raw = tmp_path / "raw.jsonl"
+    raw.write_text(json.dumps({"id": "Q1", "error": None, "prompt_tokens": 10}) + "\n", encoding="utf-8")
+    mem = {"within_budget": True}
+    scan = {"oom": False, "preempt": False}
+    assert step05.trial_checks(raw, ["Q1"], None, mem, 0.0, scan)["note"] == step05.TRIAL_NOTE
+    assert step05.trial_checks(raw, ["Q1"], None, mem, 0.0, scan, note="基準線")["note"] == "基準線"
+
+
+def test_step1_notebook_cells_parse_and_use_existing_names():
+    cells = _notebook_code(STEP1_NOTEBOOK)
+    assert len(cells) >= 9
+    for i, src in enumerate(cells):
+        ast.parse(src, filename=f"step1_measure.ipynb セル {i}")
+    code = "\n".join(cells)
+    used = set(re.findall(r"\bs5\.(\w+)", code))
+    assert {"dataset_ids", "judge_failures", "trial_checks", "gpu_util_for_budget", "judge_cmd"} <= used
+    assert sorted(n for n in used if not hasattr(step05, n)) == []
+    # V は救わない: 下げて起動し直す部品も、8 問の抜き出しも使わない
+    assert "adjusted_gpu_util" not in used and "trial_ids" not in used
+    assert "s5.TRIAL_NOTE" not in code
+
+
+def test_step1_notebook_gates_scoring_and_runs_g0_last():
+    nb = json.loads(STEP1_NOTEBOOK.read_text(encoding="utf-8"))
+    assert nb["metadata"]["colab"]["gpuType"] == "T4"
+    cells = _notebook_code(STEP1_NOTEBOOK)
+    code = "\n".join(cells)
+    assert 'MODEL = "sbintuitions/sarashina2.2-3b-instruct-v0.1"' in code
+    assert 'JUDGE_MODEL = "stelterlab/phi-4-AWQ"' in code
+    assert '"real-judge"' in code and "flow-check-only" not in code
+    assert 'JUDGE["precheck"] != "pass"' in code      # 採点役の確認に通らなければ採点しない
+    judge_at = next(i for i, c in enumerate(cells) if "s5.judge_cmd" in c)
+    g0_at = next(i for i, c in enumerate(cells) if "rag_connection_check.py" in c)
+    summary_at = next(i for i, c in enumerate(cells) if "summary.json" in c)
+    assert judge_at < g0_at < summary_at              # G0 は両サーバーを落とすので採点の後
+    assert '"--rerank", "off"' in cells[g0_at]
