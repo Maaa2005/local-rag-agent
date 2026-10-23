@@ -170,10 +170,16 @@
  "judged": {},
  "Q": {
   "read": false,
-  "reason": "採点役が確認を通らず、M4・M6 は測れていない",
+  "reason": "採点役が確認を通らず、M4（faithfulness）は測れていない。M6 は採点役を使わないキーワードの一致なので測れている",
   "judge_free": {
+   "n": 50,
    "M7_permission": 1.0,
-   "M8_refusal": "1/16"
+   "M6_correctness": 0.91,
+   "M6_pass": true,
+   "M8_refusal": "1/16",
+   "M1_recall_at_5": 1.0,
+   "M2_mrr": 0.9867,
+   "note": "Q の 50 問だけで計算。no_judge_12GB の correctness 0.81 は N の 12 問（0.375）を含む 62 問の値"
   },
   "fails_regardless": "M8 は採点役を使わない拒否の判定で 1/16（線は 16/16）なので、どの採点役で採点しても Q は不合格",
   "refusal_breakdown": {
