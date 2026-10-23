@@ -440,6 +440,34 @@ def test_step1_notebook_gates_scoring_and_runs_g0_last():
     assert '"--rerank", "off"' in cells[g0_at]
 
 
+STEP2_NOTEBOOK = NOTEBOOK.with_name("step2_measure.ipynb")
+
+
+def test_step2_notebook_collects_answers_without_judge():
+    nb = json.loads(STEP2_NOTEBOOK.read_text(encoding="utf-8"))
+    assert nb["metadata"]["colab"]["gpuType"] == "T4"
+    cells = _notebook_code(STEP2_NOTEBOOK)
+    for i, src in enumerate(cells):
+        ast.parse(src, filename=f"step2_measure.ipynb セル {i}")
+    code = "\n".join(cells)
+    used = set(re.findall(r"\bs5\.(\w+)", code))
+    assert sorted(n for n in used if not hasattr(step05, n)) == []
+    assert "adjusted_gpu_util" not in used and "trial_ids" not in used
+    assert 'MODEL = "LiquidAI/LFM2.5-1.2B-JP-202606"' in code
+    # 10/23 に人手採点へ切り替えたので採点役は起動しない（回答はセルの出力と zip に残す）
+    assert "JUDGE_CANDIDATES = []" in code and "s5.judge_cmd" not in code
+    assert '"role": "human"' in code and '"step": "2"' in code
+    measure_at = next(i for i, c in enumerate(cells) if "P_{budget}_JSON" in c)
+    dump_at = next(i for i, c in enumerate(cells) if "ANSWERS_B64_BEGIN" in c)
+    g0_at = next(i for i, c in enumerate(cells) if "rag_connection_check.py" in c)
+    summary_at = next(i for i, c in enumerate(cells) if "summary.json" in c)
+    assert measure_at < dump_at < g0_at < summary_at
+    assert '"--rerank", "off"' in cells[g0_at]
+    assert "step1" not in code
+    zip_cell = "".join(next(c["source"] for c in nb["cells"] if "zip -qr" in "".join(c["source"])))
+    assert "step2_results.zip step2 " in zip_cell      # ! のシェル行は _notebook_code で消えるので元の文で見る
+
+
 def test_numbers_only_drops_text_and_summarises_times(tmp_path):
     raw = tmp_path / "raw.jsonl"
     rows = [{"id": "Q1", "category": "c", "question": "本文", "answer": "回答", "retrieved_chunks": [{"content": "x"}],
