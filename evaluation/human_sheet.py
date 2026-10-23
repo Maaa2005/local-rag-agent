@@ -2,11 +2,12 @@
 
 本人が、モデル名・速さ・既存の点を見ずに、順を混ぜた回答を採点する。
 - make : raw.jsonl から sheet.csv (1 行 1 文) と read.md (質問・取得した本文・回答の文) を作る。
+         N の問 (expected_conclusion あり) は表に入れず、対応表の excluded_numeric_boundary に残す。
          run_label・モデル名・候補名・時間・点・問 ID・ファイル名は表にも read.md にも出さない。
          対応表 (--key-out) は --out-dir の外に置く。空/失敗の回答は auto_zero として対応表にだけ入れる。
 - score: 記入済みの sheet.csv と対応表から run_label ごとの平均を出す (auto_zero は 0 点として含める)。
 
-定義: 1 問の点は文の判定 (0/1) の平均。1 回 (run_label) の点はその回の全問の平均。0.90 以上で合格。
+定義: 1 問の点は文の判定 (0/1) の平均。1 回 (run_label) の点はその回の本番の問 (50 問) の平均。0.90 以上で合格。
 
 CLI (repo ルートから):
     python -m evaluation.human_sheet make --raw A/raw.jsonl [--raw B/raw.jsonl] --seed 1 \\
@@ -60,17 +61,21 @@ def _norm(text: str) -> str:
 
 
 # ─── make ──────────────────────────────────────────────────────
-def collect(raws: list[Path]) -> list[dict]:
-    """全回答 (run_label × 問) を、raw の順・ファイル内の順に集める。"""
+def collect(raws: list[Path]) -> tuple[list[dict], list[dict]]:
+    """(本番の回答, 外した N の問) を、raw の順・ファイル内の順に集める。"""
     items: list[dict] = []
+    excluded: list[dict] = []
     seen: dict[tuple[str, str], str] = {}
     for raw in raws:
-        for label, results in rejudge.load_saved_results(raw).items():
-            for r in results:
+        for label, all_results in rejudge.load_saved_results(raw).items():
+            for r in all_results:
                 k = (label, r.id)
                 if k in seen:
                     raise SheetError(f"run_label {label!r} の問 {r.id} が {seen[k]} と {raw} の両方にある")
                 seen[k] = str(raw)
+            results, n_ids = rejudge.split_numeric_boundary(all_results)
+            excluded += [{"raw": str(raw), "run_label": label, "question_id": q} for q in n_ids]
+            for r in results:
                 sentences = split_sentences(r.answer or "")
                 reason = None
                 if r.error:
@@ -82,7 +87,7 @@ def collect(raws: list[Path]) -> list[dict]:
                     "question": r.question, "chunks": r.retrieved_chunks,
                     "sentences": sentences, "auto_zero_reason": reason,
                 })
-    return items
+    return items, excluded
 
 
 def _read_md(shown: list[tuple[str, dict]]) -> str:
@@ -121,7 +126,9 @@ def make(raws: list[Path], seed: int, out_dir: Path, key_out: Path, max_answers:
     if key_out.resolve().is_relative_to(out_dir.resolve()):
         raise SheetError("--key-out は --out-dir の外に置く (本人が対応表を見ないため)")
 
-    items = collect(raws)
+    items, excluded = collect(raws)
+    if not items:
+        raise SheetError("本番の問が 1 つも無い (N の問だけの raw は人手採点の対象外)")
     auto = [it for it in items if it["auto_zero_reason"]]
     rest = [it for it in items if not it["auto_zero_reason"]]
     if len(rest) > max_answers:
@@ -152,6 +159,7 @@ def make(raws: list[Path], seed: int, out_dir: Path, key_out: Path, max_answers:
              "reason": it["auto_zero_reason"]}
             for it in auto
         ],
+        "excluded_numeric_boundary": excluded,
         "sheet_sha256": _sha(sheet),
         "read_sha256": _sha(read),
         "raws": [{"path": str(r), "sha256": _sha(r)} for r in raws],

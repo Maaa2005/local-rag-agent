@@ -245,6 +245,30 @@ def test_fail_without_undetermined_exits_1(tmp_path):
     assert _run(tmp_path, rows, FakeJudge(_bad_is_zero)) == 1
 
 
+def test_numeric_boundary_rows_are_not_judged_and_not_in_mean(tmp_path):
+    rows = [
+        _row("Q1", answer="良い。"),
+        _row("N01", answer="悪い。", expected_conclusion="不要"),
+        _row("N02", answer="", expected_conclusion="必要"),
+        _row("Q2", answer="良い。"),
+    ]
+    j = FakeJudge(_bad_is_zero)
+    code = _run(tmp_path, rows, j)
+    run = _load(tmp_path)["runs"]["cand_a"]
+    assert j.calls == ["良い。", "良い。"]
+    assert code == 0 and run["result"] == "pass" and run["mean"] == 1.0
+    assert run["n_questions"] == 2 and run["n_auto_zero"] == 0
+    assert [q["id"] for q in run["questions"]] == ["Q1", "Q2"]
+    assert run["excluded_numeric_boundary"] == ["N01", "N02"]
+
+
+def test_only_numeric_boundary_rows_is_undetermined(tmp_path):
+    j = FakeJudge()
+    code = _run(tmp_path, [_row("N01", expected_conclusion="不要")], j)
+    run = _load(tmp_path)["runs"]["cand_a"]
+    assert j.calls == [] and code == 3
+    assert run["result"] == "未判定" and run["mean"] is None and run["n_questions"] == 0
+
 def test_output_records_provenance(tmp_path):
     _run(tmp_path, [_row("Q1")], FakeJudge())
     doc = _load(tmp_path)

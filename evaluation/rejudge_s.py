@@ -2,7 +2,8 @@
 
 定義:
 - 回答を metrics.split_sentences で分け、文ごとに 0/1。1 問の点は文の平均。
-  1 回 (run_label) の点は、その回の全問の平均。0.90 以上で合格。
+  1 回 (run_label) の点は、その回の本番の問 (50 問) の平均。0.90 以上で合格。
+  N の問 (expected_conclusion あり) は採点せず、ID だけ残す (N は結論の一致で別に見る)。
 - 空の回答 (文が 0 個)・回答の失敗 (error が記録された行) は採点役を呼ばず、その問を 0 点にする
   (auto_zero として理由を残す)。
 - 採点できない問が 1 つでもあれば、その回は「未判定」。切り詰め・補い・既定値での穴埋めはしない。
@@ -146,9 +147,14 @@ async def judge_question(r, judge_fn: JudgeFn, provider) -> tuple[dict, Fraction
 
 
 async def rejudge_groups(groups: dict, judge_fn: JudgeFn, provider) -> dict[str, dict]:
-    """run_label ごとに全問を採点する。1 問でも採点できなければその回は未判定 (平均は出さない)。"""
+    """run_label ごとに本番の問を採点する。1 問でも採点できなければその回は未判定 (平均は出さない)。
+
+    N の問 (expected_conclusion あり) は採点せず、ID を excluded_numeric_boundary に残す。
+    本番の問が 1 つも無い回は未判定。
+    """
     out: dict[str, dict] = {}
-    for label, results in groups.items():
+    for label, all_results in groups.items():
+        results, excluded = rejudge.split_numeric_boundary(all_results)
         entries, scores = [], []
         for r in results:
             entry, score = await judge_question(r, judge_fn, provider)
@@ -156,17 +162,18 @@ async def rejudge_groups(groups: dict, judge_fn: JudgeFn, provider) -> dict[str,
             scores.append(score)
         failed = sum(1 for s in scores if s is None)
         n_auto = sum(1 for e in entries if e["status"] == "auto_zero")
-        if failed:
+        if failed or not scores:
             result, mean = "未判定", None
         else:
-            m = sum(scores) / len(scores) if scores else Fraction(0)
+            m = sum(scores) / len(scores)
             mean = float(m)
-            result = "pass" if scores and m >= PASS_THRESHOLD else "fail"
+            result = "pass" if m >= PASS_THRESHOLD else "fail"
         out[label] = {
             "mean": mean,
             "n_questions": len(entries),
             "n_auto_zero": n_auto,
             "n_failed": failed,
+            "excluded_numeric_boundary": excluded,
             "result": result,
             "questions": entries,
         }
@@ -268,7 +275,8 @@ def main(
         mean = "-" if v["mean"] is None else f"{v['mean']:.4f}"
         print(
             f"  {label}: {v['result']} 平均={mean} 問={v['n_questions']} "
-            f"auto_zero={v['n_auto_zero']} 失敗={v['n_failed']}",
+            f"auto_zero={v['n_auto_zero']} 失敗={v['n_failed']} "
+            f"外したNの問={len(v['excluded_numeric_boundary'])}",
             flush=True,
         )
     print(f"M4-S 採点: {result} → {a.out}", flush=True)

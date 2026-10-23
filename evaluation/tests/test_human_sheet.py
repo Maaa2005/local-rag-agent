@@ -138,6 +138,40 @@ def test_auto_zero_not_in_sheet_but_in_key(tmp_path):
     assert len(k["answers"]) == 1
 
 
+def test_numeric_boundary_rows_not_in_sheet_but_listed_in_key(tmp_path):
+    rows = [
+        _row("ZQ000", "普通の回答です。", LABELS[0]),
+        _row("ZN001", "境目の回答です。", LABELS[0], expected_conclusion="不要"),
+        _row("ZN002", "", LABELS[0], expected_conclusion="必要"),
+    ]
+    raw = tmp_path / "raw.jsonl"
+    _write(raw, rows)
+    code, out_dir, key = _make(tmp_path, raw)
+    assert code == 0
+    assert {r[0] for r in _read_sheet(out_dir / "sheet.csv")[1:]} == {"H001"}
+    assert "境目の回答" not in (out_dir / "read.md").read_text(encoding="utf-8")
+    k = json.loads(key.read_text(encoding="utf-8"))
+    assert [a["question_id"] for a in k["answers"].values()] == ["ZQ000"]
+    assert k["auto_zero"] == []  # N の空回答も 0 点に数えない
+    assert [(z["run_label"], z["question_id"]) for z in k["excluded_numeric_boundary"]] == [
+        (LABELS[0], "ZN001"), (LABELS[0], "ZN002")]
+
+
+def test_numeric_boundary_rows_do_not_change_score(tmp_path):
+    rows = [_row("ZQ000", "あ。い。", LABELS[0]), _row("ZN001", "う。", LABELS[0], expected_conclusion="不要")]
+    sheet, key = _setup(tmp_path, rows)
+    _write_sheet(sheet, _fill(_read_sheet(sheet)))
+    assert _score(tmp_path, sheet, key) == 0
+    run = json.loads((tmp_path / "score.json").read_text(encoding="utf-8"))["runs"][LABELS[0]]
+    assert (run["mean"], run["n_questions"]) == (1.0, 1)
+
+
+def test_make_refuses_raw_with_only_numeric_boundary(tmp_path):
+    raw = tmp_path / "raw.jsonl"
+    _write(raw, [_row("ZN001", "う。", LABELS[0], expected_conclusion="不要")])
+    code, out_dir, key = _make(tmp_path, raw)
+    assert code == 2 and not key.exists()
+
 def test_key_contents(tmp_path):
     raw = _raw(tmp_path, 2)
     _, out_dir, key = _make(tmp_path, raw, seed=9)

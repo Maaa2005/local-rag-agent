@@ -44,6 +44,16 @@ def load_saved_results(path: Path) -> dict[str, list[QuestionResult]]:
     return groups
 
 
+def split_numeric_boundary(results: list[QuestionResult]) -> tuple[list[QuestionResult], list[str]]:
+    """(本番の問, 外した N の問の ID) に分ける。N の問は expected_conclusion がある問。
+
+    M4-S は本番 50 問の平均 (docs/v2-light-model-plan.md の Q)。N の 12 問は結論の一致 (N) で別に見る。
+    """
+    main = [r for r in results if r.expected_conclusion is None]
+    excluded = [r.id for r in results if r.expected_conclusion is not None]
+    return main, excluded
+
+
 async def judge_saved(groups: dict[str, list[QuestionResult]], judge_provider) -> None:
     """保存済みの結果をその場で採点する。回答で失敗した行は採点しない。"""
     for label, results in groups.items():
