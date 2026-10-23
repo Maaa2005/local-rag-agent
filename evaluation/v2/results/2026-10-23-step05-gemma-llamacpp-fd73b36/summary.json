@@ -1,0 +1,292 @@
+{
+ "step": "0.5-6",
+ "candidate": "Gemma 4 E2B-it (GGUF Q8_0) on llama-server",
+ "source": "Colab のセル出力（SUMMARY_JSON）から作った。答えの文は入れない",
+ "notebook": "evaluation/colab/step05_gemma_llamacpp.ipynb @ fd73b36（Colab のタブの URL とセル3の中身で確認）",
+ "ran_at_jst": "2026-10-23 22:24-22:28",
+ "attempts": [
+  {
+   "at": "20:27-20:39",
+   "code": "84c19e0",
+   "result": "配布版が起動。決めた判定では GPU・答えとも不合格。作り直しは約 7 分で止めた（計画の実行記録）"
+  },
+  {
+   "at": "20:43-20:45",
+   "code": "未確認（セル2の途中で Mac が眠って切れた）",
+   "result": "数値なし"
+  },
+  {
+   "at": "21:20-22:20",
+   "code": "84c19e0（fd73b36 のつもりだったが、タブが古いまま。commit 欄は誤って fd73b36）",
+   "result": "1 回目と同じ結果。作り直し（3,268 秒）も同じ数値で落ちた。作り直しても何も変わらない証拠としてだけ使う",
+   "summary": {
+    "step": "0.5-6",
+    "gpu": "Tesla T4",
+    "compute_cap": "7.5",
+    "total_mib": "15360",
+    "baseline_mib": 0,
+    "driver": "580.82.07",
+    "nvcc": "13.0",
+    "commit": "fd73b362e4de1e99418ca4f10bb91eac439b098c",
+    "llama_tag": "b11836",
+    "gguf": {
+     "repo": "ggml-org/gemma-4-E2B-it-GGUF",
+     "revision": "6938c58e698502037401a5f19f6905f2fb2f7dee",
+     "file": "gemma-4-E2B-it-Q8_0.gguf"
+    },
+    "ctx": 4096,
+    "started": true,
+    "runs_on_gpu": false,
+    "answers_ok": false,
+    "ok": false,
+    "used": "source_sm75",
+    "peak_note": "文脈 4096・検索なしの仮の値。Step 2 の V の判定ではない",
+    "peak_mib": 2697,
+    "within": {
+     "8GB": true,
+     "12GB": true
+    },
+    "trials": [
+     {
+      "label": "prebuilt",
+      "server_bin": "/content/llama-pre/llama-b11836/llama-server",
+      "version": "version: 0.7.0-dev (build 11836, commit f5027fb21)\nbuilt with GNU 13.3.0 for Linux x86_64",
+      "devices": "Available devices:\n  CUDA0: Tesla T4 (14912 MiB, 14807 MiB free)",
+      "started": true,
+      "ready_seconds": 104.1,
+      "peak_mib": 2697,
+      "log_hits": [
+       "1.42.366.135 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'"
+      ],
+      "cuda_device": true,
+      "offloaded": null,
+      "all_layers_on_gpu": false,
+      "no_kernel_image": false,
+      "gpu_delta_mib": 2697,
+      "runs_on_gpu": false,
+      "answers_ok": false,
+      "ok": false,
+      "answers": [
+       {
+        "name": "short",
+        "seconds": 38.74,
+        "prompt_tokens": 29,
+        "completion_tokens": 181,
+        "finish": "stop",
+        "has_reasoning": true,
+        "thinking_marks": false,
+        "japanese": true
+       },
+       {
+        "name": "long",
+        "seconds": 4.75,
+        "prompt_tokens": 1862,
+        "completion_tokens": 256,
+        "finish": "length",
+        "has_reasoning": true,
+        "thinking_marks": false,
+        "japanese": false
+       },
+       {
+        "name": "long_again",
+        "seconds": 4.14,
+        "prompt_tokens": 1862,
+        "completion_tokens": 256,
+        "finish": "length",
+        "has_reasoning": true,
+        "thinking_marks": false,
+        "japanese": false
+       }
+      ]
+     },
+     {
+      "label": "source_sm75",
+      "server_bin": "/content/llama.cpp/build/bin/llama-server",
+      "version": "version: 0.7.0-dev (build 1, commit f5027fb)\nbuilt with GNU 13.3.0 for Linux x86_64",
+      "devices": "Available devices:\n  CUDA0: Tesla T4 (14912 MiB, 14807 MiB free)",
+      "started": true,
+      "ready_seconds": 4.0,
+      "peak_mib": 2697,
+      "log_hits": [
+       "0.02.381.406 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 4096, kv_unified = 'false'"
+      ],
+      "cuda_device": true,
+      "offloaded": null,
+      "all_layers_on_gpu": false,
+      "no_kernel_image": false,
+      "gpu_delta_mib": 2697,
+      "runs_on_gpu": false,
+      "answers_ok": false,
+      "ok": false,
+      "answers": [
+       {
+        "name": "short",
+        "seconds": 2.86,
+        "prompt_tokens": 29,
+        "completion_tokens": 181,
+        "finish": "stop",
+        "has_reasoning": true,
+        "thinking_marks": false,
+        "japanese": true
+       },
+       {
+        "name": "long",
+        "seconds": 4.43,
+        "prompt_tokens": 1862,
+        "completion_tokens": 256,
+        "finish": "length",
+        "has_reasoning": true,
+        "thinking_marks": false,
+        "japanese": false
+       },
+       {
+        "name": "long_again",
+        "seconds": 3.83,
+        "prompt_tokens": 1862,
+        "completion_tokens": 256,
+        "finish": "length",
+        "has_reasoning": true,
+        "thinking_marks": false,
+        "japanese": false
+       }
+      ]
+     }
+    ],
+    "commit_note": "commit 欄は実行時のブランチの先頭（fd73b36）を書いたもので誤り。実際に動いたコードは 84c19e0（Colab のタブの URL とセル3の中身で確認）"
+   }
+  },
+  {
+   "at": "22:24-22:28",
+   "code": "fd73b36",
+   "result": "合格",
+   "summary": {
+    "step": "0.5-6",
+    "gpu": "Tesla T4",
+    "compute_cap": "7.5",
+    "total_mib": "15360",
+    "baseline_mib": 0,
+    "driver": "580.82.07",
+    "nvcc": "13.0",
+    "commit": "fd73b362e4de1e99418ca4f10bb91eac439b098c",
+    "llama_tag": "b11836",
+    "gguf": {
+     "repo": "ggml-org/gemma-4-E2B-it-GGUF",
+     "revision": "6938c58e698502037401a5f19f6905f2fb2f7dee",
+     "file": "gemma-4-E2B-it-Q8_0.gguf"
+    },
+    "ctx": 4096,
+    "started": true,
+    "runs_on_gpu": true,
+    "answers_ok": true,
+    "ok": true,
+    "used": "prebuilt",
+    "peak_note": "文脈 4096・検索なしの仮の値。Step 2 の V の判定ではない",
+    "peak_mib": 2697,
+    "within": {
+     "8GB": true,
+     "12GB": true
+    },
+    "trials": [
+     {
+      "label": "prebuilt",
+      "server_bin": "/content/llama-pre/llama-b11836/llama-server",
+      "version": "version: 0.7.0-dev (build 11836, commit f5027fb21)\nbuilt with GNU 13.3.0 for Linux x86_64",
+      "devices": "Available devices:\n  CUDA0: Tesla T4 (14912 MiB, 14807 MiB free)",
+      "started": true,
+      "ready_seconds": 102.1,
+      "warmup_seconds": 25.7,
+      "peak_mib": 2697,
+      "log_hits": [
+       "0.01.032.370 I load_tensors: offloaded 36/36 layers to GPU",
+       "0.01.032.379 I load_tensors:        CUDA0 model buffer size =     0.00 MiB",
+       "0.01.032.380 I load_tensors:    CUDA_Host model buffer size =     0.00 MiB",
+       "0.01.042.084 I llama_context:  CUDA_Host  output buffer size =     1.00 MiB",
+       "0.01.042.269 I llama_kv_cache:      CUDA0 KV buffer size =     0.00 MiB",
+       "0.01.042.373 I llama_kv_cache:      CUDA0 KV buffer size =     0.00 MiB",
+       "0.01.055.670 I sched_reserve:      CUDA0 compute buffer size =   124.02 MiB",
+       "0.01.055.708 I sched_reserve:  CUDA_Host compute buffer size =    34.53 MiB",
+       "0.21.532.481 I load_tensors: offloaded 36/36 layers to GPU",
+       "0.21.532.499 I load_tensors:   CPU_Mapped model buffer size =  2380.00 MiB",
+       "0.21.532.500 I load_tensors:   CPU_Mapped model buffer size =   408.00 MiB",
+       "0.21.532.502 I load_tensors:        CUDA0 model buffer size =  2342.30 MiB",
+       "0.22.240.033 I llama_context:  CUDA_Host  output buffer size =     1.00 MiB",
+       "0.22.240.436 I llama_kv_cache:      CUDA0 KV buffer size =    24.00 MiB",
+       "0.22.240.898 I llama_kv_cache:      CUDA0 KV buffer size =    12.00 MiB",
+       "0.22.274.373 I sched_reserve:      CUDA0 compute buffer size =   124.02 MiB",
+       "0.22.274.381 I sched_reserve:  CUDA_Host compute buffer size =    34.53 MiB",
+       "1.41.757.812 I srv          init: init: chat template, thinking = 0",
+       "1.41.757.848 I srv          init: preserve_reasoning kwarg: not supported by template",
+       "1.42.122.881 D srv  eval_llama_c: reasoning budget: tokens=-1, generation_prompt='', start=2 toks, end=1 seqs, forced=1 toks",
+       "2.07.854.801 D srv  eval_llama_c: reasoning budget: tokens=-1, generation_prompt='', start=2 toks, end=1 seqs, forced=1 toks",
+       "2.07.855.595 D slot launch_slot_: id  0 | task -1 | launching slot : {\"id\":0,\"n_ctx\":4096,\"speculative\":false,\"is_processing\":false,\"id_task\":0,\"n_prompt_tokens\":22,\"n_prompt_tokens_processed\":0,\"n_prompt_tokens_cache\":0,\"params\":{\"seed\":42",
+       "2.18.095.918 D srv  eval_llama_c: reasoning budget: tokens=-1, generation_prompt='', start=2 toks, end=1 seqs, forced=1 toks",
+       "2.18.096.905 D slot launch_slot_: id  0 | task -1 | launching slot : {\"id\":0,\"n_ctx\":4096,\"speculative\":false,\"is_processing\":false,\"id_task\":16,\"n_prompt_tokens\":28,\"n_prompt_tokens_processed\":0,\"n_prompt_tokens_cache\":0,\"params\":{\"seed\":4",
+       "2.19.215.676 D srv  eval_llama_c: reasoning budget: tokens=-1, generation_prompt='', start=2 toks, end=1 seqs, forced=1 toks",
+       "2.19.216.122 D slot launch_slot_: id  0 | task -1 | launching slot : {\"id\":0,\"n_ctx\":4096,\"speculative\":false,\"is_processing\":false,\"id_task\":25,\"n_prompt_tokens\":1891,\"n_prompt_tokens_processed\":0,\"n_prompt_tokens_cache\":0,\"params\":{\"seed\""
+      ],
+      "cuda_device": true,
+      "offloaded": "offloaded 36/36 layers to GPU",
+      "all_layers_on_gpu": true,
+      "no_kernel_image": false,
+      "gpu_delta_mib": 2697,
+      "model_buffer_mib": {
+       "CUDA0": 2342.3,
+       "CPU": 408.0
+      },
+      "runs_on_gpu": true,
+      "answers_ok": true,
+      "ok": true,
+      "answers": [
+       {
+        "name": "short",
+        "seconds": 10.24,
+        "prompt_tokens": 22,
+        "completion_tokens": 7,
+        "finish": "stop",
+        "timings": {
+         "prompt_per_second": 2.1,
+         "predicted_per_second": 41.9
+        },
+        "has_reasoning": false,
+        "thinking_marks": false,
+        "japanese": true
+       },
+       {
+        "name": "long",
+        "seconds": 1.12,
+        "prompt_tokens": 1860,
+        "completion_tokens": 32,
+        "finish": "stop",
+        "timings": {
+         "prompt_per_second": 2889.6,
+         "predicted_per_second": 66.1
+        },
+        "has_reasoning": false,
+        "thinking_marks": false,
+        "japanese": true
+       },
+       {
+        "name": "long_again",
+        "seconds": 0.48,
+        "prompt_tokens": 1860,
+        "completion_tokens": 32,
+        "finish": "stop",
+        "timings": {
+         "prompt_per_second": 53.4,
+         "predicted_per_second": 67.6
+        },
+        "has_reasoning": false,
+        "thinking_marks": false,
+        "japanese": true
+       }
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "verdict": "起動・GPU で動く・答えが使える の 3 点とも合格（配布版・作り直し不要）",
+ "gpu_evidence": "offloaded 36/36 layers to GPU・CUDA0 model buffer 2,342.30 MiB（CPU 側は CPU_Mapped 2,380 + 408 MiB。入力側の埋め込みは常に CPU）",
+ "peak_note": "最大 2,697 MiB は文脈 4096・検索なしの仮の値。Step 2 の V の判定ではない",
+ "next": "Step 2 の測定を llama-server（--reasoning off）向けに合わせて流す"
+}
