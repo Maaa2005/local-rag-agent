@@ -1,0 +1,238 @@
+{
+ "step": "1",
+ "source": "Colab のセル出力と、測定直後にセル出力へ控えた 12GB の回答（raw.jsonl・report.md・run_meta.json）から作った。回答はリポジトリに入れない",
+ "notebook": "evaluation/colab/step1_measure.ipynb @ 387bc20",
+ "ran_at_jst": "2026-10-23 10:14頃-10:38（8GB 起動失敗 10:16・12GB 測定 10:18-10:23・採点役 〜10:33・G0 〜10:38）",
+ "gpu": "Tesla T4",
+ "compute_cap": "7.5",
+ "total_mib": 15360,
+ "baseline_mib": 0,
+ "vllm": "0.32.0",
+ "model": "sbintuitions/sarashina2.2-3b-instruct-v0.1",
+ "model_revision": "4f3626fb1b64b3e97c908e67f27b2d627ba2a999",
+ "dtype": "float16",
+ "embedding": "intfloat/multilingual-e5-large (CPU)",
+ "rerank": "off",
+ "index": {
+  "documents": 13,
+  "chunks": 40,
+  "seconds": 123.6
+ },
+ "measure": {
+  "max_model_len": 8192,
+  "gpu_util": 0.85,
+  "max_prompt_tokens": 1686,
+  "max_id": "N07",
+  "n": 62,
+  "needed_max_model_len": 3072,
+  "dtype": "float16"
+ },
+ "n_questions": 62,
+ "runs": [
+  {
+   "label": "8GB",
+   "gpu_util": 0.5,
+   "started": false,
+   "budget_mib": 7680,
+   "error": "No available memory for the cache blocks（10-23 01:16:01 UTC・EngineCore failed to start）",
+   "ok": null
+  },
+  {
+   "label": "12GB",
+   "gpu_util": 0.76,
+   "started": true,
+   "ready_seconds": 117,
+   "peak_mib": 11555,
+   "budget_mib": 11776,
+   "all_answered": true,
+   "longest_ok": true,
+   "no_oom": true,
+   "no_preemption": true,
+   "within_budget": true,
+   "ok": true,
+   "missing": [],
+   "run_seconds": 341,
+   "started_at": "2026-10-23T01:18:13Z",
+   "finished_at": "2026-10-23T01:23:45Z",
+   "git_head": "387bc207da6b307dd063e4d7a7f929dedc393d84",
+   "git_dirty": false
+  }
+ ],
+ "no_judge_12GB": {
+  "answer_failures": 0,
+  "recall_at_5": 1.0,
+  "mrr": 0.99,
+  "correctness": 0.81,
+  "permission": 1.0,
+  "refusal": {
+   "rate": 0.06,
+   "ok": 1,
+   "targets": 16,
+   "line": ">= 0.95",
+   "note": "拒否の判定は決まった言い方（「資料には含まれていません」など 6 種）が回答に入っているかで見る。指示文は「その情報は現在の資料には含まれていません」と答えるよう求めているが、多くの回答は「【参考情報】の中には…含まれていません」などと言い換えており、一般論で答えた問もある。判定の決まりは変えない"
+  }
+ },
+ "P": {
+  "source": "12GB の回答（--no-judge）の問ごとの時間から計算。合否は計画どおり 50 問で読む",
+  "q50": {
+   "retrieval_p50": 0.53,
+   "ftl_p50": 1.78,
+   "ftl_p95": 1.99,
+   "total_p50": 4.56,
+   "total_p50_8gb_equiv": 5.04,
+   "over_15s_8gb_equiv": [
+    "Q001 20.76",
+    "Q040 19.49"
+   ],
+   "max_8gb_equiv": 20.76,
+   "max_total": 19.67
+  },
+  "q62": {
+   "retrieval_p50": 0.54,
+   "ftl_p50": 1.78,
+   "ftl_p95": 2.16,
+   "total_p50": 4.16,
+   "total_p50_8gb_equiv": 4.57,
+   "over_15s_8gb_equiv": [
+    "Q001 20.76",
+    "Q040 19.49"
+   ],
+   "max_8gb_equiv": 20.76,
+   "max_total": 19.67
+  },
+  "P1_ftl_p50_le_5": true,
+  "P3_12GB_total_p50_le_15": true,
+  "P3_8GB_equiv_total_p50_le_15": true,
+  "note": "Q001 は最初の問で、検索の初回の準備 8.21 秒を含む。8GB は起動しなかったので、8GB 換算は 12GB の時間からの予測"
+ },
+ "N": {
+  "ok": 9,
+  "n": 12,
+  "wrong": [
+   "N02",
+   "N06",
+   "N07"
+  ],
+  "pass": false,
+  "note": "N02・N07 は 10/22 の試運転でも不一致"
+ },
+ "judge": {
+  "role": "real-judge",
+  "quant": "AWQ 4bit",
+  "max_model_len": 8192,
+  "gpu_util": 0.85,
+  "fixture_sha256": "e77b2ab0e814d1358d9796b1b1d91374acf7338cfdbf39e57cca5cd017665291",
+  "tried": [
+   {
+    "model": "casperhansen/mistral-nemo-instruct-2407-awq",
+    "revision": "c83b6438e13051ad1c0f5683635705ee83bb8772",
+    "started": true,
+    "ready_seconds": 285,
+    "precheck": "fail",
+    "precheck_rc": 1,
+    "precheck_lines": [
+     "faithfulness: faithful > unsupported: 1.0 vs 0.0 → True",
+     "faithfulness: faithful > opposite: 1.0 vs 0.0 → True",
+     "faithfulness: faithful > partial: 1.0 vs 1.0 → False",
+     "answer_relevance: faithful > refusal: 1.0 vs 1.0 → False"
+    ],
+    "broken_scores": "なし",
+    "partial_sentence_grounded": [
+     1,
+     1
+    ]
+   },
+   {
+    "model": "elyza/Llama-3-ELYZA-JP-8B-AWQ",
+    "revision": "85c3670a70d1e53bb4faa3f01c3ac2878f4a3fcd",
+    "started": true,
+    "ready_seconds": 210,
+    "precheck": "fail",
+    "precheck_rc": 1,
+    "precheck_lines": [
+     "faithfulness: faithful > unsupported: 1.0 vs 0.0 → True",
+     "faithfulness: faithful > opposite: 1.0 vs 0.0 → True",
+     "faithfulness: faithful > partial: 1.0 vs 1.0 → False",
+     "answer_relevance: faithful > refusal: 1.0 vs 1.0 → False"
+    ],
+    "broken_scores": "なし",
+    "partial_sentence_grounded": [
+     1,
+     0,
+     1
+    ]
+   }
+  ],
+  "precheck": "fail",
+  "skipped": "採点役の候補がどれも確認を通らないので採点しない（回答は手元に控えてあり、資料の本文も入っているので、採点役を決めれば回答を作り直さずに採点できる）",
+  "note": "2 つとも「一部だけ誤り」と「根拠があるのに拒否」に満点を付けた。拒否の例の根拠コメントは 2 つとも第 6 条の中身を述べ、拒否の文には触れていない。ELYZA は一部だけ誤りの例で主張ごとの判定に誤りの 1 文（0）を付けたが、faithfulness は 1.0 にした。確認の 5 例と確認のコードは 3f0b5bf（10/20）から変わっておらず、Step 0.5 で sarashina2.2-3b が通った物と同じ"
+ },
+ "judged": {},
+ "Q": {
+  "read": false,
+  "reason": "採点役が確認を通らず、M4・M6 は測れていない",
+  "judge_free": {
+   "M7_permission": 1.0,
+   "M8_refusal": "1/16"
+  },
+  "fails_regardless": "M8 は採点役を使わない拒否の判定で 1/16（線は 16/16）なので、どの採点役で採点しても Q は不合格",
+  "refusal_breakdown": {
+   "決まった言い方で断った": [
+    "Q041"
+   ],
+   "言い方は違うが断った": [
+    "Q010",
+    "Q011",
+    "Q012",
+    "Q013",
+    "Q042",
+    "Q046",
+    "Q047",
+    "Q048",
+    "Q050"
+   ],
+   "資料にないと言いつつ一般論で答えた": [
+    "Q039",
+    "Q040",
+    "Q043",
+    "Q045",
+    "Q049"
+   ],
+   "資料にないと言わずに答えた": [
+    "Q044"
+   ],
+   "note": "人が回答を読んで分けた。言い方は違うが断った 9 問のうち Q047・Q050 は一般論を 1〜2 文添えている"
+  }
+ },
+ "g0": {
+  "rc": 0,
+  "ok": true,
+  "config": {
+   "budget": "12GB",
+   "rerank": false,
+   "timeout_s": 15,
+   "max_model_len": 3072
+  },
+  "overall": "PASS",
+  "result_file_in_runtime": "/content/step1/g0_work/rag_check_result.json（手元に落ちず。下の行はセル出力の写し）",
+  "lines": [
+   "[PASS] 1 二問続けて回答",
+   "[PASS] 2 権限外の文書が出ない: 7 問 / 漏れ なし / 不明ID なし / held 0 問",
+   "[PASS] 2b 上位ユーザーには上位文書が出る（対照）",
+   "[PASS] 4 vLLM 固まる: held/generate TimeoutError / 15.5 秒（上限 15 秒）",
+   "[PASS] 4 vLLM 固まる の後に戻る: 13.5 秒",
+   "[PASS] 4 Qdrant 固まる: held/retrieve / 5.5 秒",
+   "[PASS] 4 Qdrant 固まる の後に戻る: 13.5 秒",
+   "[PASS] 4 vLLM 停止: held/generate APIConnectionError / 1.8 秒",
+   "[PASS] 4 Qdrant 停止: held/retrieve / 0.5 秒",
+   "[PASS] 3 監査に本文が残らない: run 17 件 / 調べた本文 51 個 / 行に 0 個・ファイルに 0 個 / 根拠の文書ID あり",
+   "[INFO] 5 時間（回答できた 13 問）: 検索 中央 0.51 / 最大 0.58 秒, 生成 中央 6.10 / 最大 13.06 秒"
+  ]
+ },
+ "verdict": "不合格（V の 8GB・N 9/12・Q の M8 1/16。どれも採点役に関係しない）。基準線として記録する",
+ "lost": [
+  "step1_results.zip（Colab 上で作成されたが手元に落ちなかった）",
+  "judge_precheck_*.json（セル出力に全文あり）",
+  "vllm_*.log"
+ ]
+}
