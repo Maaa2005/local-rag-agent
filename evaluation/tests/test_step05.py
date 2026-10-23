@@ -453,7 +453,9 @@ def test_step2_notebook_collects_answers_without_judge():
     used = set(re.findall(r"\bs5\.(\w+)", code))
     assert sorted(n for n in used if not hasattr(step05, n)) == []
     assert "adjusted_gpu_util" not in used and "trial_ids" not in used
-    assert 'MODEL = "LiquidAI/LFM2.5-1.2B-JP-202606"' in code
+    # 候補は計画 §3 の順に MODEL だけ替えて流す（第 1 は f95786e で流した）
+    assert re.findall(r'^MODEL = "([^"]+)"$', code, re.M) == ["Qwen/Qwen3-4B-Instruct-2507"]
+    assert "EXTRA_ARGS = []" in code
     # 10/23 に人手採点へ切り替えたので採点役は起動しない（回答はセルの出力と zip に残す）
     assert "JUDGE_CANDIDATES = []" in code and "s5.judge_cmd" not in code
     assert '"role": "human"' in code and '"step": "2"' in code
