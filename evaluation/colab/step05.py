@@ -212,6 +212,77 @@ def scan_vllm_log(text: str, keep: int = 20) -> dict:
     }
 
 
+# llama-server (b11836) の記録。行の出どころは docs/v2-light-model-plan.md §4 の Gemma の測り方。
+# プールの「alloc ... failed, flushing ... retrying」はやり直すだけのデバッグ行なので、裸の failed は拾わない。
+_LLAMA_OOM = re.compile(r"cudaMalloc failed|CUDA error|failed to allocate|failed to reserve memory|out of memory",
+                        re.IGNORECASE)
+_LLAMA_OVERFLOW = re.compile(
+    r"slot context shift|context shift is disabled|running out of context capacity"
+    r"|exceeds the available context size|larger than the max context size|truncated = 1\b")
+_LLAMA_DECODE = re.compile(r"slot decode token, .*?n_ctx = (\d+)")
+
+
+def scan_llama_log(text: str, keep: int = 20, width: int = 300) -> dict:
+    """llama-server の記録から確保の失敗と文脈あふれの行を拾う。
+
+    llama-server は KV の追い出しをしないので、"preempt" には文脈あふれの行を入れる (trial_checks にそのまま渡せる)。
+    debug_active は 1 トークンごとのデバッグ行の数。0 なら文脈あふれの一部 (DBG の行) を確かめられていない。
+    """
+    lines = text.splitlines()
+    n_ctx: set[int] = set()
+    debug = 0
+    for ln in lines:
+        m = _LLAMA_DECODE.search(ln)
+        if m:
+            debug += 1
+            n_ctx.add(int(m.group(1)))
+    return {
+        "oom": [ln[:width] for ln in lines if _LLAMA_OOM.search(ln)][:keep],
+        "preempt": [ln[:width] for ln in lines if _LLAMA_OVERFLOW.search(ln)][:keep],
+        "debug_active": debug,
+        "slot_n_ctx": sorted(n_ctx),
+    }
+
+
+def llama_preempt_delta(log_scan: dict) -> int | None:
+    """trial_checks の preempt_delta の代わり。デバッグ行が無ければ確かめられないので None (未判定)。"""
+    if not log_scan.get("debug_active"):
+        return None
+    return len(log_scan.get("preempt") or [])
+
+
+_OFFLOAD = re.compile(r"offloaded (\d+)/(\d+) layers to GPU")
+_BUFFER = re.compile(r"(CUDA\d+|CPU)\S* model buffer size =\s*([\d.]+) MiB")
+
+
+def llama_gpu_check(log: str) -> dict:
+    """起動の記録から、全層が GPU に載り GPU 側に重みがあるかを見る。"""
+    off = _OFFLOAD.findall(log)
+    buffers: dict[str, float] = {}
+    for name, mib in _BUFFER.findall(log):
+        buffers[name] = buffers.get(name, 0.0) + float(mib)
+    on, total = (int(off[-1][0]), int(off[-1][1])) if off else (None, None)
+    all_on = on is not None and total > 0 and on == total
+    cuda_mib = sum(v for k, v in buffers.items() if k.startswith("CUDA"))
+    return {
+        "offloaded": f"{on}/{total}" if off else None,
+        "all_layers_on_gpu": all_on,
+        "model_buffers_mib": buffers,
+        "no_kernel_image": "no kernel image" in log,
+        "ok": all_on and cuda_mib > 0 and "no kernel image" not in log,
+    }
+
+
+def llama_server_argv(server_bin: str, gguf_path: str, port: int, ctx: int,
+                      alias: str = "local-llm", extra=()) -> list[str]:
+    """llama-server の引数。1 枠・全層 GPU・同梱の会話の形・考える文は切る・デバッグ記録あり。"""
+    return [
+        server_bin, "-m", gguf_path, "-ngl", "999", "-c", str(ctx),
+        "--jinja", "--reasoning", "off", "-np", "1", "--alias", alias,
+        "--host", "127.0.0.1", "--port", str(port), "-v",
+    ] + list(extra)
+
+
 def metric_lines(text: str, word: str = "preempt") -> list[str]:
     """/metrics の中で word を含む行 (版で名前が違うので、ノートで実物を表示する用)。"""
     return [ln for ln in text.splitlines() if word in ln]

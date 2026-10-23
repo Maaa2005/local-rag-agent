@@ -240,6 +240,16 @@ Colab の実行記録（Step 0.5）:
   - 慣らしの 1 問は 25.7 秒、短い問も 10.24 秒かかった（起動直後の 1・2 問目）。Step 2 では本番の前に慣らしを入れる。
   - GPU の最大使用量は 2,697 MiB（文脈 4096・検索なしの仮の値。V の判定ではない）。
   - 次: Step 2 の測定を llama-server（`--reasoning off`）向けに合わせ、同じ線で測る。
+- 10/23（Step 2 の Gemma の測り方・**結果を見る前に固定**）: ノートは `evaluation/colab/step2_measure_llamacpp.ipynb`。Step 2 のノートから vLLM を llama-server（b11836 配布版・Q8_0・`-ngl 999 --jinja --reasoning off -np 1 -v`）に替えただけで、問・索引・検索・指示文・出力の上限 1024・温度 0.1・線は変えない。
+  - 文脈長: 測定用に文脈 8192 で起動し、出力 1 トークンで 62 問を流して必要な文脈長を出す（vLLM と同じ計算）。
+  - 8GB・12GB: 同じ設定（文脈 = 必要な文脈長）で 1 回ずつ起動し直し、それぞれの最大 MiB をそれぞれの予算で判定する。llama.cpp には util のような上限が無いので、§1 V どおり実測の最大値で判定する。2 つの回の答えの違いは乱れだけ。
+  - 起動ごと: GPU で動く確認（全層が GPU・GPU 側の重みが 0 より大きい）。通らなければその回は不合格。慣らしを 1 問入れ、数えない。
+  - 流す前に 1 回だけ、本番と同じ呼び方（逐次受け取り・使用量付き）で 1 問送る。入力トークン数が返ること、答えが本文の欄に入り考える文の欄が空なことを確かめ、通らなければ止める。
+  - V の「メモリ不足なし」: 記録に `cudaMalloc failed`・`CUDA error`・`failed to allocate`・`failed to reserve memory`・`out of memory` が無いこと（b11836 の ggml-cuda.cu 102–110・953、ggml-backend.cpp・ggml-alloc.c・llama-context.cpp の確保失敗の行）。プールの `alloc ... failed, flushing ... retrying` は確保をやり直すだけのデバッグ行なので数えない。
+  - V の「KV の追い出しなし」の代わり: llama-server は追い出しをしないので、文脈あふれが無いことで見る（`slot context shift`・`running out of context capacity`・`exceeds the available context size`・`larger than the max context size`・`truncated = 1`。server-context.cpp 618・2145・3696・3962–3976）。デバッグの記録（`slot decode token` の行）が出ていなければ確かめられないので未判定にし、合格扱いにしない。その行の `n_ctx` が必要な文脈長と一致するかも記録する。
+  - 第 1・第 2 候補との違い（比べるときに必ず書く）: 重みが Q8_0 の量子化、実行が vLLM でなく llama.cpp b11836、温度 0.1 以外の選び方（top_k など）は llama.cpp の既定、会話の形は GGUF 同梱の物、考える文は切る、慣らしを入れる。
+  - G0 は 12GB の設定で llama-server に向けて流す（止める試験は llama-server の工程を止める）。人手採点の用紙は下の決まり（Step 2 の測定前に固定）どおり自動で決める。
+  - Sol とは協議していない（Step 0.5 で決めた方針の実装で、流し直しは安い）。
 
 Colab の実行記録（Step 1）:
 
@@ -284,7 +294,7 @@ Colab で気を付ける事:
 - 4060 より帯域の低い 8GB カードでの速さ
 - 確認に通る採点役があるか（phi-4 14B・Mistral-Nemo 12B・ELYZA-JP 8B の AWQ 4bit は T4 で起動したが、10/22・10/23 にどれも旧の確認に通らなかった。3 つがそろって落ちた理由も未確認）。10/23 の協議で採点方法を M4-S に改め、10/23 に本人が承認した（§4 の実行記録）。新しい確認（11 例 × 2 回）にも ELYZA-JP・Mistral-Nemo は 10/23 に通らず（書式の崩れと判定の誤りの両方）、人手採点に切り替えた。そろって崩れる理由は未確認
 - 人手で採点するとき、最大 200 回答を 11/7 までに読み切れるか（1 回答 3 分は未実測）
-- Gemma 4 が llama.cpp で T4 で起動するか
+- ~~Gemma 4 が llama.cpp で T4 で起動するか~~ → 10/23 に確かめた（fd73b36・全層が GPU・§4 Step 0.5 の記録）
 - seed を送らないことの影響（2 回の合否で見る）
 - sarashina2.2-3b と japanese-reranker-xsmall-v2 のライセンス
 
@@ -323,3 +333,5 @@ Colab で気を付ける事:
   - 線 0.90 は保つが、点の単位が主張ごとの比から文ごとの 0/1 に変わるので、厳しさは変わり得る（緩くなるか厳しくなるかは未確認）。旧 M4 と数値の互換は言わない。
   - 変更の前に、本番の回答の M4・M4-S は計算していない（保存した基準線の回答を含む）。
   - 基準線 sarashina2.2-3b（387bc20）の合否はこの変更で変わらない。V の 8GB・N 9/12・Q の M8 1/16 で、採点役と関係なく不合格。
+- **2026-10-23・測定前**
+  - Step 2 の Gemma 4 E2B-it を llama-server で測る決まりを足した（§4 Step 0.5 の記録の下）。線は変えていない。vLLM の「KV の追い出し」の代わりを文脈あふれの記録で見る。確かめられないときは未判定で、合格扱いにしない。

@@ -484,3 +484,106 @@ def test_numbers_only_drops_text_and_summarises_times(tmp_path):
     text = json.dumps(out, ensure_ascii=False)
     assert "本文" not in text and "回答" not in text and "content" not in text
     assert out["rows"][2] == {"id": "Q3", "category": "c", "error": "timeout", "total_latency": 99.0}
+
+
+# ─── Step 2 の Gemma (llama-server) ─────────────────────────────
+LLAMA_LOG = """\
+load_tensors: offloaded 36/36 layers to GPU
+load_tensors:        CUDA0 model buffer size =  2342.30 MiB
+load_tensors:   CPU_Mapped model buffer size =  2380.00 MiB
+load_tensors:   CPU_Mapped model buffer size =   408.00 MiB
+ggml_cuda_pool: alloc 1048576 failed, flushing and retrying
+slot update_slots: id  0 | task 3 | slot decode token, id=12, n_ctx = 3584, n_tokens = 2001, truncated = 0
+slot update_slots: id  0 | task 3 | slot decode token, id=13, n_ctx = 3584, n_tokens = 2002, truncated = 0
+"""
+
+
+def test_scan_llama_log_clean_run_with_debug():
+    found = step05.scan_llama_log(LLAMA_LOG)
+    assert found == {"oom": [], "preempt": [], "debug_active": 2, "slot_n_ctx": [3584]}  # プールのやり直しは拾わない
+    assert step05.llama_preempt_delta(found) == 0
+
+
+@pytest.mark.parametrize("line", [
+    "ggml_backend_cuda_buffer_type_alloc_buffer: allocating 512.00 MiB on device 0: cudaMalloc failed: out of memory",
+    "CUDA error: out of memory",
+    "llama_init_from_model: failed to allocate compute buffers",
+    "graph_reserve: failed to reserve memory",
+])
+def test_scan_llama_log_finds_oom(line):
+    assert step05.scan_llama_log(LLAMA_LOG + line + "\n")["oom"] == [line]
+
+
+@pytest.mark.parametrize("line", [
+    "slot context shift, n_keep = 0, n_left = 10, n_discard = 5",
+    "stopped due to running out of context capacity, prompt.n_tokens() = 3583, task.n_tokens = 3000, n_gen = 583, n_ctx = 3584",
+    "request (4000 tokens) exceeds the available context size (3584 tokens), try increasing it",
+    "input (4000 tokens) is larger than the max context size (3584 tokens). skipping",
+    "slot decode token, id=1, n_ctx = 3584, n_tokens = 3584, truncated = 1",
+])
+def test_scan_llama_log_finds_overflow(line):
+    found = step05.scan_llama_log(LLAMA_LOG + line + "\n")
+    assert found["preempt"] == [line]
+    assert step05.llama_preempt_delta(found) == 1
+
+
+def test_llama_overflow_unknown_without_debug_lines(tmp_path):
+    found = step05.scan_llama_log("load_tensors: offloaded 36/36 layers to GPU\n")
+    assert found["debug_active"] == 0 and step05.llama_preempt_delta(found) is None
+    raw = tmp_path / "raw.jsonl"
+    raw.write_text(json.dumps({"id": "Q1", "error": None}) + "\n", encoding="utf-8")
+    checks = step05.trial_checks(raw, ["Q1"], "Q1", {"within_budget": True},
+                                 step05.llama_preempt_delta(found), found, note="n")
+    assert checks["no_preemption"] is None and checks["ok"] is None  # 確かめられない時は合格にしない
+
+
+def test_llama_gpu_check():
+    ok = step05.llama_gpu_check(LLAMA_LOG)
+    assert ok["ok"] and ok["offloaded"] == "36/36"
+    assert ok["model_buffers_mib"] == {"CUDA0": 2342.30, "CPU": 2788.0}
+    part = step05.llama_gpu_check("offloaded 20/36 layers to GPU\nCUDA0 model buffer size = 100.00 MiB\n")
+    assert not part["ok"] and not part["all_layers_on_gpu"]
+    assert not step05.llama_gpu_check("CPU model buffer size = 100.00 MiB\n")["ok"]
+    assert not step05.llama_gpu_check(LLAMA_LOG + "no kernel image is available\n")["ok"]
+
+
+def test_llama_server_argv():
+    argv = step05.llama_server_argv("/b/llama-server", "/g/m.gguf", 8001, 3584)
+    joined = " ".join(argv)
+    assert argv[:3] == ["/b/llama-server", "-m", "/g/m.gguf"]
+    for part in ("-ngl 999", "-c 3584", "--jinja", "--reasoning off", "-np 1", "--alias local-llm", "--port 8001", "-v"):
+        assert part in joined
+
+
+LLAMA_NOTEBOOK = NOTEBOOK.with_name("step2_measure_llamacpp.ipynb")
+
+
+def test_step2_llamacpp_notebook_measures_gemma_on_same_lines():
+    nb = json.loads(LLAMA_NOTEBOOK.read_text(encoding="utf-8"))
+    assert nb["metadata"]["colab"]["gpuType"] == "T4"
+    cells = _notebook_code(LLAMA_NOTEBOOK)
+    for i, src in enumerate(cells):
+        ast.parse(src, filename=f"step2_measure_llamacpp.ipynb セル {i}")
+    code = "\n".join(cells)
+    used = set(re.findall(r"\bs5\.(\w+)", code))
+    assert sorted(n for n in used if not hasattr(step05, n)) == []
+    # vLLM の起動・割合は使わず、llama 用の起動・記録の読み方・GPU の確認を使う
+    assert {"llama_server_argv", "scan_llama_log", "llama_gpu_check", "llama_preempt_delta",
+            "trial_checks", "gpu_mem_record", "needed_max_model_len"} <= used
+    assert "vllm_argv" not in used and "adjusted_gpu_util" not in used
+    # 重みと llama.cpp は固定（Step 0.5 で T4 の全層 GPU を確かめた物）
+    assert 'GGUF_FILE = "gemma-4-E2B-it-Q8_0.gguf"' in code
+    assert 'GGUF_REV = "6938c58e698502037401a5f19f6905f2fb2f7dee"' in code
+    assert 'LLAMA_TAG = "b11836"' in code
+    assert "EXTRA_ARGS = []" in code and "JUDGE_CANDIDATES = []" in code and "s5.judge_cmd" not in code
+    assert '"role": "human"' in code and '"step": "2"' in code
+    # 流し読みの事前確認が通らなければ止める
+    assert 'raise RuntimeError("流し読みの事前確認が通らない' in code
+    measure_at = next(i for i, c in enumerate(cells) if "P_{budget}_JSON" in c)
+    dump_at = next(i for i, c in enumerate(cells) if "ANSWERS_B64_BEGIN" in c)
+    g0_at = next(i for i, c in enumerate(cells) if "rag_connection_check.py" in c)
+    summary_at = next(i for i, c in enumerate(cells) if "summary.json" in c)
+    assert measure_at < dump_at < g0_at < summary_at
+    assert '"--rerank", "off"' in cells[g0_at]
+    zip_cell = "".join(next(c["source"] for c in nb["cells"] if "zip -qr" in "".join(c["source"])))
+    assert "step2g_results.zip step2g " in zip_cell
