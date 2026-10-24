@@ -145,7 +145,8 @@ def test_v1_retriever_finds_indexed_chunks_with_dataset_paths(ci, monkeypatch):
 
 
 def _cli_args(tmp_path):
-    return Namespace(repo=ROOT, work=tmp_path / "work", qdrant_url="http://127.0.0.1:6333", collection="eval_test")
+    return Namespace(repo=ROOT, work=tmp_path / "work", qdrant_url="http://127.0.0.1:6333", collection="eval_test",
+                     corpus=CORPUS)
 
 
 def _match_cli_settings(monkeypatch, a):
@@ -192,6 +193,33 @@ def test_run_writes_counts_after_indexing(ci, monkeypatch, tmp_path):
     assert info["documents"] == N_DOCS
     assert info["chunks"] > N_DOCS
     assert info["env"] == ci.index_env(a.work, a.qdrant_url, "eval_test")
+
+
+def test_run_indexes_the_corpus_given_by_option(ci, monkeypatch, tmp_path):
+    """--corpus で別のコーパス (開発用の数の比べ) だけを載せ、本番のコーパスは混ざらない。"""
+    a = _cli_args(tmp_path)
+    a.corpus = ROOT / "evaluation" / "v2" / "corpus_nx_dev"
+    _match_cli_settings(monkeypatch, a)
+
+    import app.services.qdrant
+    from qdrant_client import AsyncQdrantClient
+
+    async def scenario():
+        monkeypatch.setattr(app.services.qdrant, "_client", AsyncQdrantClient(location=":memory:"))
+        return await ci._run(a)
+
+    info = asyncio.run(scenario())
+    assert info["documents"] == len(list((a.corpus / "general").glob("*.md")))
+    assert info["corpus"] == str(a.corpus)
+
+
+def test_main_defaults_corpus_and_refuses_folder_without_levels(ci, monkeypatch, tmp_path):
+    assert ci.parse_args(["--repo", ".", "--work", "w", "--collection", "c"]).corpus is None
+    monkeypatch.delenv("QDRANT_COLLECTION", raising=False)
+    with pytest.raises(SystemExit, match="general/manager/executive"):
+        ci.main(["--repo", str(ROOT), "--work", str(tmp_path / "w"), "--collection", "eval_test",
+                 "--corpus", str(tmp_path)])
+    assert "QDRANT_COLLECTION" not in os.environ
 
 
 def test_main_refuses_existing_app_db(ci, monkeypatch, tmp_path):

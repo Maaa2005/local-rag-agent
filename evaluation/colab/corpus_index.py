@@ -11,6 +11,9 @@ CLI (評価とは別のプロセスで 1 回だけ流す。vLLM を立てる前�
         --qdrant-url http://127.0.0.1:6333 --collection eval_run1
 
 既に点がある集合・既にある app.db には載せない (前の索引と混ざると数え直せないため)。
+
+--corpus で別のコーパス (例: evaluation/v2/corpus_nx_dev) を載せられる。既定は evaluation/corpus。
+別のコーパスは別の --work・--collection に載せ、本番の 50 問・N 12 問の索引と混ぜない。
 """
 from __future__ import annotations
 
@@ -114,6 +117,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--work", required=True, type=Path, help="DATA_DIR はこの下の data/")
     p.add_argument("--qdrant-url", default="http://127.0.0.1:6333")
     p.add_argument("--collection", required=True)
+    p.add_argument("--corpus", type=Path, default=None,
+                   help="載せるコーパス (既定は <repo>/evaluation/corpus)。下に general/manager/executive を持つ")
     return p.parse_args(argv)
 
 
@@ -133,7 +138,7 @@ async def _run(a: argparse.Namespace) -> dict:
             raise SystemExit(f"集合 {a.collection} に既に点がある (前の索引と混ざるので拒否)。別の名前を使う")
 
         t0 = time.monotonic()
-        chunks, doc_level, _ = await index_corpus(a.repo / "evaluation" / "corpus")
+        chunks, doc_level, _ = await index_corpus(a.corpus)
         seconds = round(time.monotonic() - t0, 1)
         counted = await count_index()
     finally:
@@ -145,6 +150,7 @@ async def _run(a: argparse.Namespace) -> dict:
         raise SystemExit(f"載せた数と数え直した数が合わない: chunks={chunks} docs={n_docs} counted={counted}")
     return {
         "env": env,
+        "corpus": str(a.corpus),
         "documents": n_docs,
         "chunks": chunks,
         "seconds": seconds,
@@ -159,6 +165,9 @@ def main(argv: list[str] | None = None) -> int:
     a = parse_args(argv)
     # index.json の場所は評価側 (別の cwd) でも使うので絶対パスにする
     a.repo, a.work = a.repo.resolve(), a.work.resolve()
+    a.corpus = (a.corpus or a.repo / "evaluation" / "corpus").resolve()
+    if not any((a.corpus / folder).is_dir() for folder in LEVELS):
+        raise SystemExit(f"{a.corpus} の下に general/manager/executive が無い")
     db_path = a.work / "data" / "app.db"
     if db_path.exists():
         raise SystemExit(f"{db_path} が既にある (前の索引の documents 行と混ざるので拒否)。空の --work を使う")
