@@ -553,6 +553,19 @@ def test_llama_server_argv():
     assert argv[:3] == ["/b/llama-server", "-m", "/g/m.gguf"]
     for part in ("-ngl 999", "-c 3584", "--jinja", "--reasoning off", "-np 1", "--alias local-llm", "--port 8001", "-v"):
         assert part in joined
+    assert "--reasoning-budget" not in joined
+
+
+def test_llama_server_argv_with_reasoning_budget():
+    argv = step05.llama_server_argv("/b/llama-server", "/g/m.gguf", 8001, 3584, reasoning_budget=80)
+    joined = " ".join(argv)
+    assert "--reasoning on --reasoning-budget 80" in joined
+    assert "--reasoning off" not in joined
+    for part in ("-ngl 999", "-c 3584", "--jinja", "-np 1", "--alias local-llm", "--port 8001", "-v"):
+        assert part in joined
+    for bad in (0, -1):
+        with pytest.raises(ValueError):
+            step05.llama_server_argv("/b/llama-server", "/g/m.gguf", 8001, 3584, reasoning_budget=bad)
 
 
 LLAMA_NOTEBOOK = NOTEBOOK.with_name("step2_measure_llamacpp.ipynb")
@@ -572,8 +585,17 @@ def test_step2_llamacpp_notebook_measures_gemma_on_same_lines():
             "trial_checks", "gpu_mem_record", "needed_max_model_len"} <= used
     assert "vllm_argv" not in used and "adjusted_gpu_util" not in used
     # 重みと llama.cpp は固定（Step 0.5 で T4 の全層 GPU を確かめた物）
-    assert 'GGUF_FILE = "gemma-4-E2B-it-Q8_0.gguf"' in code
-    assert 'GGUF_REV = "6938c58e698502037401a5f19f6905f2fb2f7dee"' in code
+    # 10/24 追加探索の 3 番目: Qwen3.5-4B Q8_0（1 番目と同じ重み）を考え ON・80 トークンで打ち切り
+    assert 'GGUF_FILE = "Qwen3.5-4B-Q8_0.gguf"' in code
+    assert 'GGUF_REV = "e87f176479d0855a907a41277aca2f8ee7a09523"' in code
+    assert "REASONING_BUDGET = 80" in code and "ANSWER_MAX_TOKENS = 1024 + REASONING_BUDGET" in code
+    assert code.count("extra=EXTRA_ARGS, reasoning_budget=REASONING_BUDGET)") == 2   # 起動とまとめの引数
+    # 出力の上限は考える文の分を足した値で、文脈の長さと回答の両方に使う
+    assert 'needed_max_model_len(STATS["max_prompt_tokens"], max_tokens=ANSWER_MAX_TOKENS)' in code
+    assert 'LLM_MAX_TOKENS=str(ANSWER_MAX_TOKENS)' in code
+    # 事前確認: 考える文が別に出て上限内・本文に結論の行・考える印なし
+    assert 'PRECHECK.get("reasoning_chars", 0) > 0' in code
+    assert "REASONING_BUDGET + PRECHECK_SLACK" in code and 'PRECHECK.get("has_conclusion")' in code
     assert 'LLAMA_TAG = "b11836"' in code
     assert "EXTRA_ARGS = []" in code and "JUDGE_CANDIDATES = []" in code and "s5.judge_cmd" not in code
     assert '"role": "human"' in code and '"step": "2"' in code
@@ -586,4 +608,4 @@ def test_step2_llamacpp_notebook_measures_gemma_on_same_lines():
     assert measure_at < dump_at < g0_at < summary_at
     assert '"--rerank", "off"' in cells[g0_at]
     zip_cell = "".join(next(c["source"] for c in nb["cells"] if "zip -qr" in "".join(c["source"])))
-    assert "step2g_results.zip step2g " in zip_cell
+    assert "step2q35on_results.zip step2q35on " in zip_cell

@@ -274,12 +274,21 @@ def llama_gpu_check(log: str) -> dict:
 
 
 def llama_server_argv(server_bin: str, gguf_path: str, port: int, ctx: int,
-                      alias: str = "local-llm", extra=()) -> list[str]:
-    """llama-server の引数。1 枠・全層 GPU・同梱の会話の形・考える文は切る・デバッグ記録あり。"""
+                      alias: str = "local-llm", extra=(), reasoning_budget: int | None = None) -> list[str]:
+    """llama-server の引数。1 枠・全層 GPU・同梱の会話の形・デバッグ記録あり。
+
+    reasoning_budget が None なら考える文は切る (--reasoning off)。数を渡すと考える文を入れ、
+    その数のトークンで打ち切る (--reasoning on --reasoning-budget N)。
+    """
+    if reasoning_budget is None:
+        reasoning = ["--reasoning", "off"]
+    elif reasoning_budget > 0:
+        reasoning = ["--reasoning", "on", "--reasoning-budget", str(reasoning_budget)]
+    else:
+        raise ValueError("考える文の上限は 1 以上")
     return [
-        server_bin, "-m", gguf_path, "-ngl", "999", "-c", str(ctx),
-        "--jinja", "--reasoning", "off", "-np", "1", "--alias", alias,
-        "--host", "127.0.0.1", "--port", str(port), "-v",
+        server_bin, "-m", gguf_path, "-ngl", "999", "-c", str(ctx), "--jinja", *reasoning,
+        "-np", "1", "--alias", alias, "--host", "127.0.0.1", "--port", str(port), "-v",
     ] + list(extra)
 
 
