@@ -342,6 +342,18 @@ def test_hold_other_requirement_unmet():
     held(decide(dq("2026年9月1日", "2026年9月10日", "領収書が分からない状態です。"), DEADLINE), "other_requirements:unmet")
 
 
+def test_other_requirement_holds_on_either_side_regardless_of_matters_for():
+    # matters_for は「前提として答えの文に書く側」だけを決める。満たさない／分からない・書かれていない時の保留は、
+    # どちらの側の結論でも、matters_for に関係なく効く（10/25 の採点で「any_false 側だけの確認」と読まれた点の固定）
+    assert DEADLINE["other_requirements"][0]["matters_for"] == "any_false"
+    held(decide(dq("2026年9月1日", "2026年9月20日", "領収書を紛失しました。"), DEADLINE), "other_requirements:unmet")
+    for mf in ("all_true", "any_false", "both"):
+        d = copy.deepcopy(DEADLINE)
+        d["other_requirements"][0].update(matters_for=mf, assume_met_if_unstated=False)
+        held(decide(dq("2026年9月1日", "2026年9月20日"), d), "other_requirements:unstated")
+        held(decide(dq("2026年9月1日", "2026年9月10日"), d), "other_requirements:unstated")
+
+
 def test_hold_other_requirement_unstated_when_not_assumable():
     d = copy.deepcopy(DEADLINE)
     d["other_requirements"][0]["assume_met_if_unstated"] = False
