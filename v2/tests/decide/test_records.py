@@ -68,8 +68,11 @@ def test_all_shipped_records_load_against_their_documents():
     from decide.engine import FileDocLookup
     root = Path(__file__).resolve().parents[3]
     lookup = FileDocLookup([root / "evaluation/corpus", root / "evaluation/v2/corpus_nx_dev"])
-    recs = load_records(root / "v2/decide/records", lookup)
-    assert len(recs) >= 12 and not [r.rule_id for r in recs if r.stale]
+    # 採点で OK の記録だけが records/ に残り verified.json に載る（NG は records_ng/）。表と一致しないと起動で止まる
+    recs = load_records(root / "v2/decide/records", lookup, require_verified=True)
+    table = json.loads((root / "v2/decide/records/verified.json").read_text(encoding="utf-8"))["records"]
+    assert recs and {r.rule_id for r in recs} == set(table) and not [r.rule_id for r in recs if r.stale]
+    assert not set(table) & {p.stem for p in (root / "v2/decide/records_ng").glob("R-*.json")}
 
 
 # ---- 構造の拒否

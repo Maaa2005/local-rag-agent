@@ -27,8 +27,18 @@ def rows():
 
 @pytest.fixture(scope="module")
 def results(rows):
-    # 確認済みの表（verified.json）はまだ無い記録を使うので、表なしで読む（評価には使えない）
-    return rdd.run_rows(rows, allow_unverified=True)
+    # 確認済みの表（verified.json）にある記録だけで読む（既定の経路）
+    return rdd.run_rows(rows)
+
+
+@pytest.fixture(scope="module")
+def results_with_rejected(rows, tmp_path_factory):
+    # 採点で NG になり records_ng/ へ移した記録も戻した全記録で、表なしで読む（比べるためだけ。評価には使えない）
+    d = tmp_path_factory.mktemp("all_records")
+    for src in (rdd.RECORDS_DIR, rdd.ROOT / "v2/decide/records_ng"):
+        for p in src.glob("R-*.json"):
+            (d / p.name).write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
+    return rdd.run_rows(rows, engine=rdd.make_engine(d, allow_unverified=True))
 
 
 def test_all_dev_rows_are_run_in_file_order(rows, results):
@@ -41,9 +51,22 @@ def test_dev_rows_decided_ones_are_all_correct_and_the_rest_are_holds(results):
     # 守る事: 答えた問は 1 問も外れていない（間違った結論を言い切らない）。答えなかった問は保留で、モデルだけの回答には回らない
     wrong = [(r["id"], r["got"], r["expected"]) for r in results if r["kind"] == "decided" and not r["correct"]]
     assert not wrong, wrong
-    assert {r["kind"] for r in results} <= {"decided", "held"}
+    assert {r["kind"] for r in results} <= {"decided", "held", "no_record"}
     assert any(r["kind"] == "decided" for r in results)
-    assert all(not r["correct"] for r in results if r["kind"] == "held")  # 開発用の問は「答えられる」問なので保留は不正解
+    assert all(not r["correct"] for r in results if r["kind"] != "decided")  # 開発用の問は「答えられる」問なので保留は不正解
+
+
+def test_no_record_only_where_the_record_was_rejected_by_grading(results, results_with_rejected):
+    # 7.2 の採点で NG の記録は表に載らず records_ng/ に移る。その分の問は記録なし（モデルだけの回答）に回る。
+    # 守る事: 記録なしに回るのは NG で外した記録の問だけで、それ以外の問の答えは全記録のときと同じ
+    rejected = {p.stem for p in (rdd.ROOT / "v2/decide/records_ng").glob("R-*.json")}
+    assert rejected
+    for a, b in zip(results, results_with_rejected, strict=True):
+        if a["kind"] == "no_record" and b["kind"] != "no_record":
+            assert b["rule_id"] in rejected, (a["id"], b["rule_id"])
+        elif b["rule_id"] not in rejected:
+            assert (a["kind"], a["hold_code"], a["got"]) == (b["kind"], b["hold_code"], b["got"]), a["id"]
+    assert not [r["id"] for r in results_with_rejected if r["kind"] == "no_record"]  # 全記録なら記録なしは出ない
 
 
 def test_answer_does_not_depend_on_grading_columns(rows):
@@ -97,8 +120,9 @@ def test_decision_record_is_one_per_row_with_id_and_correct(results):
     assert len(ids) == len(set(ids)) == 36
     for r in results:
         d = r["decision_record"]
-        assert d["correct"] is r["correct"] and d["doc_version"] and d["final_answer"] == (
+        assert d["correct"] is r["correct"] and d["final_answer"] == (
             None if r["kind"] != "decided" else d["final_answer"])
+        assert bool(d["doc_version"]) is (r["kind"] != "no_record")  # 記録なしの問だけ版が無い
 
 
 def test_main_writes_jsonl_outside_repo_and_refuses_inside(tmp_path, capsys):
