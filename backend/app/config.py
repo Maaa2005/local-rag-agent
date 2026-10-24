@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     chunk_overlap: int = 50
     retrieval_top_k: int = 5
 
+    # 質問の値と規程の条件の比べをコードでやり、【計算の結果】として LLM へ渡す。
+    # 既定は OFF (従来と同じ出力)。環境変数 NUMERIC_CHECK_ENABLED=true で ON。
+    numeric_check_enabled: bool = False
+
     # ファイルコピー途中の部分インデックスを防ぐための猶予秒数。
     # mtime からこの秒数未満しか経過していないファイルは処理を先送りする。
     index_settle_seconds: int = 10
