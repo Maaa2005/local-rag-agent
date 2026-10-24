@@ -1,0 +1,129 @@
+{
+  "rule_id": "R-expense-deadline",
+  "doc_path": "/watched/general/経費精算規程.md",
+  "doc_version": "560049797b6669e46fa4d4b52f545a4f3e00b56792f85ef668516eea53cd84c9",
+  "description": "経費精算は費用が発生した月の翌月10日までに申請する。過ぎた申請は原則として受理しない",
+  "supported": true,
+  "subject": {
+    "groups": [
+      [
+        "経費",
+        "精算"
+      ],
+      [
+        "受理",
+        "期限",
+        "締切",
+        "締め切り",
+        "提出"
+      ]
+    ],
+    "exclude": [
+      {
+        "terms": [
+          "出張",
+          "旅費",
+          "宿泊"
+        ],
+        "reason": "出張に伴う旅費・宿泊費は別の規程（出張旅費規程）が定める",
+        "evidence": {
+          "quote": "出張に伴う旅費および宿泊費は「出張旅費規程」による",
+          "line": 9
+        }
+      }
+    ]
+  },
+  "facts": [
+    {
+      "role": "expense_date",
+      "label": "費用の発生日",
+      "kind": "date",
+      "cues": [
+        "発生",
+        "利用日",
+        "支出日",
+        "支払日"
+      ]
+    },
+    {
+      "role": "submit_date",
+      "label": "申請日",
+      "kind": "date",
+      "cues": [
+        "提出",
+        "申請"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "submit_date",
+      "op": ">",
+      "threshold": {
+        "type": "month_day",
+        "base": "expense_date",
+        "month_offset": 1,
+        "day": 10
+      },
+      "evidence": {
+        "quote": "翌月10日を過ぎた申請は原則として受理しない",
+        "line": 12
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "受理されない",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "翌月10日を過ぎた申請は原則として受理しない",
+        "line": 12
+      }
+    },
+    "any_false": {
+      "value": "受理される",
+      "basis": "inferred_negation",
+      "evidence": {
+        "quote": "翌月10日を過ぎた申請は原則として受理しない",
+        "line": 12
+      }
+    }
+  },
+  "options": [
+    "受理される",
+    "受理されない"
+  ],
+  "exceptions": [
+    {
+      "description": "「原則として」の例外の中身は規程に書かれていない。質問が例外に当たる事情を述べたら保留する",
+      "cues": [
+        "やむを得",
+        "事情",
+        "例外",
+        "特例",
+        "災害",
+        "入院",
+        "特別に",
+        "認められ"
+      ],
+      "evidence": {
+        "quote": "翌月10日を過ぎた申請は原則として受理しない",
+        "line": 12
+      }
+    }
+  ],
+  "other_requirements": [
+    {
+      "description": "領収書の添付",
+      "cues": [
+        "領収書"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "any_false",
+      "evidence": {
+        "quote": "申請にあたっては、支払いを証明する領収書を添付しなければならない",
+        "line": 15
+      }
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "rule_id": "R-leave-grant",
+  "doc_path": "/watched/general/就業規則.md",
+  "doc_version": "137bfa90374d6d4be5d910702908718a4feff2f6fc4a941407bc79a8f7e25c9a",
+  "description": "勤続6ヶ月を経過し、その間の全労働日の8割以上出勤した従業員に年次有給休暇を付与する",
+  "supported": true,
+  "subject": {
+    "groups": [
+      [
+        "年次有給休暇",
+        "有給"
+      ],
+      [
+        "付与"
+      ]
+    ],
+    "exclude": [
+      {
+        "terms": [
+          "契約社員",
+          "パートタイム",
+          "パート",
+          "アルバイト",
+          "非正規"
+        ],
+        "reason": "契約社員・パートタイム従業員は別の就業規則による",
+        "evidence": {
+          "quote": "契約社員・パートタイム従業員については別途定める「非正規社員就業規則」による",
+          "line": 11
+        }
+      }
+    ]
+  },
+  "facts": [
+    {
+      "role": "tenure",
+      "label": "勤続期間",
+      "kind": "quantity",
+      "unit": "か月",
+      "cues": [
+        "入社",
+        "勤続",
+        "雇入れ",
+        "経過"
+      ]
+    },
+    {
+      "role": "attended_days",
+      "label": "出勤日数",
+      "kind": "quantity",
+      "unit": "日",
+      "cues": [
+        "出勤"
+      ]
+    },
+    {
+      "role": "working_days",
+      "label": "全労働日数",
+      "kind": "quantity",
+      "unit": "日",
+      "cues": [
+        "全労働日",
+        "労働日"
+      ]
+    },
+    {
+      "role": "attendance_rate",
+      "label": "出勤率",
+      "kind": "ratio",
+      "cues": [],
+      "percent_cues": [
+        "出勤率"
+      ],
+      "numerator": "attended_days",
+      "denominator": "working_days"
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "tenure",
+      "op": ">=",
+      "threshold": {
+        "type": "number",
+        "value": 6
+      },
+      "evidence": {
+        "quote": "勤続6ヶ月を経過し",
+        "line": 27
+      }
+    },
+    {
+      "fact": "attendance_rate",
+      "op": ">=",
+      "threshold": {
+        "type": "number",
+        "value": 80
+      },
+      "evidence": {
+        "quote": "その間の全労働日の8割以上出勤した",
+        "line": 27
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "付与される",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "会社は、雇入れの日から起算して勤続6ヶ月を経過し、かつ、その間の全労働日の8割以上出勤した従業員に対して、10日の年次有給休暇を付与する",
+        "line": 27
+      }
+    },
+    "any_false": {
+      "value": "付与されない",
+      "basis": "inferred_negation",
+      "evidence": {
+        "quote": "会社は、雇入れの日から起算して勤続6ヶ月を経過し、かつ、その間の全労働日の8割以上出勤した従業員に対して、10日の年次有給休暇を付与する",
+        "line": 27
+      }
+    }
+  },
+  "options": [
+    "付与される",
+    "付与されない"
+  ]
+}

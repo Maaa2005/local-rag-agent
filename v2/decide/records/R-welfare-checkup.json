@@ -1,0 +1,65 @@
+{
+  "rule_id": "R-welfare-checkup",
+  "doc_path": "/watched/general/福利厚生規程.md",
+  "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
+  "description": "健康診断の受診率が90%未満の部署には改善計画の提出を求める",
+  "supported": true,
+  "subject": {
+    "groups": [
+      [
+        "健康診断"
+      ],
+      [
+        "改善計画",
+        "受診率"
+      ]
+    ]
+  },
+  "facts": [
+    {
+      "role": "checkup_rate",
+      "label": "受診率",
+      "kind": "ratio",
+      "cues": [],
+      "percent_cues": [
+        "受診率"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "checkup_rate",
+      "op": "<",
+      "threshold": {
+        "type": "number",
+        "value": 90
+      },
+      "evidence": {
+        "quote": "健康診断の受診率が90%未満の部署には、改善計画の提出を求める",
+        "line": 11
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "求められる",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "健康診断の受診率が90%未満の部署には、改善計画の提出を求める",
+        "line": 11
+      }
+    },
+    "any_false": {
+      "value": "求められない",
+      "basis": "inferred_negation",
+      "evidence": {
+        "quote": "健康診断の受診率が90%未満の部署には、改善計画の提出を求める",
+        "line": 11
+      }
+    }
+  },
+  "options": [
+    "求められる",
+    "求められない"
+  ]
+}

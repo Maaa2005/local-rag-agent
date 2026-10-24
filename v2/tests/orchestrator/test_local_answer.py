@@ -230,3 +230,88 @@ def test_to_chunk_level(level, expected):
 
 def test_to_chunk_missing_source():
     assert to_chunk({"content": "x"}).source == "不明"
+
+
+# ---- decider（「コードが決める」方式）の差し込み。既定は無し（上のテストは decider なしの挙動）
+
+class _Verdict:
+    def __init__(self, kind, text="", used=(), record=None):
+        self.kind, self.answer_text, self.used_chunks = kind, text, tuple(used)
+        self.decision_record = record or {}
+
+
+class FakeDecider:
+    def __init__(self, verdict=None, exc: Exception | None = None):
+        self.verdict, self.exc, self.calls = verdict, exc, []
+
+    def decide(self, question, chunks):
+        self.calls.append((question, list(chunks)))
+        if self.exc:
+            raise self.exc
+        return self.verdict
+
+
+def test_decider_default_is_none_and_signature_is_optional():
+    import inspect
+    p = inspect.signature(answer_locally).parameters["decider"]
+    assert p.default is None and p.kind is inspect.Parameter.KEYWORD_ONLY
+
+
+def test_decided_answer_skips_generator_and_uses_used_chunks():
+    low, high = ch(1, doc="d1", source="a.md"), ch(2, doc="d2", source="b.md")
+    v = _Verdict("decided", "【判定】\n結論: 必要", used=[high], record={"rule_id": "R-x", "outcome_key": "all_true"})
+    g = FakeGenerator()
+    res = answer_locally(MANAGER, QUESTION, POLICY, FakeRetriever([low, high]), g, decider=FakeDecider(v))
+    assert res.run.outcome == "answered" and res.run.output_text == "【判定】\n結論: 必要"
+    assert g.seen == []  # モデルは呼ばれない
+    assert res.sources == ("b.md",) and res.run.min_view_level == 2
+    assert res.run.visible_to == MANAGER and res.run.response_visibility == "source_level_requester_only"
+    ev = {e.stage: e for e in res.run.audit}
+    assert ev["decide"].result == "ok" and "rule=R-x" in ev["decide"].detail
+
+
+def test_decider_sees_only_allowed_chunks():
+    over = ch(2, doc="secret", source="s.md")
+    d = FakeDecider(_Verdict("no_record"))
+    answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1), over]), FakeGenerator(), decider=d)
+    assert [c.document_id for c in d.calls[0][1]] == ["d1"]
+
+
+def test_held_verdict_is_held_without_generator_and_carries_code_only():
+    v = _Verdict("held", record={"hold_code": "facts:missing"})
+    g = FakeGenerator()
+    res = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), g, decider=FakeDecider(v))
+    assert res.run.outcome == "held" and res.run.stopped_at == "decide"
+    assert "facts:missing" in res.run.reason and g.seen == []
+
+
+def test_no_record_falls_through_to_generator():
+    g = FakeGenerator()
+    res = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), g, decider=FakeDecider(_Verdict("no_record")))
+    assert res.run.outcome == "answered" and res.run.output_text == "締め日は毎月25日です [1]"
+
+
+@pytest.mark.parametrize("decider", [
+    FakeDecider(exc=RuntimeError("boom")),
+    FakeDecider(_Verdict("???")),
+    FakeDecider(_Verdict("decided", "", used=[])),
+    FakeDecider(_Verdict("decided", "結論: 必要", used=[])),  # 根拠なし
+])
+def test_decider_failure_or_unusable_verdict_is_held_not_generated(decider):
+    g = FakeGenerator()
+    res = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), g, decider=decider)
+    assert res.run.outcome == "held" and res.run.stopped_at == "decide" and g.seen == []
+
+
+def test_decider_not_called_without_evidence():
+    d = FakeDecider(_Verdict("no_record"))
+    res = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([]), FakeGenerator(), decider=d)
+    assert res.run.stopped_at == "retrieve" and d.calls == []
+
+
+def test_decider_events_carry_no_body_text():
+    secret = "98,000円の申請"
+    v = _Verdict("decided", "結論: 必要 " + secret, used=[ch(1)], record={"rule_id": "R-x", "outcome_key": "all_true"})
+    res = answer_locally(GENERAL, secret, POLICY, FakeRetriever([ch(1)]), FakeGenerator(), decider=FakeDecider(v))
+    assert all(secret not in (e.detail or "") for e in res.run.audit)
+    assert secret in res.bodies[-1]  # 本文は監査の除去用に bodies へ

@@ -1,0 +1,91 @@
+{
+  "rule_id": "R-supply-deadline",
+  "doc_path": "/watched/general/備品購入規程.md",
+  "doc_version": "aad877806fd36411fa9f4f6fb5a94eed0f2347d8957ed51066917f7331d73237",
+  "description": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない",
+  "supported": true,
+  "subject": {
+    "groups": [
+      [
+        "備品"
+      ],
+      [
+        "申請",
+        "期限",
+        "受け付け",
+        "受付"
+      ]
+    ]
+  },
+  "facts": [
+    {
+      "role": "purchase_date",
+      "label": "購入日",
+      "kind": "date",
+      "cues": [
+        "購入"
+      ]
+    },
+    {
+      "role": "submit_date",
+      "label": "申請日",
+      "kind": "date",
+      "cues": [
+        "申請",
+        "提出"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "submit_date",
+      "op": ">",
+      "threshold": {
+        "type": "offset_days",
+        "base": "purchase_date",
+        "days": 14,
+        "count_from": "next_day"
+      },
+      "evidence": {
+        "quote": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない",
+        "line": 15
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "受け付けられない",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない",
+        "line": 15
+      }
+    },
+    "any_false": {
+      "value": "受け付けられる",
+      "basis": "inferred_negation",
+      "evidence": {
+        "quote": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない",
+        "line": 15
+      }
+    }
+  },
+  "options": [
+    "受け付けられる",
+    "受け付けられない"
+  ],
+  "other_requirements": [
+    {
+      "description": "領収書の写しの添付",
+      "cues": [
+        "領収書"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "any_false",
+      "evidence": {
+        "quote": "申請には領収書の写しを添える",
+        "line": 17
+      }
+    }
+  ]
+}

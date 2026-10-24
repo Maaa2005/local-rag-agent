@@ -13,7 +13,7 @@ from datetime import datetime
 from judge.base import guarded_c1, is_guard_stop
 from integration.flow import C1_MAX_INPUT_CHARS, C1_TIMEOUT_S, C1Router
 from orchestrator.audit_store import AuditSink, persist_run
-from orchestrator.local_answer import Generator, LocalResult, Retriever, answer_locally
+from orchestrator.local_answer import Decider, Generator, LocalResult, Retriever, answer_locally
 from orchestrator.pipeline import AuditEvent, c1_detail, stopped_at_c1
 from orchestrator.policy import JST, Policy
 
@@ -30,6 +30,7 @@ def ask(
     now: datetime | None = None,
     timeout_s: float = C1_TIMEOUT_S,
     max_input_chars: int = C1_MAX_INPUT_CHARS,
+    decider: Decider | None = None,
 ) -> LocalResult:
     run_at = now or datetime.now(JST)
     decision = None
@@ -43,6 +44,9 @@ def ask(
         elif decision.route == "local":
             res = answer_locally(user, question, pol, retriever, generator,
                                  audit=[AuditEvent("C1", "local", c1_detail(decision))])
+        elif decision.route == "code" and decider is not None:
+            res = answer_locally(user, question, pol, retriever, generator,
+                                 audit=[AuditEvent("C1", "code", c1_detail(decision))], decider=decider)
         elif decision.route == "code":
             res = LocalResult(stopped_at_c1(decision, "コードで処理する経路（F7 数値ガード）は未実装のため保留"),
                               bodies=(question,))

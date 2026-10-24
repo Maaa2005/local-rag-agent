@@ -39,6 +39,13 @@ class Generator(Protocol):
     def answer(self, question: str, chunks: Sequence[Chunk]) -> str: ...
 
 
+class Decider(Protocol):
+    """「コードが決める」方式（v2/decide の DecisionEngine）。結果は kind で見分ける:
+    decided（answer_text・decision_record・used_chunks）/ held（decision_record）/ no_record。"""
+
+    def decide(self, question: str, chunks: Sequence[Chunk]) -> object: ...
+
+
 @dataclass
 class LocalResult:
     run: RunResult
@@ -52,6 +59,21 @@ def _held(stage: str, reason: str, audit: list[AuditEvent], bodies: Sequence[str
     return LocalResult(RunResult(outcome="held", stopped_at=stage, reason=reason, audit=audit), bodies=tuple(bodies))
 
 
+def _answer_by_code(user: str, verdict, events: list[AuditEvent], bodies: list[str], max_answer_chars: int) -> LocalResult:
+    text = verdict.answer_text
+    used = list(verdict.used_chunks)
+    if not isinstance(text, str) or not text.strip() or not used or len(text) > max_answer_chars:
+        return _held("decide", "コードによる判定の答えが使えない形", events, bodies)
+    rec = verdict.decision_record
+    bodies.append(text)
+    events.append(AuditEvent("decide", "ok", f"rule={rec.get('rule_id')} outcome={rec.get('outcome_key')} chars={len(text)}"))
+    events.append(AuditEvent("result", "answered", "stopped_at=none: コードが規程から判定（外部送信なし）"))
+    run = RunResult(outcome="answered", stopped_at="none", reason="コードが規程から判定", output_text=text, audit=events,
+                    response_visibility="source_level_requester_only", visible_to=user,
+                    min_view_level=max(c.access_level for c in used))
+    return LocalResult(run, sources=tuple(c.source for c in used), bodies=tuple(bodies))
+
+
 def answer_locally(
     user: str,
     question: str,
@@ -61,6 +83,7 @@ def answer_locally(
     *,
     audit: Sequence[AuditEvent] = (),
     max_answer_chars: int = MAX_ANSWER_CHARS,
+    decider: Decider | None = None,
 ) -> LocalResult:
     events = list(audit)
     bodies: list[str] = [question]
@@ -81,6 +104,21 @@ def answer_locally(
     events.append(AuditEvent("retrieve", "ok", f"level={u.level} hits={len(found)} dropped={dropped} docs=[{ids}]"))
     if not allowed:
         return _held("retrieve", "閲覧できる根拠が見つからない（根拠なしでは生成しない）", events, bodies)
+
+    if decider is not None:
+        try:
+            verdict = decider.decide(question, allowed)
+            kind = getattr(verdict, "kind", None)
+            if kind == "decided":
+                return _answer_by_code(user, verdict, events, bodies, max_answer_chars)
+            if kind == "held":
+                code = str(getattr(verdict, "decision_record", {}).get("hold_code") or "unknown")
+                return _held("decide", f"コードによる判定を保留（{code}）", events, bodies)
+            if kind != "no_record":
+                return _held("decide", "コードによる判定の結果が不明", events, bodies)
+        except Exception as e:  # noqa: BLE001
+            return _held("decide", f"コードによる判定に失敗: {type(e).__name__}", events, bodies)
+        # no_record: 数の規程ではない問は、下の通常のローカル回答へ
 
     try:
         text = generator.answer(question, allowed)
