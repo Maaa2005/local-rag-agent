@@ -28,6 +28,18 @@
           "quote": "出張に伴う旅費および宿泊費は「出張旅費規程」による",
           "line": 9
         }
+      },
+      {
+        "terms": [
+          "私的",
+          "罰金",
+          "反則金"
+        ],
+        "reason": "業務との関連性が認められない費用は精算の対象外",
+        "evidence": {
+          "quote": "私的な飲食費、罰金・反則金、規定を超えるタクシー利用等、業務との関連性が認められない費用は精算の対象としない",
+          "line": 30
+        }
       }
     ]
   },
@@ -76,5 +88,62 @@
   "options": [
     "必要",
     "不要"
+  ],
+  "other_requirements": [
+    {
+      "description": "費用が発生した月の翌月10日までの申請",
+      "cues": [
+        "期限",
+        "翌月10日",
+        "10日"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "any_false",
+      "evidence": {
+        "quote": "経費の精算は、費用が発生した月の翌月10日までに、経費精算システムより申請書を提出しなければならない",
+        "line": 12
+      }
+    },
+    {
+      "description": "領収書の添付（紛失時は上長の承認を得て支出証明書で代替）",
+      "cues": [
+        "領収書",
+        "支出証明書"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "any_false",
+      "evidence": {
+        "quote": "申請にあたっては、支払いを証明する領収書を添付しなければならない",
+        "line": 15
+      }
+    },
+    {
+      "description": "直属の上長の一次承認と経理部の最終承認",
+      "cues": [
+        "上長",
+        "経理部"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "any_false",
+      "evidence": {
+        "quote": "申請書は直属の上長が一次承認を行い、経理部が最終承認を行う",
+        "line": 21
+      }
+    },
+    {
+      "description": "費目別の上限（会議費1人5,000円・消耗品費1件10,000円、超える時は事前の稟議）",
+      "cues": [
+        "上限",
+        "稟議",
+        "会議費",
+        "消耗品"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "any_false",
+      "evidence": {
+        "quote": "消耗品費は1件あたり10,000円を上限とし、これを超える場合は事前に稟議が必要である",
+        "line": 18
+      }
+    }
   ]
 }

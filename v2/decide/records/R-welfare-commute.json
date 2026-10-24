@@ -57,5 +57,24 @@
   "options": [
     "支給される",
     "支給されない"
+  ],
+  "other_requirements": [
+    {
+      "description": "通勤距離は会社が定める方法で測る",
+      "cues": [
+        "測り方",
+        "測る",
+        "測った",
+        "計測",
+        "測定",
+        "地図"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "both",
+      "evidence": {
+        "quote": "通勤距離は会社が定める方法で測る",
+        "line": 17
+      }
+    }
   ]
 }

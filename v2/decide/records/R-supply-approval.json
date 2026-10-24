@@ -63,5 +63,33 @@
   "options": [
     "必要",
     "不要"
+  ],
+  "other_requirements": [
+    {
+      "description": "購入日の翌日から数えて14日以内の申請",
+      "cues": [
+        "申請期限",
+        "14日",
+        "期限"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "both",
+      "evidence": {
+        "quote": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない",
+        "line": 15
+      }
+    },
+    {
+      "description": "領収書の写しの添付",
+      "cues": [
+        "領収書"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "both",
+      "evidence": {
+        "quote": "申請には領収書の写しを添える",
+        "line": 17
+      }
+    }
   ]
 }

@@ -83,6 +83,20 @@
         "quote": "申請には領収書の写しを添える",
         "line": 17
       }
+    },
+    {
+      "description": "購入金額に応じた承認（5万円超は総務部長・それ以外は所属長）",
+      "cues": [
+        "承認",
+        "総務部長",
+        "所属長"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "any_false",
+      "evidence": {
+        "quote": "1件あたり5万円を超える備品の購入は、総務部長の承認を要する",
+        "line": 9
+      }
     }
   ]
 }

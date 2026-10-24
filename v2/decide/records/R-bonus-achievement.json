@@ -32,7 +32,7 @@
   "facts": [
     {
       "role": "achievement_rate",
-      "label": "達成率",
+      "label": "達成率（営業利益目標とROE目標の達成率を50%ずつ加重した値）",
       "kind": "ratio",
       "cues": [],
       "percent_cues": [
@@ -71,5 +71,36 @@
   "options": [
     "支給される",
     "支給されない"
+  ],
+  "exceptions": [
+    {
+      "description": "営業利益とROEの達成率を別々に述べた質問は、加重の計算を持たないので保留する",
+      "cues": [
+        "ROE",
+        "自己資本利益率",
+        "営業利益"
+      ],
+      "evidence": {
+        "quote": "業績連動賞与は、営業利益目標の達成率とROE（自己資本利益率）目標の達成率をそれぞれ50%ずつ加重して算定する",
+        "line": 27
+      }
+    }
+  ],
+  "other_requirements": [
+    {
+      "description": "株主総会の決議の範囲内で取締役会が配分を決める",
+      "cues": [
+        "取締役会",
+        "株主総会",
+        "決議",
+        "配分"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "any_false",
+      "evidence": {
+        "quote": "役員賞与の総額は、株主総会の決議により定められた金額の範囲内で、取締役会が各役員への配分を決定する",
+        "line": 12
+      }
+    }
   ]
 }
