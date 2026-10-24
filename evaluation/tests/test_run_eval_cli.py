@@ -250,3 +250,47 @@ def test_bad_args_stop_before_running(tmp_path, monkeypatch, run_eval, argv):
         _run(monkeypatch, run_eval, full + argv)
     assert exc.value.code == 2  # argparse の使い方エラー
     assert not (tmp_path / "o").exists()
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_numeric_check_record_only_when_enabled(tmp_path, monkeypatch, run_eval, enabled):
+    # C が ON の時だけ、質問と検索で取れた文から数え直した記録を残す。問の boundary・expected_* は渡さない
+    seen = []
+    real = run_eval.numeric_check.check
+
+    def spy(question, chunk_texts):
+        seen.append((question, list(chunk_texts)))
+        return real(question, chunk_texts)
+
+    a = _jsonl(tmp_path / "a.jsonl", [_item("N01", "1件49,000円の備品を買います。", expected_conclusion="不要",
+                                            boundary={"value": 49000, "op": ">", "threshold": 50000})])
+    _install_fakes(monkeypatch, run_eval)
+    monkeypatch.setattr(run_eval.numeric_check, "check", spy)
+    monkeypatch.setattr(run_eval.settings, "numeric_check_enabled", enabled)
+    out = tmp_path / "run1"
+    _run(monkeypatch, run_eval, ["--provider", "vllm", "--no-judge", "--rerank", "off",
+                                 "--dataset", str(a), "--out-dir", str(out)])
+    row = _rows(out / "raw.jsonl")[0]
+    if not enabled:
+        assert row["numeric_check"] is None and seen == []
+        return
+    assert seen == [("1件49,000円の備品を買います。", ["本文"])]
+    assert set(row["numeric_check"]) == {"fired", "hold_reason", "kind", "op", "applies", "tiebreak"}
+    assert row["numeric_check"]["fired"] is False and row["numeric_check"]["hold_reason"]
+
+
+def test_numeric_check_record_fires_on_dev_rule(run_eval):
+    rec = run_eval.numeric_check_record(
+        "1件49,000円の備品を購入します。総務部長の承認は必要ですか？",
+        [{"content": "1件あたり5万円を超える備品の購入は、総務部長の承認を要する。"}],
+    )
+    assert rec == {"fired": True, "hold_reason": None, "kind": rec["kind"], "op": ">", "applies": False,
+                   "tiebreak": False}
+
+
+def test_numeric_check_record_survives_errors(monkeypatch, run_eval):
+    def boom(question, chunk_texts):
+        raise ValueError("x")
+
+    monkeypatch.setattr(run_eval.numeric_check, "check", boom)
+    assert run_eval.numeric_check_record("q", []) == {"fired": False, "hold_reason": "error: ValueError"}

@@ -41,6 +41,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from app.config import settings  # noqa: E402
 from app.services.llm import stream_answer  # noqa: E402
+from app.services import numeric_check  # noqa: E402
 from app.services.providers import (  # noqa: E402
     get_meta,
     get_provider,
@@ -56,6 +57,19 @@ DATASET = Path(__file__).resolve().parent / "dataset.jsonl"
 
 
 # ─── ヘルパ ────────────────────────────────────────────────────
+def numeric_check_record(question: str, chunks: list[dict]) -> dict:
+    """C が回答に足した物の記録。llm._numeric_check_block と同じ入力 (質問と検索で取れた文) で数え直す。
+
+    問の boundary・expected_* は渡さない。規程の文 (rule_span) と比べた値は入れない。
+    """
+    try:
+        r = numeric_check.check(question, [str(c.get("content", "")) for c in chunks])
+    except Exception as exc:
+        return {"fired": False, "hold_reason": f"error: {type(exc).__name__}"}
+    return {"fired": r.sentence is not None, "hold_reason": r.hold_reason, "kind": r.kind, "op": r.op,
+            "applies": r.applies, "tiebreak": r.tiebreak}
+
+
 async def _collect_answer_and_chunks(question: str, level: int, provider_name: str) -> TimedAnswer:
     """retriever で取得 → stream_answer で生成し、レイテンシも計測 (検索込み・evaluation/timing.py)。"""
     def _stream(q: str, chunks: list[dict]):
@@ -99,6 +113,8 @@ async def evaluate_question(
         res.first_token_latency = t.first_token_latency
         res.total_latency = t.total_latency
         res.retrieval_latency = t.retrieval_latency
+        if settings.numeric_check_enabled:
+            res.numeric_check = numeric_check_record(item["question"], chunks)
 
         # M1, M2, M6, M7, M8
         res.recall_at_5 = metrics.recall_at_k(sources, item.get("expected_sources", []), k=5)

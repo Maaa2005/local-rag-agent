@@ -41,3 +41,5 @@ class QuestionResult:
     # 取れなかった問とこの欄より前の raw.jsonl では None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    # C (数の比べをコードで) が ON の時だけ: 足したか・保留の理由など (本文は入れない)。OFF では None
+    numeric_check: dict | None = None

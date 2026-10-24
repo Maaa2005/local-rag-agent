@@ -585,17 +585,17 @@ def test_step2_llamacpp_notebook_measures_gemma_on_same_lines():
             "trial_checks", "gpu_mem_record", "needed_max_model_len"} <= used
     assert "vllm_argv" not in used and "adjusted_gpu_util" not in used
     # 重みと llama.cpp は固定（Step 0.5 で T4 の全層 GPU を確かめた物）
-    # 10/24 追加探索の 3 番目: Qwen3.5-4B Q8_0（1 番目と同じ重み）を考え ON・80 トークンで打ち切り
-    assert 'GGUF_FILE = "Qwen3.5-4B-Q8_0.gguf"' in code
-    assert 'GGUF_REV = "e87f176479d0855a907a41277aca2f8ee7a09523"' in code
-    assert "REASONING_BUDGET = 80" in code and "ANSWER_MAX_TOKENS = 1024 + REASONING_BUDGET" in code
-    assert code.count("extra=EXTRA_ARGS, reasoning_budget=REASONING_BUDGET)") == 2   # 起動とまとめの引数
-    # 出力の上限は考える文の分を足した値で、文脈の長さと回答の両方に使う
-    assert 'needed_max_model_len(STATS["max_prompt_tokens"], max_tokens=ANSWER_MAX_TOKENS)' in code
-    assert 'LLM_MAX_TOKENS=str(ANSWER_MAX_TOKENS)' in code
-    # 事前確認: 考える文が別に出て上限内・本文に結論の行・考える印なし
-    assert 'PRECHECK.get("reasoning_chars", 0) > 0' in code
-    assert "REASONING_BUDGET + PRECHECK_SLACK" in code and 'PRECHECK.get("has_conclusion")' in code
+    # 10/24 追加探索の 4 番目: Gemma 4 E4B Q4_K_M・考え OFF（2 番目と同じ重み）に C を ON
+    assert 'GGUF_FILE = "gemma-4-E4B-it-Q4_K_M.gguf"' in code
+    assert 'GGUF_REV = "bfc15c382204943c3a8fff0c750b94ae2364d7a3"' in code
+    assert "REASONING_BUDGET" not in code and "extra=EXTRA_ARGS)" in code
+    # C は測定・予算ごと・確かめ用の 3 か所の評価と G0 に渡す（確かめ用は ON の後に対照の OFF）
+    assert 'NUMERIC_CHECK = "true"' in code
+    assert code.count("NUMERIC_CHECK_ENABLED=NUMERIC_CHECK") == 4
+    assert 'env=dict(os.environ, NUMERIC_CHECK_ENABLED=NUMERIC_CHECK)' in code
+    assert '(("holdout_on", NUMERIC_CHECK), ("holdout_off", "false"))' in code
+    # 測定で C の記録が全問に無ければ止める（OFF のまま測らない）
+    assert 'raise RuntimeError("C の記録が無い問がある' in code
     assert 'LLAMA_TAG = "b11836"' in code
     assert "EXTRA_ARGS = []" in code and "JUDGE_CANDIDATES = []" in code and "s5.judge_cmd" not in code
     assert '"role": "human"' in code and '"step": "2"' in code
@@ -605,7 +605,13 @@ def test_step2_llamacpp_notebook_measures_gemma_on_same_lines():
     dump_at = next(i for i, c in enumerate(cells) if "ANSWERS_B64_BEGIN" in c)
     g0_at = next(i for i, c in enumerate(cells) if "rag_connection_check.py" in c)
     summary_at = next(i for i, c in enumerate(cells) if "summary.json" in c)
-    assert measure_at < dump_at < g0_at < summary_at
+    holdout_at = next(i for i, c in enumerate(cells) if "HOLDOUT_JSON" in c)
+    assert measure_at < holdout_at < dump_at < g0_at < summary_at
     assert '"--rerank", "off"' in cells[g0_at]
+    # 確かめ用 48 問: 別の集合に載せ、記録の末尾を出さず、回答は控えにも zip にも入れない
+    h = cells[holdout_at]
+    assert 'f"{COLLECTION}_holdout"' in h and "HOLDOUT_CORPUS" in h and "datasets=(HOLDOUT_DATASET,)" in h
+    assert "run_eval(" not in h and h.count("run_quiet(") == 3 and "finally:\n    kill(srv)" in h
+    assert "holdout" not in cells[dump_at] and '"holdout": HOLDOUT' in cells[summary_at]
     zip_cell = "".join(next(c["source"] for c in nb["cells"] if "zip -qr" in "".join(c["source"])))
-    assert "step2q35on_results.zip step2q35on " in zip_cell
+    assert "step2con_results.zip step2con " in zip_cell and "'step2con/holdout_*'" in zip_cell
