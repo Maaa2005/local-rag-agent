@@ -4,6 +4,7 @@
   "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
   "description": "通勤距離が2km以下の社員には通勤手当を支給しない",
   "supported": true,
+  "relation": "if_then_not",
   "subject": {
     "groups": [
       [
@@ -49,12 +50,8 @@
       }
     },
     "any_false": {
-      "value": "支給される",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "通勤距離が2km以下の社員には、通勤手当を支給しない",
-        "line": 15
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

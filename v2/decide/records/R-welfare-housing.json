@@ -4,6 +4,7 @@
   "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
   "description": "勤続年数が3年以上の社員は住宅手当の対象",
   "supported": true,
+  "relation": "if_then",
   "subject": {
     "groups": [
       [
@@ -50,12 +51,8 @@
       }
     },
     "any_false": {
-      "value": "対象にならない",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "勤続年数が3年以上の社員は、住宅手当の対象とする",
-        "line": 5
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

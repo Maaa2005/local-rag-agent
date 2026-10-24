@@ -4,6 +4,7 @@
   "doc_version": "aad877806fd36411fa9f4f6fb5a94eed0f2347d8957ed51066917f7331d73237",
   "description": "1件あたり5万円を超える備品の購入は総務部長の承認を要する。それ以外は所属長の承認",
   "supported": true,
+  "relation": "if_else",
   "subject": {
     "groups": [
       [

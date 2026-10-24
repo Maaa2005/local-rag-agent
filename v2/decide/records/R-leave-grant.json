@@ -4,6 +4,7 @@
   "doc_version": "137bfa90374d6d4be5d910702908718a4feff2f6fc4a941407bc79a8f7e25c9a",
   "description": "勤続6ヶ月を経過し、その間の全労働日の8割以上出勤した従業員に年次有給休暇を付与する",
   "supported": true,
+  "relation": "if_then",
   "subject": {
     "groups": [
       [
@@ -111,12 +112,8 @@
       }
     },
     "any_false": {
-      "value": "付与されない",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "会社は、雇入れの日から起算して勤続6ヶ月を経過し、かつ、その間の全労働日の8割以上出勤した従業員に対して、10日の年次有給休暇を付与する",
-        "line": 27
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

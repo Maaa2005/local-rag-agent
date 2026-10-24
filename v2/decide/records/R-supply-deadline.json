@@ -4,6 +4,7 @@
   "doc_version": "aad877806fd36411fa9f4f6fb5a94eed0f2347d8957ed51066917f7331d73237",
   "description": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない",
   "supported": true,
+  "relation": "if_then_not",
   "subject": {
     "groups": [
       [
@@ -62,12 +63,8 @@
       }
     },
     "any_false": {
-      "value": "受け付けられる",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない",
-        "line": 15
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

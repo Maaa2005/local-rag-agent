@@ -4,6 +4,7 @@
   "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
   "description": "人間ドックの補助は2026年12月1日より前に受診した分が対象",
   "supported": true,
+  "relation": "if_then",
   "subject": {
     "groups": [
       [
@@ -50,12 +51,8 @@
       }
     },
     "any_false": {
-      "value": "対象にならない",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "人間ドックの補助は、2026年12月1日より前に受診した分を対象とする",
-        "line": 21
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

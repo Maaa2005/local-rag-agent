@@ -4,6 +4,7 @@
   "doc_version": "aad877806fd36411fa9f4f6fb5a94eed0f2347d8957ed51066917f7331d73237",
   "description": "2026年11月1日以降に入社した社員は当年度の永年勤続表彰の対象外",
   "supported": true,
+  "relation": "if_then_not",
   "subject": {
     "groups": [
       [
@@ -49,12 +50,8 @@
       }
     },
     "any_false": {
-      "value": "対象になる",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "2026年11月1日以降に入社した社員は、当年度の永年勤続表彰の対象外とする",
-        "line": 21
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

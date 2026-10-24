@@ -4,6 +4,7 @@
   "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
   "description": "育児支援金は子の誕生日の翌日から数えて60日以内の申請に限り受け付ける",
   "supported": true,
+  "relation": "only_if",
   "subject": {
     "groups": [
       [
@@ -54,12 +55,8 @@
   ],
   "outcomes": {
     "all_true": {
-      "value": "受け付けられる",
-      "basis": "explicit",
-      "evidence": {
-        "quote": "育児支援金の申請は、子の誕生日の翌日から数えて60日以内に行ったものに限り受け付ける",
-        "line": 27
-      }
+      "value": "unknown",
+      "basis": "unknown"
     },
     "any_false": {
       "value": "受け付けられない",

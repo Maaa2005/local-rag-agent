@@ -4,6 +4,7 @@
   "doc_version": "560049797b6669e46fa4d4b52f545a4f3e00b56792f85ef668516eea53cd84c9",
   "description": "経費精算の申請金額が10万円を超えると部門長の承認が追加で要る",
   "supported": true,
+  "relation": "if_then",
   "subject": {
     "groups": [
       [
@@ -68,12 +69,8 @@
       }
     },
     "any_false": {
-      "value": "不要",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "10万円を超える申請は部門長の承認を追加で要する",
-        "line": 21
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

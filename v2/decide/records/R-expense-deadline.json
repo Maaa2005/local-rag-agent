@@ -4,6 +4,7 @@
   "doc_version": "560049797b6669e46fa4d4b52f545a4f3e00b56792f85ef668516eea53cd84c9",
   "description": "経費精算は費用が発生した月の翌月10日までに申請する。過ぎた申請は原則として受理しない",
   "supported": true,
+  "relation": "if_then_not",
   "subject": {
     "groups": [
       [
@@ -81,12 +82,8 @@
       }
     },
     "any_false": {
-      "value": "受理される",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "翌月10日を過ぎた申請は原則として受理しない",
-        "line": 12
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

@@ -4,6 +4,7 @@
   "doc_version": "bdc7bbfa692e7ecb6aca75802584f523f5ab5eafc0c4f5e520e7971e0b4601e8",
   "description": "達成率が80%を下回る場合、業績連動賞与は支給しない",
   "supported": true,
+  "relation": "if_then_not",
   "subject": {
     "groups": [
       [
@@ -63,12 +64,8 @@
       }
     },
     "any_false": {
-      "value": "支給される",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "達成率が80%を下回る場合、業績連動賞与は支給しない",
-        "line": 27
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [

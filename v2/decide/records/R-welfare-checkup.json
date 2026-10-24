@@ -4,6 +4,7 @@
   "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
   "description": "健康診断の受診率が90%未満の部署には改善計画の提出を求める",
   "supported": true,
+  "relation": "if_then",
   "subject": {
     "groups": [
       [
@@ -50,12 +51,8 @@
       }
     },
     "any_false": {
-      "value": "求められない",
-      "basis": "inferred_negation",
-      "evidence": {
-        "quote": "健康診断の受診率が90%未満の部署には、改善計画の提出を求める",
-        "line": 11
-      }
+      "value": "unknown",
+      "basis": "unknown"
     }
   },
   "options": [
