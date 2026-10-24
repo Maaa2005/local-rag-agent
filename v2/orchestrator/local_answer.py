@@ -51,19 +51,32 @@ class LocalResult:
     run: RunResult
     sources: tuple[str, ...] = ()  # 回答の根拠（[n] の順）
     bodies: tuple[str, ...] = ()  # 監査の本文除去用（質問・根拠・回答）。表示や保存には使わない
+    # decider が走った時だけ入る。判断の記録（decided / held / no_record の verdict.decision_record の写し）。
+    # 最終の答えの記録（ask の on_final）の元になる。監査（AuditEvent）には入れない
+    decision_record: dict | None = None
+    # decider が返した kind（decided / held / no_record）。走らなかった・失敗した・不明な結果は None / "error"
+    decider_kind: str | None = None
 
 
-def _held(stage: str, reason: str, audit: list[AuditEvent], bodies: Sequence[str]) -> LocalResult:
+def _record_of(verdict) -> dict | None:
+    rec = getattr(verdict, "decision_record", None)
+    return dict(rec) if isinstance(rec, dict) else None
+
+
+def _held(stage: str, reason: str, audit: list[AuditEvent], bodies: Sequence[str], *,
+          decision_record: dict | None = None, decider_kind: str | None = None) -> LocalResult:
     audit.append(AuditEvent(stage, "error", reason))
     audit.append(AuditEvent("result", "held", f"stopped_at={stage}: {reason}"))
-    return LocalResult(RunResult(outcome="held", stopped_at=stage, reason=reason, audit=audit), bodies=tuple(bodies))
+    return LocalResult(RunResult(outcome="held", stopped_at=stage, reason=reason, audit=audit), bodies=tuple(bodies),
+                       decision_record=decision_record, decider_kind=decider_kind)
 
 
 def _answer_by_code(user: str, verdict, events: list[AuditEvent], bodies: list[str], max_answer_chars: int) -> LocalResult:
     text = verdict.answer_text
     used = list(verdict.used_chunks)
     if not isinstance(text, str) or not text.strip() or not used or len(text) > max_answer_chars:
-        return _held("decide", "コードによる判定の答えが使えない形", events, bodies)
+        return _held("decide", "コードによる判定の答えが使えない形", events, bodies,
+                     decision_record=_record_of(verdict), decider_kind="decided")
     rec = verdict.decision_record
     bodies.append(text)
     events.append(AuditEvent("decide", "ok", f"rule={rec.get('rule_id')} outcome={rec.get('outcome_key')} chars={len(text)}"))
@@ -71,7 +84,8 @@ def _answer_by_code(user: str, verdict, events: list[AuditEvent], bodies: list[s
     run = RunResult(outcome="answered", stopped_at="none", reason="コードが規程から判定", output_text=text, audit=events,
                     response_visibility="source_level_requester_only", visible_to=user,
                     min_view_level=max(c.access_level for c in used))
-    return LocalResult(run, sources=tuple(c.source for c in used), bodies=tuple(bodies))
+    return LocalResult(run, sources=tuple(c.source for c in used), bodies=tuple(bodies),
+                       decision_record=_record_of(verdict), decider_kind="decided")
 
 
 def answer_locally(
@@ -105,6 +119,8 @@ def answer_locally(
     if not allowed:
         return _held("retrieve", "閲覧できる根拠が見つからない（根拠なしでは生成しない）", events, bodies)
 
+    no_record: dict | None = None
+    decider_kind: str | None = None
     if decider is not None:
         try:
             verdict = decider.decide(question, allowed)
@@ -113,19 +129,24 @@ def answer_locally(
                 return _answer_by_code(user, verdict, events, bodies, max_answer_chars)
             if kind == "held":
                 code = str(getattr(verdict, "decision_record", {}).get("hold_code") or "unknown")
-                return _held("decide", f"コードによる判定を保留（{code}）", events, bodies)
+                return _held("decide", f"コードによる判定を保留（{code}）", events, bodies,
+                             decision_record=_record_of(verdict), decider_kind="held")
             if kind != "no_record":
-                return _held("decide", "コードによる判定の結果が不明", events, bodies)
+                return _held("decide", "コードによる判定の結果が不明", events, bodies,
+                             decision_record=_record_of(verdict), decider_kind="error")
+            no_record, decider_kind = _record_of(verdict) or {}, "no_record"
         except Exception as e:  # noqa: BLE001
-            return _held("decide", f"コードによる判定に失敗: {type(e).__name__}", events, bodies)
+            return _held("decide", f"コードによる判定に失敗: {type(e).__name__}", events, bodies, decider_kind="error")
         # no_record: 数の規程ではない問は、下の通常のローカル回答へ
 
     try:
         text = generator.answer(question, allowed)
     except Exception as e:  # noqa: BLE001
-        return _held("generate", f"ローカル LLM の生成に失敗: {type(e).__name__}", events, bodies)
+        return _held("generate", f"ローカル LLM の生成に失敗: {type(e).__name__}", events, bodies,
+                     decision_record=no_record, decider_kind=decider_kind)
     if not isinstance(text, str) or not text.strip():
-        return _held("generate", "ローカル LLM の回答が空", events, bodies)
+        return _held("generate", "ローカル LLM の回答が空", events, bodies,
+                     decision_record=no_record, decider_kind=decider_kind)
     truncated = len(text) > max_answer_chars
     if truncated:
         text = text[:max_answer_chars]
@@ -136,4 +157,5 @@ def answer_locally(
     run = RunResult(outcome="answered", stopped_at="none", reason="ローカルで回答", output_text=text, audit=events,
                     response_visibility="source_level_requester_only", visible_to=user,
                     min_view_level=max(c.access_level for c in allowed))
-    return LocalResult(run, sources=tuple(c.source for c in allowed), bodies=tuple(bodies))
+    return LocalResult(run, sources=tuple(c.source for c in allowed), bodies=tuple(bodies),
+                       decision_record=no_record, decider_kind=decider_kind)

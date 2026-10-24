@@ -43,12 +43,13 @@ def ev(line, quote=None):
 def money_record(**over):
     d = {
         "rule_id": "R-money", "doc_path": PATH, "doc_version": sha256_text(DOC), "description": "d", "supported": True,
+        "relation": "if_else",  # 両側に結論を持つ合成の記録
         "subject": {"groups": [["購入"], ["承認"]]},
         "facts": [{"role": "amount", "label": "金額", "kind": "money", "cues": ["購入"]}],
         "conditions": [{"fact": "amount", "op": ">", "threshold": {"type": "number", "value": 100000},
                         "evidence": ev(3, "10万円を超える購入は部長の承認を要する")}],
         "outcomes": {"all_true": {"value": "必要", "basis": "explicit", "evidence": ev(3, "10万円を超える購入は部長の承認を要する")},
-                     "any_false": {"value": "不要", "basis": "inferred_negation",
+                     "any_false": {"value": "不要", "basis": "explicit",
                                    "evidence": ev(3, "10万円を超える購入は部長の承認を要する")}},
         "options": ["必要", "不要"],
     }
@@ -114,6 +115,66 @@ def test_load_records_reads_only_json(tmp_path):
     (tmp_path / "a.json").write_text(json.dumps(money_record(), ensure_ascii=False), encoding="utf-8")
     (tmp_path / "ignored.jsonl").write_text("{broken", encoding="utf-8")
     assert [r.rule_id for r in load_records(tmp_path, Source())] == ["R-money"]
+
+
+# ---- relation（計画 7.1）
+
+def _with_sides(relation, all_true, any_false):
+    d = money_record(relation=relation)
+    e = ev(3, "10万円を超える購入は部長の承認を要する")
+    d["outcomes"] = {
+        "all_true": {"value": "必要", "basis": "explicit", "evidence": e} if all_true else {"value": "unknown", "basis": "unknown"},
+        "any_false": {"value": "不要", "basis": "explicit", "evidence": e} if any_false else {"value": "unknown", "basis": "unknown"}}
+    return d
+
+
+@pytest.mark.parametrize("relation,all_true,any_false,ok", [
+    ("if_then", True, False, True), ("if_then", False, True, False), ("if_then", True, True, False),
+    ("if_then_not", True, False, True), ("if_then_not", False, True, False), ("if_then_not", True, True, False),
+    ("only_if", False, True, True), ("only_if", True, False, False), ("only_if", True, True, False),
+    ("if_else", True, True, True), ("if_else", True, False, True), ("if_else", False, True, True),
+])
+def test_relation_allows_only_its_sides(relation, all_true, any_false, ok):
+    d = _with_sides(relation, all_true, any_false)
+    if ok:
+        assert parse_record(d).relation == relation
+    else:
+        with pytest.raises(RecordError, match="relation"):
+            parse_record(d)
+        with pytest.raises(RecordError, match="relation"):
+            build_record(d, Source())  # 文書の照合より前（構造の段）で止まる
+
+
+def test_both_sides_unknown_is_allowed_for_every_relation():
+    for rel in ("if_then", "if_then_not", "only_if", "if_else"):
+        assert parse_record(_with_sides(rel, False, False)).all_true.value == "unknown"
+
+
+def test_inferred_negation_basis_is_rejected():
+    d = money_record()
+    d["outcomes"]["any_false"]["basis"] = "inferred_negation"
+    with pytest.raises(RecordError, match="basis"):
+        parse_record(d)
+
+
+def test_supported_record_without_relation_is_rejected_and_unknown_relation_too():
+    d = money_record()
+    del d["relation"]
+    with pytest.raises(RecordError, match="relation"):
+        parse_record(d)
+    with pytest.raises(RecordError, match="relation"):
+        parse_record(money_record(relation="only_then"))
+
+
+def test_unsupported_record_needs_no_relation_but_a_stated_outcome_does():
+    d = money_record(supported=False, scope_reason="対応外", conditions=[], outcomes={})
+    del d["relation"]
+    assert parse_record(d).relation is None
+    d = _with_sides("if_then", True, False)
+    d.update(supported=False, scope_reason="対応外")
+    del d["relation"]
+    with pytest.raises(RecordError, match="relation"):
+        parse_record(d)
 
 
 # ---- 文書との照合（F7）

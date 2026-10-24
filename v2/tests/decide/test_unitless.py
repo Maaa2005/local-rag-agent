@@ -1,7 +1,8 @@
 """単位のない量（「評価が5以上」の 5）の記録と取り出し。合成の文書だけを使う。
 
-- 記録: unit: null と明示した量の事実は、引用の境目が単位なし（または単位付き）でも、直後の比べ方の語の向きが op と合えば作れる
-- 取り出し: 質問の数が単位なしなら使い、単位が付いていれば保留（facts:unit_mismatch）
+- 記録: unit: null と明示した量の事実は、引用の境目が単位なしで、直後の比べ方の語の向きが op と合えば作れる。境目に単位が付いていれば（「5点以上」）拒否
+- 取り出し: 質問の数が単位なしの型（後ろが文の終わり・句読点・閉じ括弧・です／の／以上 等）なら使い、
+  単位が付いている・型に合わない数は、手がかりと同じ節にあれば保留（facts:unit_mismatch）
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ LINES = [
     "賞与は評価が5以上5以下の社員に支給する。",    # 7
     "勤続3年以上の社員は住宅手当の対象とする。",   # 8
     "賞与の評価が5以上の社員には、3年以内の勤続を問わず支給する。",  # 9
+    "賞与は評価が5メートル以上の社員に支給する。",  # 10
 ]
 DOC = "\n".join(LINES) + "\n"
 PATH = "/watched/general/評価規程.md"
@@ -56,10 +58,11 @@ SCORE = {"role": "score", "label": "評価", "kind": "quantity", "unit": None, "
 def rec(line=3, quote="賞与は評価が5以上の社員に支給する", op=">=", value=5, facts=None, **over):
     e = ev(line, quote)
     d = {"rule_id": "R-score", "doc_path": PATH, "doc_version": sha256_text(DOC), "description": "d", "supported": True,
+         "relation": "if_else",  # 取り出しの試験用に両側へ結論を持たせる合成の記録
          "subject": {"groups": [["賞与"], ["支給"]]}, "facts": facts or [SCORE],
          "conditions": [{"fact": "score", "op": op, "threshold": {"type": "number", "value": value}, "evidence": e}],
          "outcomes": {"all_true": {"value": "支給される", "basis": "explicit", "evidence": e},
-                      "any_false": {"value": "支給されない", "basis": "inferred_negation", "evidence": e}},
+                      "any_false": {"value": "支給されない", "basis": "explicit", "evidence": e}},
          "options": ["支給される", "支給されない"]}
     d.update(over)
     return d
@@ -83,8 +86,13 @@ def test_unitless_record_loads():
     assert not r.stale and r.fact("score").unit == ""
 
 
-def test_unitless_record_accepts_unit_attached_quote_too():
-    assert build_record(rec(line=5, quote="賞与は評価が5点以上の社員に支給する"), Docs())
+def test_unitless_record_rejects_unit_attached_quote():
+    # 変更（計画 7.3）: 旧は「5点以上」の引用でも作れた。今は単位のない量の境目に単位が付いていれば拒否する
+    with pytest.raises(RecordError, match="単位"):
+        build_record(rec(line=5, quote="賞与は評価が5点以上の社員に支給する"), Docs())
+    # 向きの合う引用でも、単位として読めない語が続く数（5メートル以上）は単位付きとして拒否
+    with pytest.raises(RecordError, match="単位"):
+        build_record(rec(line=10, quote="賞与は評価が5メートル以上の社員に支給する"), Docs())
 
 
 def test_unitless_boundary_with_other_comparison_word():
@@ -179,3 +187,27 @@ def test_unitful_records_ignore_bare_numbers():
     from decide import parse
     assert [c.kind for c in parse.extract("評価は5、勤続3年").cands] == ["年"]
     assert [c.kind for c in parse.extract("評価は5、勤続3年", bare=True).cands] == ["", "年"]
+
+
+# ---------------------------------------------------------------- 質問から取る数の型（計画 7.3）
+
+def test_bare_number_forms_accepted_and_rejected():
+    from decide import parse
+    kinds = lambda q: [c.kind for c in parse.extract(q, bare=True).cands]  # noqa: E731
+    for q in ("評価は5です", "評価は5。", "評価は5", "評価は5、", "（評価5）", "評価は5 です", "評価5以上", "評価5未満", "評価が5より上",
+              "評価は5を超える", "評価は5と6", "評価は5だ", "評価は5に上がった", "評価5の人", "評価5が", "評価5は"):
+        assert kinds(q)[:1] == [""], q
+    for q in ("評価は5メートルです", "評価は 5 点です", "評価は5段階です", "評価は5条で決まる"):
+        assert kinds(q) == [parse.UNKNOWN_UNIT], q
+    # 日付・第N条・条の枝番は値として使わない
+    assert kinds("評価が決まったのは2026年5月1日です") == ["date"]
+    assert kinds("第7条により、評価は5です") == [""]
+    assert kinds("第7条の2により") == []
+
+
+def test_number_with_unit_in_other_clause_is_ignored_but_same_clause_holds():
+    assert last(decide("勤続3メートルです。評価は5です。賞与は支給されますか？")) == "結論: 支給される"
+    res = decide("評価は5メートルです。賞与は支給されますか？")
+    assert res.kind == "held" and res.decision_record["hold_code"] == "facts:unit_mismatch"
+    res = decide("評価は 5 点です。賞与は支給されますか？")
+    assert res.kind == "held" and res.decision_record["hold_code"] == "facts:unit_mismatch"

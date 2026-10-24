@@ -216,3 +216,118 @@ def test_local_route_with_decider_held_stops_at_decide(no_gateway):
     res = ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), g,
               decider=_Decider(_CodeVerdict("held", record={"hold_code": "facts:missing"})))
     assert res.run.outcome == "held" and res.run.stopped_at == "decide" and g.calls == 0
+
+
+# ---- 最終の答えの記録（plan 7.4）: on_final は ask() 1 回につき 1 回、最後に呼ばれる
+
+class _Boom:
+    def __init__(self, exc=None, text=ANSWER):
+        self.exc, self.text = exc, text
+
+    def answer(self, question, chunks):
+        if self.exc:
+            raise self.exc
+        return self.text
+
+
+def _final(c1, *, decider=None, generator=None, retriever=None, user=USER):
+    got = []
+    res = ask(c1, user, QUESTION, POLICY, retriever or FakeRetriever(), generator or FakeGenerator(),
+              decider=decider, on_final=got.append)
+    assert len(got) == 1  # 1 回だけ
+    return res, got[0]
+
+
+def test_ask_on_final_default_is_none():
+    assert inspect.signature(ask).parameters["on_final"].default is None
+    ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), FakeGenerator())  # 無くても動く
+
+
+def test_on_final_decided_by_code(no_gateway):
+    rec = {"rule_id": "R-x", "outcome_key": "all_true", "final_answer": None}
+    res, f = _final(StubC1("local"), decider=_Decider(_CodeVerdict("decided", "結論: 必要", used=[CHUNK], record=rec)))
+    assert f["route_final"] == "code" and f["final_answer"] == "結論: 必要" == res.run.output_text
+    assert f["outcome"] == "answered" and f["stopped_at"] == "none" and f["rule_id"] == "R-x"
+    assert rec["final_answer"] is None  # 渡した記録そのものは書き換えない
+
+
+def test_on_final_held_by_decider(no_gateway):
+    res, f = _final(StubC1("code"), decider=_Decider(_CodeVerdict("held", record={"hold_code": "facts:missing"})))
+    assert f["route_final"] == "held" and f["final_answer"] is None
+    assert f["outcome"] == "held" and f["stopped_at"] == "decide" and f["hold_code"] == "facts:missing"
+
+
+def test_on_final_model_only_carries_the_models_actual_answer(no_gateway):
+    g = _Boom(text="モデルが実際に答えた文 [1]")
+    res, f = _final(StubC1("local"), decider=_Decider(_CodeVerdict("no_record", record={"route": "model_only", "final_answer": None})),
+                    generator=g)
+    assert f["route_final"] == "model_only" and f["final_answer"] == "モデルが実際に答えた文 [1]"
+    assert f["route"] == "model_only" and f["outcome"] == "answered"
+
+
+@pytest.mark.parametrize("exc,text", [(RuntimeError("gpu"), ANSWER), (None, "")])
+def test_on_final_generation_failure_is_recorded_as_model_failed(no_gateway, exc, text):
+    res, f = _final(StubC1("local"), decider=_Decider(_CodeVerdict("no_record", record={"route": "model_only"})),
+                    generator=_Boom(exc, text))
+    assert f["route_final"] == "model_failed" and f["final_answer"] is None
+    assert f["outcome"] == "held" and f["stopped_at"] == "generate" and f["route"] == "model_only"
+
+
+def test_on_final_no_decider(no_gateway):
+    res, f = _final(StubC1("local"))
+    assert f["route_final"] == "no_decider" and f["final_answer"] == ANSWER
+    assert f["outcome"] == "answered" and "rule_id" not in f
+
+
+def test_on_final_no_decider_generation_failure_is_other_but_still_recorded(no_gateway):
+    res, f = _final(StubC1("local"), generator=_Boom(RuntimeError("gpu")))
+    assert f["route_final"] == "other" and f["stopped_at"] == "generate" and f["final_answer"] is None
+
+
+@pytest.mark.parametrize("c1,decider", [
+    (None, None),
+    (StubC1(exc=RuntimeError("down")), None),
+    (StubC1("reject"), None),
+    (StubC1("human"), _Decider(_CodeVerdict("no_record"))),
+    (StubC1("code"), None),
+    (StubC1("A", destination="x"), _Decider(_CodeVerdict("no_record"))),
+])
+def test_on_final_other_routes_stop_before_decider(no_gateway, c1, decider):
+    res, f = _final(c1, decider=decider)
+    assert f["route_final"] == "other" and f["final_answer"] is None and f["outcome"] != "answered"
+    assert f["stopped_at"] == res.run.stopped_at
+    if decider is not None:
+        assert decider.calls == 0
+
+
+def test_on_final_decider_given_but_no_evidence_is_other(no_gateway):
+    d = _Decider(_CodeVerdict("no_record"))
+    res, f = _final(StubC1("local"), decider=d, retriever=FakeRetriever(()))
+    assert f["route_final"] == "other" and f["stopped_at"] == "retrieve" and d.calls == 0
+
+
+def test_on_final_is_called_after_generation_and_audit(tmp_path, no_gateway):
+    order = []
+
+    class G:
+        def answer(self, q, c):
+            order.append("generate")
+            return ANSWER
+    store = AuditStore(tmp_path / "audit.db")
+    try:
+        ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), G(), audit_sink=store,
+            on_final=lambda r: order.append(("final", len(store.runs()))))
+    finally:
+        store.close()
+    assert order == ["generate", ("final", 1)]
+
+
+def test_on_final_log_is_not_in_audit_store(tmp_path, no_gateway):
+    store = AuditStore(tmp_path / "audit.db")
+    try:
+        res, f = (lambda got: (ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), FakeGenerator(),
+                                   audit_sink=store, on_final=got.append), got[0]))([])
+        dumped = json.dumps([store.runs(), store.events(res.run.audit_run_id)], ensure_ascii=False, default=str)
+        assert ANSWER not in dumped and f["final_answer"] == ANSWER
+    finally:
+        store.close()

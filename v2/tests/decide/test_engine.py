@@ -64,10 +64,13 @@ CHUNKS = [Ch(PATH)]
 
 def rec(rule_id, groups, facts, conditions, a, b, options, **extra):
     q = conditions[0]["evidence"] if conditions else None
+    # 計算の試験用: 両側に結論を持つ if_else の記録（Y 側の引用は条件の引用で代用する。engine の計算を試す為の合成の記録）。
+    # 片側だけ結論を持つ記録は IF_THEN_MONEY など（下）で、成り立たない側が保留になる事を確かめる。
     d = {"rule_id": rule_id, "doc_path": PATH, "doc_version": sha256_text(DOC), "description": rule_id, "supported": True,
+         "relation": "if_else",
          "subject": {"groups": groups}, "facts": facts, "conditions": conditions,
          "outcomes": {"all_true": {"value": a, "basis": "explicit", "evidence": q},
-                      "any_false": {"value": b, "basis": "inferred_negation", "evidence": q}},
+                      "any_false": {"value": b, "basis": "explicit", "evidence": q}},
          "options": options}
     d.update(extra)
     return d
@@ -130,6 +133,12 @@ UNKNOWN = rec("R-unknown", [["賞与"], ["支給"]],
               [{"fact": "score", "op": ">=", "threshold": {"type": "number", "value": 5},
                 "evidence": ev(15, "賞与は評価が5点以上の社員に支給する")}], "支給される", "unknown", ["支給される", "支給されない"])
 UNKNOWN["outcomes"]["any_false"] = {"value": "unknown", "basis": "unknown"}
+UNKNOWN["relation"] = "if_then"
+
+# 原文が「A なら X」だけの記録（if_then）。成り立たない側は規程が決めていないので unknown
+IF_THEN_MONEY = copy.deepcopy(MONEY)
+IF_THEN_MONEY["relation"] = "if_then"
+IF_THEN_MONEY["outcomes"]["any_false"] = {"value": "unknown", "basis": "unknown"}
 
 
 def engine(*datas, docs=None, on_record=None):
@@ -398,11 +407,13 @@ def test_decision_record_is_made_once_per_question_and_has_all_fields():
     assert seen[0]["extracted"][0]["sources"][0]["text"] == "12万円"
 
 
-def test_basis_inferred_negation_is_stated_in_the_answer():
-    t = decide(money_q("5万円"), MONEY).answer_text
-    assert "推論" in t
-    t = decide(money_q("12万円"), MONEY).answer_text
-    assert "推論" not in t
+def test_unconstrained_side_is_held_not_inferred():
+    """旧: 5万円（成り立たない側）は「推論」と断って「不要」を出していた。今は規程が決めていない側なので保留。"""
+    res = decide(money_q("5万円"), IF_THEN_MONEY)
+    held(res, "outcome:unknown")
+    assert res.decision_record["outcome_basis"] == "unknown" and res.decision_record["conclusion"] is None
+    t = decide(money_q("12万円"), IF_THEN_MONEY).answer_text
+    assert "推論" not in t and t.strip().split("\n")[-1] == "結論: 必要"
 
 
 # ---------------------------------------------------------------- F7: 敵対的な記録
@@ -422,12 +433,8 @@ def test_f7_wrong_number_wrong_op_wrong_version_are_stopped():
     held(DecisionEngine([build_record(bad, Docs())], Docs()).decide(money_q("12万円"), CHUNKS), "version:stale")
 
 
-def test_f7_known_gap_reversed_outcome_is_not_stopped():
-    """既知の穴: 結論の向きを取り違えた記録は読み込まれ、逆の結論を出す。F7 の機械検査では止まらない。
-    止める手段は人による記録の確認（作問役とは別の採点）。ここでは「止まらない」ことを事実として固定する。"""
-    bad = copy.deepcopy(MONEY)
-    bad["outcomes"]["all_true"]["value"], bad["outcomes"]["any_false"]["value"] = "不要", "必要"
-    assert last(decide(money_q("12万円"), bad)) == "結論: 不要"
+# 結論を逆にした記録・境目の数を変えた記録・版を変えた記録・表に無い記録が使う前に止まる事は、確認済みの表（verified.json）の試験
+# tests/decide/test_verified.py で確かめる（旧: ここの「止まらない」固定の試験は、計画 7.2 で置き換えた）。
 
 
 # ---------------------------------------------------------------- 実ファイルの文書の置き場

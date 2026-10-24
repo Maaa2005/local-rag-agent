@@ -273,20 +273,31 @@ def to_fraction(v: Decimal | int | str) -> Fraction:
     return Fraction(Decimal(v)) if not isinstance(v, Fraction) else v
 
 
-# 数の直後にこれが付く物は「単位のない数」ではない（日付・金額・順序・番号などの一部）。単位の一覧に無い物もここで外す
-_COUNTER_AFTER = "年月日時分秒円割%点人名回件個台枚歳週号条項章節番階つ倍期度万千億"
+# 単位のない数（質問から取る数）の受け付け範囲（計画 7.3）。
+# 数の後ろ（空白を飛ばす）が、文の終わり・句読点・閉じ括弧、または下の語で始まる時だけ「単位のない数」として使う。
+# それ以外（「5メートル」「5 点」「5条」など）は値ではない。手がかりの語と同じ節に在れば engine が単位のずれとして保留する。
+# 「第5条」のように 第 の直後の数と、日付・金額・量として読めた数は、単位のない数として使わない。
 _BARE_NUM = re.compile(
-    r"(?<![\d.,:/\-A-Za-z_第])(?P<n>\d+(?:,\d{3})*(?:\.\d+)?)(?![\d:/\-A-Za-z_" + _COUNTER_AFTER + r"])(?!\.\d)"
+    r"(?<![\d.,:/\-A-Za-z_第])(?<!条の)(?<!項の)(?<!号の)(?P<n>\d+(?:,\d{3})*(?:\.\d+)?)(?![,.]?\d)"
 )
+_BARE_AFTER_PUNCT = "。、，,．.！？!?）)」』】]"
+_BARE_AFTER_WORDS = ("です", "だ", "で", "と", "を", "に", "は", "が", "の", "以上", "以下", "未満", "より", "超")
+UNKNOWN_UNIT = "?"  # 単位のない数として受け付けない数（単位が付いているか、型に合わない）
 
 
-def _bare_numbers(text: str, consumed: list[tuple[int, int]]) -> list[tuple[int, int, Decimal]]:
-    """単位の付かない数 [(開始, 終わり, 値)]。日付・金額・量などで読めた範囲（consumed）と重なる物は除く。"""
+def bare_form_ok(text: str, end: int) -> bool:
+    """text[end:]（空白を飛ばす）が、単位のない数として受け付ける型か。"""
+    rest = text[end:].lstrip()
+    return not rest or rest[0] in _BARE_AFTER_PUNCT or rest.startswith(_BARE_AFTER_WORDS)
+
+
+def _bare_numbers(text: str, consumed: list[tuple[int, int]]) -> list[tuple[int, int, Decimal, bool]]:
+    """日付・金額・量などで読めた範囲（consumed）と重ならない数 [(開始, 終わり, 値, 単位のない数として受け付けるか)]。"""
     out = []
     for m in _BARE_NUM.finditer(text):
         if any(a < m.end() and m.start() < b for a, b in consumed):
             continue
-        out.append((m.start(), m.end(), _dec(m["n"])))
+        out.append((m.start(), m.end(), _dec(m["n"]), bare_form_ok(text, m.end())))
     return out
 
 
@@ -295,6 +306,7 @@ def extract(question: str, base_year: int | None = None, bare: bool = False) -> 
 
     年の無い「M月D日」は、質問の中の完全な日付の年が 1 種類だけ（または base_year の指定）のときだけ日付にする。
     bare=True の時は、単位の付かない数も kind="" の候補として取る（記録に単位のない量の事実がある時だけ使う）。
+    受け付けない型の数（「5メートル」「5 点」など）は kind=UNKNOWN_UNIT の候補にする（engine が単位のずれとして扱う）。
     """
     text = clean_question(question)
     spans: list[tuple[int, int]] = []
@@ -331,8 +343,8 @@ def extract(question: str, base_year: int | None = None, bare: bool = False) -> 
         cands.append(Cand(q.kind, to_fraction(q.value), q.start, q.end, text[q.start:q.end]))
     if bare:
         consumed = spans + [(q.start, q.end) for q in qtys]
-        for a, b, v in _bare_numbers(text, consumed):
-            cands.append(Cand("", to_fraction(v), a, b, text[a:b]))
+        for a, b, v, ok in _bare_numbers(text, consumed):
+            cands.append(Cand("" if ok else UNKNOWN_UNIT, to_fraction(v), a, b, text[a:b]))
     cands.sort(key=lambda c: (c.start, c.end))
     return Extracted(text, tuple(cands), unresolved, any(q.bizday for q in qtys) or "営業日" in text)
 
@@ -404,20 +416,24 @@ def quote_tokens(quote: str, kind: str, unit: str | None = None) -> list[tuple[i
     return out
 
 
-def quote_number_tokens(quote: str) -> list[tuple[int, Any]]:
-    """単位のない量の境目用: 引用の中の数 [(終わり位置, 値)]。単位が付いていれば単位の後ろが終わり位置。
+def quote_number_tokens(quote: str) -> list[tuple[int, Any, str | None]]:
+    """単位のない量の境目用: 引用の中の数 [(終わり位置, 値, 単位)]。単位が付いていれば単位の後ろが終わり位置。
 
-    日付の一部の数は除く。単位の無い数（「5以上」の 5）も取る。
+    単位: 単位なしなら None。単位が付いていれば単位名（「5点以上」なら "点"）。単位として読めない語が続く数
+    （「5メートル以上」）は UNKNOWN_UNIT。比べ方の言い回し（「5以上」「5を超える」）が続く数は単位なし。
+    日付の一部の数は除く。呼び出し側（records）が、境目の数に単位が付いていれば記録を拒む。
     """
     text = _normalize(quote)
     spans = [(a, b) for a, b, _ in _full_dates(text)]
     spans += [(m.start(), m.end()) for m in _PART_DATE.finditer(text)]
     spans += [(m.start(), m.end()) for m in _MONTH_REF.finditer(text)]
     spans += [(m.start(), m.end()) for m in _YEAR_MONTH.finditer(text)]
-    qtys = [q for q in _quantities(text, spans) if not q.bizday]
-    out = [(q.end, to_fraction(q.value)) for q in qtys]
-    consumed = spans + [(q.start, q.end) for q in _quantities(text, spans)]
-    out += [(b, to_fraction(v)) for _, b, v in _bare_numbers(text, consumed)]
+    all_q = _quantities(text, spans)
+    out: list[tuple[int, Any, str | None]] = [(q.end, to_fraction(q.value), q.kind) for q in all_q if not q.bizday]
+    consumed = spans + [(q.start, q.end) for q in all_q]
+    for _, b, v, ok in _bare_numbers(text, consumed):
+        has_phrase = _match_phrase(text, b, _NUM_RE) is not None
+        out.append((b, to_fraction(v), None if (ok or has_phrase) else UNKNOWN_UNIT))
     out.sort(key=lambda t: t[0])
     return out
 

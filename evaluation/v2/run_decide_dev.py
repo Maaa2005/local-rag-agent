@@ -6,8 +6,10 @@
 - 順番: 先に engine が答え、その後で expected_conclusion と照らす（答えを作る側は正解を見ない）
 - 判断の記録（plan §4）は engine が答えた時に 1 回だけ作ったものに id と correct を足した写しを --out に書く
 - --out の既定は /tmp/decide-dev.jsonl。リポジトリの中は拒否する
+- 記録は確認済みの表（verified.json）にあるものだけ読む。表に無い・ハッシュが違う記録があれば起動の時点で止まる（終了 2）。
+  --allow-unverified を付けた時だけ表なしで読む（警告を 1 行出す。評価には使えない）
 
-使い方: python evaluation/v2/run_decide_dev.py [--out /tmp/decide-dev.jsonl]
+使い方: python evaluation/v2/run_decide_dev.py [--out /tmp/decide-dev.jsonl] [--allow-unverified]
 """
 from __future__ import annotations
 
@@ -22,7 +24,7 @@ if str(ROOT / "v2") not in sys.path:
     sys.path.insert(0, str(ROOT / "v2"))
 
 from decide.engine import DecisionEngine, FileDocLookup  # noqa: E402
-from decide.records import load_records  # noqa: E402
+from decide.records import RecordError, load_records  # noqa: E402
 from orchestrator.local_answer import Chunk  # noqa: E402
 
 QUESTION_FILES = (ROOT / "evaluation/v2/numeric_boundary.jsonl", ROOT / "evaluation/v2/numeric_dev24.jsonl")
@@ -30,6 +32,7 @@ CORPUS_DIRS = (ROOT / "evaluation/corpus", ROOT / "evaluation/v2/corpus_nx_dev")
 RECORDS_DIR = ROOT / "v2/decide/records"
 LEVELS = {"general": 1, "manager": 2, "executive": 3}
 DEFAULT_OUT = Path("/tmp/decide-dev.jsonl")
+UNVERIFIED_WARNING = "未確認の記録で実行（評価には使えない）"
 
 
 def load_rows(paths=QUESTION_FILES) -> list[dict]:
@@ -56,19 +59,22 @@ def visible_chunks(level: int, corpus_dirs=CORPUS_DIRS) -> list[Chunk]:
     return chunks
 
 
-def make_engine(records_dir=RECORDS_DIR, corpus_dirs=CORPUS_DIRS, on_record=None) -> DecisionEngine:
+def make_engine(records_dir=RECORDS_DIR, corpus_dirs=CORPUS_DIRS, on_record=None, *,
+                allow_unverified: bool = False) -> DecisionEngine:
+    """既定は確認済みの記録だけ（RecordError で止まる）。allow_unverified=True の時だけ表なしで読む。"""
     lookup = FileDocLookup(corpus_dirs)
-    return DecisionEngine(load_records(records_dir, lookup), lookup, on_record=on_record)
+    records = load_records(records_dir, lookup, require_verified=not allow_unverified)
+    return DecisionEngine(records, lookup, on_record=on_record)
 
 
 def final_line(text: str) -> str:
     return text.strip().split("\n")[-1]
 
 
-def run_rows(rows: list[dict], engine: DecisionEngine | None = None) -> list[dict]:
+def run_rows(rows: list[dict], engine: DecisionEngine | None = None, *, allow_unverified: bool = False) -> list[dict]:
     """各問を engine に流して結果の行を返す。engine が答えを返した後で初めて正解欄を見る。"""
     records: list[dict] = []
-    engine = engine or make_engine(on_record=records.append)
+    engine = engine or make_engine(on_record=records.append, allow_unverified=allow_unverified)
     out = []
     for row in rows:
         n_before = len(records)
@@ -112,12 +118,21 @@ def print_table(results: list[dict]) -> None:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--out", default=str(DEFAULT_OUT), help="判断の記録の JSONL（リポジトリの外）")
+    ap.add_argument("--records", default=str(RECORDS_DIR), help="記録の dir（既定は v2/decide/records）")
+    ap.add_argument("--allow-unverified", action="store_true", help="確認済みの表なしで読む（評価には使えない）")
     args = ap.parse_args(argv)
     out = Path(args.out).resolve()
     if ROOT == out or ROOT in out.parents:
         print(f"--out はリポジトリの外に指定してください: {out}", file=sys.stderr)
         return 2
-    results = run_rows(load_rows())
+    try:
+        engine = make_engine(Path(args.records), allow_unverified=args.allow_unverified)
+    except RecordError as e:
+        print(f"記録を読めない: {e}")
+        return 2
+    if args.allow_unverified:
+        print(UNVERIFIED_WARNING)
+    results = run_rows(load_rows(), engine=engine)
     write_jsonl(results, out)
     print_table(results)
     print(f"判断の記録: {out}")

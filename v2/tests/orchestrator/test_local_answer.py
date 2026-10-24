@@ -315,3 +315,47 @@ def test_decider_events_carry_no_body_text():
     res = answer_locally(GENERAL, secret, POLICY, FakeRetriever([ch(1)]), FakeGenerator(), decider=FakeDecider(v))
     assert all(secret not in (e.detail or "") for e in res.run.audit)
     assert secret in res.bodies[-1]  # 本文は監査の除去用に bodies へ
+
+
+# ---- 判断の記録（plan 7.4）: decider が走った時だけ LocalResult.decision_record に入る
+
+def test_decision_record_field_defaults_to_none():
+    import dataclasses
+    from orchestrator.local_answer import LocalResult
+    f = {x.name: x for x in dataclasses.fields(LocalResult)}
+    assert f["decision_record"].default is None
+
+
+def test_decision_record_filled_for_decided_held_and_no_record():
+    rec = {"rule_id": "R-x", "outcome_key": "all_true", "hold_code": "facts:missing"}
+    dec = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), FakeGenerator(),
+                         decider=FakeDecider(_Verdict("decided", "結論: 必要", used=[ch(1)], record=rec)))
+    held = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), FakeGenerator(),
+                          decider=FakeDecider(_Verdict("held", record=rec)))
+    nor = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), FakeGenerator(),
+                         decider=FakeDecider(_Verdict("no_record", record={"route": "model_only"})))
+    assert (dec.decision_record, dec.decider_kind) == (rec, "decided")
+    assert (held.decision_record, held.decider_kind) == (rec, "held")
+    assert (nor.decision_record, nor.decider_kind) == ({"route": "model_only"}, "no_record")
+    assert nor.run.outcome == "answered"  # モデルが答えても記録は残る
+
+
+def test_decision_record_survives_generation_failure_after_no_record():
+    res = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), FakeGenerator(exc=RuntimeError("gpu")),
+                         decider=FakeDecider(_Verdict("no_record", record={"route": "model_only"})))
+    assert res.run.outcome == "held" and res.run.stopped_at == "generate"
+    assert res.decision_record == {"route": "model_only"} and res.decider_kind == "no_record"
+
+
+def test_decision_record_is_none_without_decider_or_before_it_runs():
+    g = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), FakeGenerator())
+    nochunk = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([]), FakeGenerator(),
+                             decider=FakeDecider(_Verdict("no_record")))
+    assert g.decision_record is None and g.decider_kind is None
+    assert nochunk.decision_record is None and nochunk.decider_kind is None
+
+
+def test_decider_exception_leaves_no_record_and_marks_error():
+    res = answer_locally(GENERAL, QUESTION, POLICY, FakeRetriever([ch(1)]), FakeGenerator(),
+                         decider=FakeDecider(exc=RuntimeError("boom")))
+    assert res.decision_record is None and res.decider_kind == "error"

@@ -11,14 +11,17 @@
   で確かめる。不一致は RecordError（黙って読み込まない）。
 版が違う（SHA 不一致・文書なし）記録は構造だけ検査して stale として読み込み、engine が「版」で保留する。
 
-この検査で分かるのは「境目の数・比べ方の向きが引用と食い違う」ことまで。
-結論側（成り立つ時・成り立たない時にどちらの結論を出すか）の取り違え、対象の取り違え、手がかりの語の取り違えは検出できない。
+この検査で分かるのは「境目の数・比べ方の向きが引用と食い違う」「relation の表が許さない側に結論がある」ことまで。
+結論側の取り違え（最初から逆に書かれた記録）、対象の取り違え、手がかりの語の取り違えは、この検査では検出できない。
+それを止めるのは採点（作問役）と確認済みの表（verified.json。load_records の require_verified）で、
+表が保証するのは「確認済みの物から変わったら止まる」ことだけ（計画 7.2）。
 .jsonl は開かない。
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from datetime import date
 from fractions import Fraction
@@ -29,7 +32,15 @@ from . import parse
 
 MAX_CONDITIONS = 3
 OPS = (">", ">=", "<", "<=")
-BASES = ("explicit", "inferred_negation", "unknown")
+BASES = ("explicit", "unknown")  # 否定で推論した側（inferred_negation）は使わない（計画 7.1）
+# relation（原文の文の型）ごとに、結論（unknown 以外）を持てる側（計画 7.1 の表）
+RELATIONS: dict[str, tuple[str, ...]] = {
+    "if_then": ("all_true",),
+    "if_then_not": ("all_true",),
+    "only_if": ("any_false",),
+    "if_else": ("all_true", "any_false"),
+}
+VERIFIED_FILE = "verified.json"
 FACT_KINDS = ("money", "date", "quantity", "ratio")
 MATTERS_FOR = ("all_true", "any_false", "both")
 
@@ -105,7 +116,7 @@ class OtherRequirement:
 @dataclass(frozen=True)
 class Outcome:
     value: str  # options のどれか、または "unknown"
-    basis: str  # explicit / inferred_negation / unknown
+    basis: str  # explicit / unknown
     evidence: Evidence | None
 
 
@@ -127,6 +138,7 @@ class Record:
     any_false: Outcome | None
     options: tuple[str, ...]
     stale: bool = False  # 文書の版が記録の doc_version と違う（または文書が無い）
+    relation: str | None = None  # if_then / if_then_not / only_if / if_else（supported なら必須）
 
     def fact(self, role: str) -> Fact:
         for f in self.facts:
@@ -261,7 +273,7 @@ def parse_record(data: Any) -> Record:
     """構造だけを検査して Record にする（文書との照合は validate_against_document）。"""
     top = _obj(data, {
         "rule_id": True, "doc_path": True, "doc_version": True, "description": True, "supported": True,
-        "scope_reason": False, "subject": True, "facts": True, "conditions": True, "exceptions": False,
+        "scope_reason": False, "relation": False, "subject": True, "facts": True, "conditions": True, "exceptions": False,
         "other_requirements": False, "outcomes": True, "options": True}, "record")
     rule_id = _str(top["rule_id"], "rule_id")
     ctx = rule_id
@@ -336,9 +348,24 @@ def parse_record(data: Any) -> Record:
     outs = _obj(top["outcomes"], {"all_true": False, "any_false": False}, f"{ctx}.outcomes")
     if supported and set(outs) != {"all_true", "any_false"}:
         raise RecordError(f"{ctx}.outcomes: all_true と any_false の両方が要る（導けない側は basis unknown）")
+    relation = top.get("relation")
+    if relation is None:
+        if supported:
+            raise RecordError(f"{ctx}: relation が要る（{' / '.join(RELATIONS)}）")
+    elif relation not in RELATIONS:
+        raise RecordError(f"{ctx}: 知らない relation {relation!r}")
     scope_reason = top.get("scope_reason")
     if not supported and not (isinstance(scope_reason, str) and scope_reason.strip()):
         raise RecordError(f"{ctx}: 対応範囲外の記録には scope_reason が要る")
+    all_true = _outcome(outs["all_true"], f"{ctx}.outcomes.all_true", options) if "all_true" in outs else None
+    any_false = _outcome(outs["any_false"], f"{ctx}.outcomes.any_false", options) if "any_false" in outs else None
+    for name, out in (("all_true", all_true), ("any_false", any_false)):
+        if out is None or out.value == "unknown":
+            continue
+        if relation is None:
+            raise RecordError(f"{ctx}.outcomes.{name}: 結論を持つには relation が要る")
+        if name not in RELATIONS[relation]:
+            raise RecordError(f"{ctx}.outcomes.{name}: relation {relation} はこの側に結論を持てない（unknown にする）")
     return Record(
         rule_id=rule_id,
         doc_path=_str(top["doc_path"], "doc_path"),
@@ -346,9 +373,7 @@ def parse_record(data: Any) -> Record:
         description=_str(top["description"], "description"),
         supported=supported, scope_reason=scope_reason, groups=groups_t, excludes=excludes, facts=facts,
         conditions=tuple(conds), exceptions=tuple(excs), other_requirements=tuple(others),
-        all_true=_outcome(outs["all_true"], f"{ctx}.outcomes.all_true", options) if "all_true" in outs else None,
-        any_false=_outcome(outs["any_false"], f"{ctx}.outcomes.any_false", options) if "any_false" in outs else None,
-        options=options)
+        all_true=all_true, any_false=any_false, options=options, relation=relation)
 
 
 # ---------------------------------------------------------------- 文書との照合（F7）
@@ -372,9 +397,14 @@ def _check_condition(rec: Record, c: Condition, ctx: str) -> None:
     f = rec.fact(c.fact)
     th, q = c.threshold, c.evidence.quote
     if th.type == "number" and f.kind == "quantity" and not f.unit:
-        # 単位のない量: 境目の数は単位なし、または単位付きで書かれていてよい。直後（単位があれば単位の後）の比べ方の語で向きを確かめる
-        toks = [(end, v) for end, v in parse.quote_number_tokens(q) if v == th.value]
-        _all_agree([parse.phrase_op(q, end, "num") for end, _ in toks], c.op,
+        # 単位のない量: 境目の数に単位が付いていれば（「5点以上」）拒否。単位なしなら直後の比べ方の語で向きを確かめる（計画 7.3）
+        toks = [(end, v, u) for end, v, u in parse.quote_number_tokens(q) if v == th.value]
+        united = [u for _, _, u in toks if u is not None]
+        if united:
+            raise RecordError(f"{ctx}: 単位のない量の境目 {parse.fmt_number(th.value)} に単位が付いている"
+                              f"（引用の「{parse.fmt_number(th.value)}{'' if united[0] == parse.UNKNOWN_UNIT else united[0]}…」）。"
+                              "単位の付いた量として記録する")
+        _all_agree([parse.phrase_op(q, end, "num") for end, _, _ in toks], c.op,
                    f"{ctx}: 境目 {parse.fmt_number(th.value)}（単位なし）")
     elif th.type == "number":
         kind = f.unit or ""
@@ -421,14 +451,78 @@ def build_record(data: Any, source: DocSource | None) -> Record:
     return Record(**{**rec.__dict__, "stale": True})
 
 
-def load_records(directory: Path | str, source: DocSource | None) -> list[Record]:
-    """directory の *.json（記録）を読む。.jsonl など他の拡張子は見ない。"""
-    out = []
-    for p in sorted(Path(directory).glob("*.json")):
+def record_sha256(data: dict) -> str:
+    """記録（JSON を読んだ dict）の中身の SHA-256。キーの順・空白に依らない。"""
+    blob = json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()
+
+
+_HEX64 = re.compile(r"[0-9a-f]{64}")
+
+
+def _is_sha(v: Any) -> bool:
+    return isinstance(v, str) and _HEX64.fullmatch(v) is not None
+
+
+def load_verified_table(path: Path | str) -> dict[str, str]:
+    """確認済みの表（verified.json）を読む。形が違えば RecordError。戻り値は {rule_id: 記録の SHA-256}。"""
+    p = Path(path)
+    if not p.is_file():
+        raise RecordError(f"確認済みの表 {p.name} が無い（評価の設定では必須）")
+    try:
+        table = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise RecordError(f"{p.name}: JSON が読めない") from e
+    if not isinstance(table, dict):
+        raise RecordError(f"{p.name}: オブジェクトでない")
+    if not _is_sha(table.get("grade_report_sha256")):
+        raise RecordError(f"{p.name}: grade_report_sha256 が SHA-256（64 桁の 16 進）でない")
+    if not isinstance(table.get("graded_by"), str) or not table["graded_by"].strip():
+        raise RecordError(f"{p.name}: graded_by が無い")
+    recs = table.get("records")
+    if not isinstance(recs, dict) or not all(isinstance(k, str) and _is_sha(v) for k, v in recs.items()):
+        raise RecordError(f"{p.name}: records が {{rule_id: SHA-256}} の形でない")
+    return dict(recs)
+
+
+def load_records(directory: Path | str, source: DocSource | None, *, verified: Path | str | None = None,
+                 require_verified: bool = False) -> list[Record]:
+    """directory の *.json（記録）を読む。.jsonl など他の拡張子は見ない。verified.json は記録ではない。
+
+    require_verified=True（評価の設定）: 確認済みの表（verified。省略時は directory/verified.json）が無い、
+    表に無い記録、中身の SHA-256 が表と違う記録、記録の無い表の項目があれば、記録を作る前に RecordError。
+    """
+    d = Path(directory)
+    table_path = Path(verified) if verified is not None else d / VERIFIED_FILE
+    skip = {VERIFIED_FILE}
+    if require_verified:
+        if table_path.parent.resolve() == d.resolve():
+            skip.add(table_path.name)
+    raw: list[tuple[Path, Any]] = []
+    for p in sorted(d.glob("*.json")):
+        if p.name in skip:
+            continue
         try:
-            data = json.loads(p.read_text(encoding="utf-8"))
+            raw.append((p, json.loads(p.read_text(encoding="utf-8"))))
         except json.JSONDecodeError as e:
             raise RecordError(f"{p.name}: JSON が読めない") from e
+    if require_verified:
+        table = load_verified_table(table_path)
+        seen: set[str] = set()
+        for p, data in raw:
+            rid = data.get("rule_id") if isinstance(data, dict) else None
+            if not isinstance(rid, str) or not rid:
+                raise RecordError(f"{p.name}: rule_id が読めない（確認済みの表と照合できない）")
+            if rid not in table:
+                raise RecordError(f"{p.name}: 記録 {rid} は確認済みの表に無い")
+            if record_sha256(data) != table[rid]:
+                raise RecordError(f"{p.name}: 記録 {rid} の中身が確認済みの表と違う（確認後に変更された）")
+            seen.add(rid)
+        gone = sorted(set(table) - seen)
+        if gone:
+            raise RecordError(f"確認済みの表にあるが記録が無い: {', '.join(gone)}")
+    out = []
+    for p, data in raw:
         try:
             out.append(build_record(data, source))
         except RecordError as e:
