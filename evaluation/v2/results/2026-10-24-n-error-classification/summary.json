@@ -1,0 +1,26 @@
+{
+ "what": "Step 2 の 3 候補・5 回分の N（12 問）の不一致を原因で分けた。回答の文はリポジトリに入れない（問の番号・種類・数だけ）",
+ "made_at_jst": "2026-10-24",
+ "inputs": [
+  "2026-10-23 LFM2.5-1.2B-JP 8GB・12GB（vLLM・float16）",
+  "2026-10-23 Qwen3-4B-2507 12GB（vLLM・float16。8GB は起動せず）",
+  "2026-10-24 Gemma 4 E2B-it 8GB・12GB（llama-server・Q8_0）"
+ ],
+ "not_included": "基準線 sarashina2.2-3b（Step 1 の回答は手元に残っていない。数だけ summary.json にある）",
+ "method": "各問の検索結果に規程の文（rule_quote の先頭 12 文字）が入っているか、最後の「結論:」が選択肢のどれかか、を機械で確かめた。境目ちょうどの問（N02・N05・N08・N11）の不一致を「以上/超える等の読み違い」、それ以外（境目の下・上）の不一致を「大小の比べ違い」と数えた",
+ "total_wrong": 29,
+ "rule_text_missing": 0,
+ "format_broken": 0,
+ "by_model": {
+  "Gemma 4 E2B": {"runs": 2, "wrong": {"N02": 2, "N04": 2, "N05": 2, "N08": 2, "N09": 2, "N11": 2}, "at_boundary": 8, "off_boundary": 4, "output_tokens_median_all_N": 6},
+  "LFM2.5-1.2B-JP": {"runs": 2, "wrong": {"N01": 2, "N02": 2, "N04": 2, "N05": 2, "N07": 2, "N11": 2}, "at_boundary": 6, "off_boundary": 6, "output_tokens_median_all_N": 121},
+  "Qwen3-4B-2507": {"runs": 1, "wrong": {"N01": 1, "N02": 1, "N04": 1, "N05": 1, "N07": 1}, "at_boundary": 2, "off_boundary": 3, "output_tokens_median_all_N": 11}
+ },
+ "reading": [
+  "29 件すべてで規程の文は検索で取れており、結論の書式も崩れていない。落ちた原因は検索や書式ではなく、数の判断そのもの",
+  "Gemma と Qwen は途中の考えを書かず結論だけを出す（出力の中央 6・11 トークン）",
+  "LFM は先に結論を書き、その後の説明で数の大小を取り違えて結論に合わせている（例: 9 万 8 千円を 10 万超えとみなす）",
+  "Gemma は R2（日付）と R3（出勤率）の 6 問すべてで、制限する側の答えを出した（境目から離れた 90・100 日も含む）"
+ ],
+ "caution": "この 12 問を見て直し方（コードで比べる・考えさせる等）を決めて同じ 12 問で測ると、問に合わせただけになる。直し方を試すなら別の問でも確かめる"
+}
