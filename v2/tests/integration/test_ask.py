@@ -170,11 +170,11 @@ def test_code_route_with_decider_held_stops_at_decide(no_gateway):
     assert res.run.outcome == "held" and res.run.stopped_at == "decide" and g.calls == 0
 
 
-def test_local_route_does_not_use_decider(no_gateway):
-    d = _Decider(_CodeVerdict("decided", "結論: 必要", used=[CHUNK]))
-    res = ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), FakeGenerator(), decider=d)
-    # decider は C1 が code を選んだ時だけ使う。local は従来どおりモデルが答える
-    assert res.run.outcome == "answered" and res.run.output_text == ANSWER and d.calls == 0
+def test_local_route_without_decider_uses_model(no_gateway):
+    # 10/24 変更: local でも decider を通す（決め事 3 節: 全質問が記録の検索を通る）。decider が無ければ従来どおりモデルが答える
+    g = FakeGenerator()
+    res = ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), g)
+    assert res.run.outcome == "answered" and res.run.output_text == ANSWER and g.calls == 1
 
 
 def test_code_route_audit_has_no_bodies(tmp_path, no_gateway):
@@ -191,3 +191,28 @@ def test_code_route_audit_has_no_bodies(tmp_path, no_gateway):
         assert "R-x" in dumped
     finally:
         store.close()
+
+
+# ---- local 経路でも decider を通す（全質問が記録の検索を通る）
+
+def test_local_route_with_decider_decided_answers_from_code(no_gateway):
+    g = FakeGenerator()
+    d = _Decider(_CodeVerdict("decided", "結論: 必要", used=[CHUNK], record={"rule_id": "R-x", "outcome_key": "all_true"}))
+    res = ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), g, decider=d)
+    assert res.run.outcome == "answered" and res.run.output_text == "結論: 必要"
+    assert g.calls == 0 and d.calls == 1
+    assert res.run.audit[0].stage == "C1" and res.run.audit[0].result == "local"
+
+
+def test_local_route_with_decider_no_record_falls_back_to_model(no_gateway):
+    g, d = FakeGenerator(), _Decider(_CodeVerdict("no_record"))
+    res = ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), g, decider=d)
+    assert res.run.outcome == "answered" and res.run.output_text == ANSWER
+    assert d.calls == 1 and g.calls == 1
+
+
+def test_local_route_with_decider_held_stops_at_decide(no_gateway):
+    g = FakeGenerator()
+    res = ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), g,
+              decider=_Decider(_CodeVerdict("held", record={"hold_code": "facts:missing"})))
+    assert res.run.outcome == "held" and res.run.stopped_at == "decide" and g.calls == 0

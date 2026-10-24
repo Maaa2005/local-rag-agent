@@ -1,7 +1,8 @@
 """自由質問の入口: C1 → local ならローカル回答（権限付き RAG）。
 
 送信契約の入力を持たない質問を扱う。C1 は必ず judge.base.guarded_c1 を通す。
-- local: orchestrator.local_answer.answer_locally（Gateway を持たないので外部へは送れない）
+- local: orchestrator.local_answer.answer_locally（Gateway を持たないので外部へは送れない）。
+  decider があれば local でも記録の検索を通す（全質問が記録を通る）。no_record ならこれまでどおりモデルが答える
 - reject: rejected
 - それ以外（human・code・A・B・C1 失敗）: held。A/B は契約の入口（run_contract_a / run_contract_b）からしか
   送らない。code（コードで処理）は数値ガード（F7）が未実装のため保留する
@@ -43,7 +44,7 @@ def ask(
             res = LocalResult(stopped_at_c1(None, f"C1 failed: {decision.reason}", error=True), bodies=(question,))
         elif decision.route == "local":
             res = answer_locally(user, question, pol, retriever, generator,
-                                 audit=[AuditEvent("C1", "local", c1_detail(decision))])
+                                 audit=[AuditEvent("C1", "local", c1_detail(decision))], decider=decider)
         elif decision.route == "code" and decider is not None:
             res = answer_locally(user, question, pol, retriever, generator,
                                  audit=[AuditEvent("C1", "code", c1_detail(decision))], decider=decider)

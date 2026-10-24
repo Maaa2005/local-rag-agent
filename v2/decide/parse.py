@@ -273,10 +273,28 @@ def to_fraction(v: Decimal | int | str) -> Fraction:
     return Fraction(Decimal(v)) if not isinstance(v, Fraction) else v
 
 
-def extract(question: str, base_year: int | None = None) -> Extracted:
+# 数の直後にこれが付く物は「単位のない数」ではない（日付・金額・順序・番号などの一部）。単位の一覧に無い物もここで外す
+_COUNTER_AFTER = "年月日時分秒円割%点人名回件個台枚歳週号条項章節番階つ倍期度万千億"
+_BARE_NUM = re.compile(
+    r"(?<![\d.,:/\-A-Za-z_第])(?P<n>\d+(?:,\d{3})*(?:\.\d+)?)(?![\d:/\-A-Za-z_" + _COUNTER_AFTER + r"])(?!\.\d)"
+)
+
+
+def _bare_numbers(text: str, consumed: list[tuple[int, int]]) -> list[tuple[int, int, Decimal]]:
+    """単位の付かない数 [(開始, 終わり, 値)]。日付・金額・量などで読めた範囲（consumed）と重なる物は除く。"""
+    out = []
+    for m in _BARE_NUM.finditer(text):
+        if any(a < m.end() and m.start() < b for a, b in consumed):
+            continue
+        out.append((m.start(), m.end(), _dec(m["n"])))
+    return out
+
+
+def extract(question: str, base_year: int | None = None, bare: bool = False) -> Extracted:
     """質問から日付・金額・量・割合の候補を全部取る。役割（どの事実か）はここでは決めない。
 
     年の無い「M月D日」は、質問の中の完全な日付の年が 1 種類だけ（または base_year の指定）のときだけ日付にする。
+    bare=True の時は、単位の付かない数も kind="" の候補として取る（記録に単位のない量の事実がある時だけ使う）。
     """
     text = clean_question(question)
     spans: list[tuple[int, int]] = []
@@ -311,6 +329,10 @@ def extract(question: str, base_year: int | None = None) -> Extracted:
         if q.bizday:
             continue
         cands.append(Cand(q.kind, to_fraction(q.value), q.start, q.end, text[q.start:q.end]))
+    if bare:
+        consumed = spans + [(q.start, q.end) for q in qtys]
+        for a, b, v in _bare_numbers(text, consumed):
+            cands.append(Cand("", to_fraction(v), a, b, text[a:b]))
     cands.sort(key=lambda c: (c.start, c.end))
     return Extracted(text, tuple(cands), unresolved, any(q.bizday for q in qtys) or "営業日" in text)
 
@@ -379,6 +401,24 @@ def quote_tokens(quote: str, kind: str, unit: str | None = None) -> list[tuple[i
             continue
         if q.kind == kind:
             out.append((q.end, to_fraction(q.value)))
+    return out
+
+
+def quote_number_tokens(quote: str) -> list[tuple[int, Any]]:
+    """単位のない量の境目用: 引用の中の数 [(終わり位置, 値)]。単位が付いていれば単位の後ろが終わり位置。
+
+    日付の一部の数は除く。単位の無い数（「5以上」の 5）も取る。
+    """
+    text = _normalize(quote)
+    spans = [(a, b) for a, b, _ in _full_dates(text)]
+    spans += [(m.start(), m.end()) for m in _PART_DATE.finditer(text)]
+    spans += [(m.start(), m.end()) for m in _MONTH_REF.finditer(text)]
+    spans += [(m.start(), m.end()) for m in _YEAR_MONTH.finditer(text)]
+    qtys = [q for q in _quantities(text, spans) if not q.bizday]
+    out = [(q.end, to_fraction(q.value)) for q in qtys]
+    consumed = spans + [(q.start, q.end) for q in _quantities(text, spans)]
+    out += [(b, to_fraction(v)) for _, b, v in _bare_numbers(text, consumed)]
+    out.sort(key=lambda t: t[0])
     return out
 
 

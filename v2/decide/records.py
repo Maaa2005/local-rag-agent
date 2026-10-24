@@ -5,6 +5,7 @@
 - 文書との照合（記録の doc_version が文書の SHA-256 と一致する時だけ）:
     * 引用は、示した行に一字一句そのまま在る
     * 条件の境目の語（10万円・8割・14日・翌月10日・完全な日付）が引用の中に在る
+      （単位のない量の事実は unit: null と明示する。境目の数は単位なし「5以上」でも、単位付きでもよい）
     * 境目の直後の言い回し（超える・以上・未満・過ぎた・まで 等。質問側と同じ表で読む）が、条件の比べ方と一致する
       （同じ境目が引用に何度も出るなら、全部の言い回しが一致していなければならない）
   で確かめる。不一致は RecordError（黙って読み込まない）。
@@ -220,8 +221,10 @@ def _fact(d: Any, ctx: str) -> Fact:
         unit = "%"
     elif kind == "date":
         unit = None
+    elif "unit" in d and (unit is None or unit == ""):
+        unit = ""  # 単位のない量（「評価が5以上」の 5 など）。書き忘れと区別するため unit: null を明示した時だけ
     elif not isinstance(unit, str) or not unit:
-        raise RecordError(f"{ctx}: quantity には unit が要る")
+        raise RecordError(f"{ctx}: quantity には unit が要る（単位のない量は \"unit\": null と明示する）")
     if kind == "ratio":
         pc = _strs(d.get("percent_cues", []), f"{ctx}.percent_cues", min_len=0)
         num, den = d.get("numerator"), d.get("denominator")
@@ -368,7 +371,12 @@ def _all_agree(ops: list[str | None], want: str, ctx: str) -> None:
 def _check_condition(rec: Record, c: Condition, ctx: str) -> None:
     f = rec.fact(c.fact)
     th, q = c.threshold, c.evidence.quote
-    if th.type == "number":
+    if th.type == "number" and f.kind == "quantity" and not f.unit:
+        # 単位のない量: 境目の数は単位なし、または単位付きで書かれていてよい。直後（単位があれば単位の後）の比べ方の語で向きを確かめる
+        toks = [(end, v) for end, v in parse.quote_number_tokens(q) if v == th.value]
+        _all_agree([parse.phrase_op(q, end, "num") for end, _ in toks], c.op,
+                   f"{ctx}: 境目 {parse.fmt_number(th.value)}（単位なし）")
+    elif th.type == "number":
         kind = f.unit or ""
         toks = [(end, v) for end, v in parse.quote_tokens(q, kind) if v == th.value]
         _all_agree([parse.phrase_op(q, end, "num") for end, _ in toks], c.op, f"{ctx}: 境目 {parse.fmt_number(th.value)}{kind}")

@@ -137,8 +137,19 @@ def _fact_unit_kind(f: Fact) -> str:
     return "date" if f.kind == "date" else (f.unit or "")
 
 
-def _eligible(f: Fact, c: parse.Cand) -> str | None:
-    """候補 c が事実 f の値になりうるか。'ok' / 'mismatch'（同じ時間の家族だが換算できない）/ None（別物）。"""
+def _eligible(f: Fact, c: parse.Cand, text: str = "") -> str | None:
+    """候補 c が事実 f の値になりうるか。'ok' / 'mismatch'（同じ時間の家族だが換算できない）/ None（別物）。
+
+    単位のない量の事実（unit が空）: 単位の付かない数は 'ok'。単位の付いた数は、事実の手がかりが同じ節に在る時だけ 'mismatch'。
+    """
+    if f.kind == "quantity" and not f.unit:
+        if c.kind == "":
+            return "ok"
+        if c.kind == "date":
+            return None
+        cs, ce = _clause_bounds(text, c.start)
+        seg = text[cs:max(ce, c.end)]
+        return "mismatch" if any(_n(cue) in seg for cue in f.cues) else None
     if f.kind == "date":
         return "ok" if c.kind == "date" else None
     if f.kind == "money":
@@ -164,7 +175,7 @@ def _assign(ex: parse.Extracted, active: list[Fact]) -> dict[int, Fact]:
     cands = ex.cands
     assigned: dict[int, Fact] = {}
     for i, c in enumerate(cands):
-        opts = [(f, _eligible(f, c)) for f in active]
+        opts = [(f, _eligible(f, c, text)) for f in active]
         opts = [(f, e) for f, e in opts if e is not None]
         if not opts:
             continue
@@ -240,9 +251,9 @@ def _extract_facts(rec: Record, ex: parse.Extracted, needed: set[str]) -> dict[s
     for i, c in enumerate(ex.cands):
         if i in assigned:
             continue
-        opts = [f for f in active if _eligible(f, c) == "ok"]
+        opts = [f for f in active if _eligible(f, c, ex.text) == "ok"]
         if not opts:
-            if any(_eligible(f, c) == "mismatch" for f in active):
+            if any(_eligible(f, c, ex.text) == "mismatch" for f in active):
                 raise _Hold("facts", "unit_mismatch", f"単位が規程と換算できない（{c.text}）")
             continue
         ok = False
@@ -381,7 +392,7 @@ class DecisionEngine:
         if not rec.supported:
             raise _Hold("scope", "unsupported", rec.scope_reason or "対応範囲外")
         has_date = any(f.kind == "date" for f in rec.facts)
-        ex = parse.extract(question)
+        ex = parse.extract(question, bare=any(f.kind == "quantity" and not f.unit for f in rec.facts))
         if has_date and ex.business_days:
             raise _Hold("scope", "business_day", "営業日で数える期限は対応範囲外（休業日の表を持たない）")
 
