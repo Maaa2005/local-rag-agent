@@ -1,0 +1,163 @@
+{
+  "what": "文ごとの採点役 (M4-S) の確認 11 例 × 2 回。本番の回答は採点していない (rejudged は空)",
+  "date": "2026-10-23",
+  "notebook": "evaluation/colab/judge_precheck_s.ipynb",
+  "overall": "未判定",
+  "next": "人手採点 (計画書 §1 Q・§4 の 10/23)",
+  "rejudged_is_empty": true,
+  "models": [
+    {
+      "precheck_file": "judge_precheck_s_Llama-3-ELYZA-JP-8B-AWQ.json",
+      "result": "未判定",
+      "judge": "vllm",
+      "temperature": 0.0,
+      "max_tokens": 2048,
+      "prompt_sha256": "86cae2dbc9619c700450d036a6335ba074876f1282b2dcf0997e4ab6f8774248",
+      "fixture": {
+        "path": "/content/repo/evaluation/v2/judge_precheck_s.jsonl",
+        "sha256": "fb889eead27b3a0927931c7d60134d297381ec2b82133c1b06d990614d7583fa",
+        "rows": 11
+      },
+      "runs": [
+        {
+          "run": 1,
+          "result": "未判定",
+          "checks_ok": 1,
+          "checks_fail": [
+            "relevance: JA3 == expected_relevance"
+          ],
+          "checks_undecided": 8,
+          "checks_total": 10,
+          "broken": [
+            "JP1",
+            "JP3",
+            "JP4",
+            "JA1",
+            "JA2",
+            "JB1",
+            "JB2"
+          ],
+          "errors_by_kind": {
+            "判定の要素数が文の数と違う": [
+              "JP1"
+            ],
+            "JSON が壊れている": [
+              "JP3",
+              "JP4",
+              "JA1",
+              "JA2",
+              "JB1",
+              "JB2"
+            ]
+          }
+        },
+        {
+          "run": 2,
+          "result": "未判定",
+          "checks_ok": 1,
+          "checks_fail": [
+            "relevance: JA3 == expected_relevance"
+          ],
+          "checks_undecided": 8,
+          "checks_total": 10,
+          "broken": [
+            "JP1",
+            "JP3",
+            "JP4",
+            "JA1",
+            "JA2",
+            "JB1",
+            "JB2"
+          ],
+          "errors_by_kind": {
+            "判定の要素数が文の数と違う": [
+              "JP1"
+            ],
+            "JSON が壊れている": [
+              "JP3",
+              "JP4",
+              "JA1",
+              "JA2",
+              "JB1",
+              "JB2"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "precheck_file": "judge_precheck_s_mistral-nemo-instruct-2407-awq.json",
+      "result": "未判定",
+      "judge": "vllm",
+      "temperature": 0.0,
+      "max_tokens": 2048,
+      "prompt_sha256": "86cae2dbc9619c700450d036a6335ba074876f1282b2dcf0997e4ab6f8774248",
+      "fixture": {
+        "path": "/content/repo/evaluation/v2/judge_precheck_s.jsonl",
+        "sha256": "fb889eead27b3a0927931c7d60134d297381ec2b82133c1b06d990614d7583fa",
+        "rows": 11
+      },
+      "runs": [
+        {
+          "run": 1,
+          "result": "未判定",
+          "checks_ok": 4,
+          "checks_fail": [
+            "verdicts: JB1 == expected_sentences"
+          ],
+          "checks_undecided": 5,
+          "checks_total": 10,
+          "broken": [
+            "JP2",
+            "JP3",
+            "JA1",
+            "JA2",
+            "JB3"
+          ],
+          "errors_by_kind": {
+            "判定の要素数が文の数と違う": [
+              "JP2",
+              "JB3"
+            ],
+            "JSON が壊れている": [
+              "JP3",
+              "JA1",
+              "JA2"
+            ]
+          }
+        },
+        {
+          "run": 2,
+          "result": "未判定",
+          "checks_ok": 4,
+          "checks_fail": [
+            "verdicts: JA1 == expected_sentences",
+            "verdicts: JB1 == expected_sentences"
+          ],
+          "checks_undecided": 4,
+          "checks_total": 10,
+          "broken": [
+            "JP2",
+            "JP3",
+            "JA2",
+            "JB3"
+          ],
+          "errors_by_kind": {
+            "判定の要素数が文の数と違う": [
+              "JP2",
+              "JB3"
+            ],
+            "JSON が壊れている": [
+              "JP3",
+              "JA2"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "downloads": {
+    "judge_s.zip": "d5ccdb2f7b5b283d4b00299b6c7c77bf945a8049185aa758b93bd1eeae35029b",
+    "judge_precheck_s.ipynb": "ada39a22091668fac523ab5627fdc448e0297f38c95e379ef695da8656153af0"
+  }
+}

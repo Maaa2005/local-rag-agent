@@ -1,0 +1,654 @@
+{
+  "status": "done",
+  "started_at": "2026-10-23T17:20:22Z",
+  "argv": [
+    "/content/repo/evaluation/run_eval.py",
+    "--provider",
+    "vllm",
+    "--no-judge",
+    "--rerank",
+    "off",
+    "--dataset",
+    "evaluation/dataset.jsonl",
+    "--dataset",
+    "evaluation/v2/numeric_boundary.jsonl",
+    "--out-dir",
+    "/content/step2g/run_8GB",
+    "--meta",
+    "step=2",
+    "--meta",
+    "gpu=Tesla T4",
+    "--meta",
+    "compute_cap=7.5",
+    "--meta",
+    "model=google/gemma-4-E2B-it",
+    "--meta",
+    "model_revision=6938c58e698502037401a5f19f6905f2fb2f7dee",
+    "--meta",
+    "runtime=llama.cpp b11836",
+    "--meta",
+    "gguf=ggml-org/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q8_0.gguf",
+    "--meta",
+    "quant=Q8_0",
+    "--meta",
+    "rerank=off",
+    "--meta",
+    "note=Step 2 候補 google/gemma-4-E2B-it Q8_0（llama.cpp b11836・8GB と 12GB は同じ設定で実測を比べる・採点は人手）",
+    "--meta",
+    "budget=8GB",
+    "--meta",
+    "budget_mib=7680",
+    "--meta",
+    "ctx=3072"
+  ],
+  "python": "3.13.16",
+  "git": {
+    "head": "12eb45e6bb08a34f832e4212af0da09f88f79a35",
+    "dirty": false,
+    "changes": []
+  },
+  "datasets": [
+    {
+      "path": "evaluation/dataset.jsonl",
+      "sha256": "477b4da450815f0dd7b2277ddb7ed76cb007c267ee7badc1f38578174147cd27",
+      "rows": 50
+    },
+    {
+      "path": "evaluation/v2/numeric_boundary.jsonl",
+      "sha256": "445caaff561429e366bbb445cb919cd757cad7d78480aab50d6f1f3e6e636fb4",
+      "rows": 12
+    }
+  ],
+  "ids": null,
+  "n_questions": 62,
+  "providers": [
+    "vllm"
+  ],
+  "rerank_modes": [
+    false
+  ],
+  "judge": null,
+  "settings": {
+    "llm_provider": "vllm",
+    "llm_model": "local-llm",
+    "vllm_base_url": "http://127.0.0.1:8001/v1",
+    "llm_max_tokens": 1024,
+    "llm_temperature": 0.1,
+    "embed_model": "intfloat/multilingual-e5-large",
+    "embed_device": "cpu",
+    "rerank_enabled": true,
+    "rerank_model": "BAAI/bge-reranker-v2-m3",
+    "rerank_device": "cpu",
+    "rerank_candidates": 30,
+    "qdrant_collection": "step2g_1792775654",
+    "retrieval_top_k": 5,
+    "chunk_size": 500,
+    "chunk_overlap": 50,
+    "vector_size": 1024,
+    "data_dir": "/content/step2g/index_work/data",
+    "qdrant_url": "http://127.0.0.1:6333"
+  },
+  "vllm": {
+    "url": "http://127.0.0.1:8001/v1/models",
+    "models": [
+      {
+        "id": "local-llm",
+        "root": null,
+        "max_model_len": null
+      }
+    ]
+  },
+  "extras": {
+    "step": "2",
+    "gpu": "Tesla T4",
+    "compute_cap": "7.5",
+    "model": "google/gemma-4-E2B-it",
+    "model_revision": "6938c58e698502037401a5f19f6905f2fb2f7dee",
+    "runtime": "llama.cpp b11836",
+    "gguf": "ggml-org/gemma-4-E2B-it-GGUF/gemma-4-E2B-it-Q8_0.gguf",
+    "quant": "Q8_0",
+    "rerank": "off",
+    "note": "Step 2 候補 google/gemma-4-E2B-it Q8_0（llama.cpp b11836・8GB と 12GB は同じ設定で実測を比べる・採点は人手）",
+    "budget": "8GB",
+    "budget_mib": "7680",
+    "ctx": "3072"
+  },
+  "index": {
+    "collection": "step2g_1792775654",
+    "points": 40,
+    "documents": 13,
+    "qdrant_documents": 13,
+    "matched": 13
+  },
+  "finished_at": "2026-10-23T17:22:10Z",
+  "results": {
+    "vllm": 62
+  },
+  "gpu_mem": {
+    "peak_mib": 2691,
+    "budget_mib": 7680,
+    "total_mib": 15360,
+    "baseline_mib": 0,
+    "within_budget": true,
+    "windows": {
+      "launch": {
+        "start": 1792776009.8783174,
+        "end": 1792776016.2864914,
+        "peak_mib": 2623,
+        "n_samples": 6
+      },
+      "run": {
+        "start": 1792776016.2879603,
+        "end": 1792776131.8378155,
+        "peak_mib": 2691,
+        "n_samples": 113
+      }
+    },
+    "samples": [
+      [
+        0.3,
+        0
+      ],
+      [
+        1.3,
+        105
+      ],
+      [
+        2.4,
+        105
+      ],
+      [
+        3.4,
+        2615
+      ],
+      [
+        4.4,
+        2623
+      ],
+      [
+        5.5,
+        2623
+      ],
+      [
+        6.5,
+        2623
+      ],
+      [
+        7.5,
+        2623
+      ],
+      [
+        8.5,
+        2623
+      ],
+      [
+        9.6,
+        2623
+      ],
+      [
+        10.6,
+        2623
+      ],
+      [
+        11.6,
+        2623
+      ],
+      [
+        12.7,
+        2623
+      ],
+      [
+        13.7,
+        2623
+      ],
+      [
+        14.7,
+        2623
+      ],
+      [
+        15.7,
+        2623
+      ],
+      [
+        16.8,
+        2689
+      ],
+      [
+        17.8,
+        2689
+      ],
+      [
+        18.8,
+        2689
+      ],
+      [
+        19.8,
+        2689
+      ],
+      [
+        20.9,
+        2689
+      ],
+      [
+        21.9,
+        2689
+      ],
+      [
+        22.9,
+        2689
+      ],
+      [
+        23.9,
+        2689
+      ],
+      [
+        25.0,
+        2689
+      ],
+      [
+        26.0,
+        2689
+      ],
+      [
+        27.0,
+        2689
+      ],
+      [
+        28.1,
+        2689
+      ],
+      [
+        29.1,
+        2689
+      ],
+      [
+        30.1,
+        2689
+      ],
+      [
+        31.1,
+        2689
+      ],
+      [
+        32.2,
+        2689
+      ],
+      [
+        33.2,
+        2689
+      ],
+      [
+        34.2,
+        2689
+      ],
+      [
+        35.2,
+        2689
+      ],
+      [
+        36.3,
+        2689
+      ],
+      [
+        37.3,
+        2689
+      ],
+      [
+        38.3,
+        2689
+      ],
+      [
+        39.4,
+        2689
+      ],
+      [
+        40.4,
+        2689
+      ],
+      [
+        41.4,
+        2689
+      ],
+      [
+        42.4,
+        2689
+      ],
+      [
+        43.5,
+        2689
+      ],
+      [
+        44.5,
+        2689
+      ],
+      [
+        45.5,
+        2689
+      ],
+      [
+        46.6,
+        2689
+      ],
+      [
+        47.6,
+        2689
+      ],
+      [
+        48.6,
+        2689
+      ],
+      [
+        49.6,
+        2689
+      ],
+      [
+        50.7,
+        2689
+      ],
+      [
+        51.7,
+        2689
+      ],
+      [
+        52.7,
+        2691
+      ],
+      [
+        53.8,
+        2691
+      ],
+      [
+        54.8,
+        2691
+      ],
+      [
+        55.8,
+        2691
+      ],
+      [
+        56.8,
+        2691
+      ],
+      [
+        57.9,
+        2691
+      ],
+      [
+        58.9,
+        2691
+      ],
+      [
+        59.9,
+        2691
+      ],
+      [
+        60.9,
+        2691
+      ],
+      [
+        62.0,
+        2691
+      ],
+      [
+        63.0,
+        2691
+      ],
+      [
+        64.0,
+        2691
+      ],
+      [
+        65.1,
+        2691
+      ],
+      [
+        66.1,
+        2691
+      ],
+      [
+        67.1,
+        2691
+      ],
+      [
+        68.1,
+        2691
+      ],
+      [
+        69.2,
+        2691
+      ],
+      [
+        70.2,
+        2691
+      ],
+      [
+        71.2,
+        2691
+      ],
+      [
+        72.3,
+        2691
+      ],
+      [
+        73.3,
+        2691
+      ],
+      [
+        74.3,
+        2691
+      ],
+      [
+        75.4,
+        2691
+      ],
+      [
+        76.4,
+        2691
+      ],
+      [
+        77.4,
+        2691
+      ],
+      [
+        78.5,
+        2691
+      ],
+      [
+        79.5,
+        2691
+      ],
+      [
+        80.5,
+        2691
+      ],
+      [
+        81.5,
+        2691
+      ],
+      [
+        82.6,
+        2691
+      ],
+      [
+        83.6,
+        2691
+      ],
+      [
+        84.6,
+        2691
+      ],
+      [
+        85.7,
+        2691
+      ],
+      [
+        86.7,
+        2691
+      ],
+      [
+        87.7,
+        2691
+      ],
+      [
+        88.7,
+        2691
+      ],
+      [
+        89.8,
+        2691
+      ],
+      [
+        90.8,
+        2691
+      ],
+      [
+        91.8,
+        2691
+      ],
+      [
+        92.9,
+        2691
+      ],
+      [
+        93.9,
+        2691
+      ],
+      [
+        94.9,
+        2691
+      ],
+      [
+        96.0,
+        2691
+      ],
+      [
+        97.0,
+        2691
+      ],
+      [
+        98.0,
+        2691
+      ],
+      [
+        99.1,
+        2691
+      ],
+      [
+        100.1,
+        2691
+      ],
+      [
+        101.1,
+        2691
+      ],
+      [
+        102.2,
+        2691
+      ],
+      [
+        103.2,
+        2691
+      ],
+      [
+        104.2,
+        2691
+      ],
+      [
+        105.2,
+        2691
+      ],
+      [
+        106.3,
+        2691
+      ],
+      [
+        107.3,
+        2691
+      ],
+      [
+        108.3,
+        2691
+      ],
+      [
+        109.4,
+        2691
+      ],
+      [
+        110.4,
+        2691
+      ],
+      [
+        111.4,
+        2691
+      ],
+      [
+        112.5,
+        2691
+      ],
+      [
+        113.5,
+        2691
+      ],
+      [
+        114.5,
+        2691
+      ],
+      [
+        115.5,
+        2691
+      ],
+      [
+        116.6,
+        2691
+      ],
+      [
+        117.6,
+        2691
+      ],
+      [
+        118.7,
+        2691
+      ],
+      [
+        119.7,
+        2691
+      ],
+      [
+        120.7,
+        2691
+      ],
+      [
+        121.8,
+        2691
+      ]
+    ]
+  },
+  "run_checks": {
+    "all_answered": true,
+    "longest_ok": true,
+    "no_oom": true,
+    "no_preemption": true,
+    "within_budget": true,
+    "missing": [],
+    "ok": true,
+    "note": "Step 2 候補 google/gemma-4-E2B-it Q8_0（llama.cpp b11836・8GB と 12GB は同じ設定で実測を比べる・採点は人手）"
+  },
+  "llama_log_scan": {
+    "oom": [],
+    "preempt": [],
+    "debug_active": 2429,
+    "slot_n_ctx": [
+      3072
+    ]
+  },
+  "gpu_check": {
+    "offloaded": "36/36",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+      "CUDA0": 2342.3,
+      "CPU": 2788.0
+    },
+    "no_kernel_image": false,
+    "ok": true
+  }
+}

@@ -1,0 +1,14 @@
+# 監査 DB の保持期限削除（設計書 N7: メタデータ 90 日）を 1 日 1 回実行する crontab の例（ホスト側）。
+#
+# 登録: V2_DIR を v2/ の絶対パスに書き換えてから `crontab -e` に追記する（このファイルを丸ごと
+#       `crontab deploy/audit-purge.cron` すると既存の crontab を上書きするので注意）。
+# 対象: internal-app コンテナの環境変数 ORCHESTRATOR_AUDIT_DB（/audit-data/audit.db）。--db は付けない
+#       （アプリと cron が必ず同じ DB を見るように、場所の指定は compose.yml の 1 か所に寄せる）。
+# 出力: 件数だけの JSON（run_id・本文は出ない）。失敗時は終了コード 1 と {"error": ...} を stderr に出す。
+# 前提: internal-app が起動中で、イメージに orchestrator パッケージが入っていること。
+#       現時点の internal-app はプレースホルダなので、Orchestrator 本体のイメージができるまでは動かない。
+# 実行時刻: 03:17（毎正時を避ける）。append と同時に走ってもよい（BEGIN IMMEDIATE で直列化）。
+V2_DIR=/path/to/local-rag-agent/v2
+PATH=/usr/local/bin:/usr/bin:/bin
+
+17 3 * * * cd "$V2_DIR" && docker compose -f deploy/compose.yml exec -T internal-app python -m orchestrator.purge >> "$HOME/audit-purge.log" 2>&1

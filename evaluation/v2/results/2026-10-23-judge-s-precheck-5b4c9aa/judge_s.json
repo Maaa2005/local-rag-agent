@@ -1,0 +1,32 @@
+{
+  "judge": {
+    "role": "sentence-judge",
+    "quant": "AWQ 4bit",
+    "max_model_len": 8192,
+    "gpu_util": 0.85,
+    "temperature": "0",
+    "max_tokens": "2048",
+    "commit": "5b4c9aa7c9a452aa31004bc6b204a8b372ee029a",
+    "vllm_version": "0.32.0",
+    "gpu": "Tesla T4",
+    "tried": [
+      {
+        "model": "elyza/Llama-3-ELYZA-JP-8B-AWQ",
+        "revision": "85c3670a70d1e53bb4faa3f01c3ac2878f4a3fcd",
+        "started": true,
+        "precheck": "未判定",
+        "precheck_rc": 3
+      },
+      {
+        "model": "casperhansen/mistral-nemo-instruct-2407-awq",
+        "revision": "c83b6438e13051ad1c0f5683635705ee83bb8772",
+        "started": true,
+        "precheck": "未判定",
+        "precheck_rc": 3
+      }
+    ],
+    "precheck": "未判定",
+    "skipped": "どちらの採点役も確認を通らない → 人手採点へ（指示文・確認例は直さない）"
+  },
+  "rejudged": {}
+}

@@ -1,0 +1,125 @@
+{
+  "result": "pass",
+  "checks": [
+    {
+      "name": "faithfulness: faithful > unsupported",
+      "good": 1.0,
+      "bad": 0.4,
+      "ok": true
+    },
+    {
+      "name": "faithfulness: faithful > opposite",
+      "good": 1.0,
+      "bad": 0.4,
+      "ok": true
+    },
+    {
+      "name": "faithfulness: faithful > partial",
+      "good": 1.0,
+      "bad": 0.9,
+      "ok": true
+    },
+    {
+      "name": "answer_relevance: faithful > refusal",
+      "good": 0.9,
+      "bad": 0.0,
+      "ok": true
+    }
+  ],
+  "broken": [],
+  "judge": "vllm",
+  "llm_model": "local-llm",
+  "vllm": {
+    "url": "http://127.0.0.1:8001/v1/models",
+    "models": [
+      {
+        "id": "local-llm",
+        "root": "sbintuitions/sarashina2.2-3b-instruct-v0.1",
+        "max_model_len": 8192
+      }
+    ]
+  },
+  "fixture": {
+    "path": "/content/repo/evaluation/v2/judge_precheck.jsonl",
+    "sha256": "e77b2ab0e814d1358d9796b1b1d91374acf7338cfdbf39e57cca5cd017665291",
+    "rows": 5
+  },
+  "scores": {
+    "faithful": {
+      "id": "JP1",
+      "raw": {
+        "context_relevance": 1.0,
+        "answer_relevance": 0.9,
+        "faithfulness": 1.0,
+        "sentence_grounded": [
+          1,
+          1,
+          1
+        ],
+        "rationale": "取得チャンク[1]に10万円を超える経費申請の追加承認に関する詳細な規定が記載されています。また、回答は質問に直接答えており、主張はチャンク内のテキストから推論可能です。"
+      },
+      "error": null,
+      "seconds": 4.31
+    },
+    "unsupported": {
+      "id": "JP2",
+      "raw": {
+        "context_relevance": 0.75,
+        "answer_relevance": 0.25,
+        "faithfulness": 0.4,
+        "sentence_grounded": [
+          1,
+          0,
+          0
+        ],
+        "rationale": "取得チャンク第6条には10万円を超える申請に関する記載がありますが、回答は社長と取締役会の決議が必要としており、具体的な根拠は示されていません。また、第5条には消耗品費の上限が10,000円とありますが、回答では10万円を超える申請全般について言及しています。そのため、回答は一部しか取得チャンクに基づいておらず、完全な一致とは言えません。"
+      },
+      "error": null,
+      "seconds": 5.99
+    },
+    "opposite": {
+      "id": "JP3",
+      "raw": {
+        "context_relevance": 0.8,
+        "answer_relevance": 0.33,
+        "faithfulness": 0.4,
+        "sentence_grounded": [
+          1,
+          0,
+          0
+        ],
+        "rationale": "取得チャンク[1]では10万円を超える申請は部門長の承認を追加で必要とするとありますが、回答では部門長の承認は必要ないとされています。これは取得チャンクの内容と矛盾しています。また、回答は質問に直接答えておらず、10万円を超える経費申請に対する追加承認者について明確な答えを提供していません。"
+      },
+      "error": null,
+      "seconds": 5.74
+    },
+    "partial": {
+      "id": "JP4",
+      "raw": {
+        "context_relevance": 1.0,
+        "answer_relevance": 0.8,
+        "faithfulness": 0.9,
+        "sentence_grounded": [
+          1,
+          1,
+          0
+        ],
+        "rationale": "取得チャンク[1]に10万円を超える経費申請に対する部門長の承認追加に関する記載があります。また、回答は質問に直接答えており、主張はチャンク内のテキストから推論可能です。"
+      },
+      "error": null,
+      "seconds": 5.01
+    },
+    "refusal": {
+      "id": "JP5",
+      "raw": {
+        "context_relevance": 0.5,
+        "answer_relevance": 0.0,
+        "faithfulness": 0.0,
+        "sentence_grounded": [],
+        "rationale": "提供された資料には、10万円を超える経費申請に関する具体的な承認フローの詳細が記載されていません。質問に直接答えるためには、追加の資料や情報が必要となります。"
+      },
+      "error": null,
+      "seconds": 4.13
+    }
+  }
+}

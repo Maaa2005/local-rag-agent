@@ -1,0 +1,29 @@
+{
+  "u_general": {
+    "level": 1,
+    "contracts": [
+      "A-faq-format@1"
+    ],
+    "free_text_approval": []
+  },
+  "u_manager": {
+    "level": 2,
+    "contracts": [
+      "A-faq-format@1",
+      "B-csv-codegen@1"
+    ],
+    "free_text_approval": [
+      "B-csv-codegen@1"
+    ]
+  },
+  "u_exec": {
+    "level": 3,
+    "contracts": [
+      "A-faq-format@1",
+      "B-csv-codegen@1"
+    ],
+    "free_text_approval": [
+      "B-csv-codegen@1"
+    ]
+  }
+}

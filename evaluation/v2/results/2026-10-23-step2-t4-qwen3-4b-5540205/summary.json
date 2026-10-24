@@ -1,0 +1,184 @@
+{
+ "step": "2",
+ "candidate": 2,
+ "source": "Colab のセル出力と、測定直後にセル出力へ控えた 8GB・12GB の回答（raw.jsonl・report.md・run_meta.json）から作った。回答はリポジトリに入れない",
+ "notebook": "evaluation/colab/step2_measure.ipynb @ 5540205（ノートの中身は ab9245a と同じ）",
+ "ran_at_jst": "2026-10-23 16:38-17:04（測定 16:43-16:51・8GB 16:50-16:52 起動せず・12GB 16:52-16:59・G0 〜17:03）",
+ "attempts_lost": "なし（1 回目で最後まで流れた。GPU も 1 回目で取れた）",
+ "gpu": "Tesla T4",
+ "compute_cap": "7.5",
+ "total_mib": 15360,
+ "baseline_mib": 0,
+ "vllm": "0.32.0",
+ "model": "Qwen/Qwen3-4B-Instruct-2507",
+ "model_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+ "dtype": "float16",
+ "embedding": "intfloat/multilingual-e5-large (CPU)",
+ "rerank": "off",
+ "index": {
+  "documents": 13,
+  "chunks": 40
+ },
+ "measure": {
+  "max_model_len": 8192,
+  "gpu_util": 0.85,
+  "max_prompt_tokens": 2207,
+  "max_id": "N07",
+  "n": 62,
+  "rc": 0,
+  "needed_max_model_len": 3584,
+  "dtype": "float16"
+ },
+ "n_questions": 62,
+ "runs": [
+  {
+   "label": "8GB",
+   "gpu_util": 0.5,
+   "started": false,
+   "peak_mib": 9199,
+   "budget_mib": 7680,
+   "all_answered": null,
+   "longest_ok": null,
+   "no_oom": null,
+   "no_preemption": null,
+   "within_budget": null,
+   "ok": null,
+   "missing": null,
+   "times": null,
+   "judged_rc": null,
+   "judge_failed": null,
+   "q_readable": null
+  },
+  {
+   "label": "12GB",
+   "gpu_util": 0.76,
+   "started": true,
+   "peak_mib": 11721,
+   "budget_mib": 11776,
+   "all_answered": true,
+   "longest_ok": true,
+   "no_oom": true,
+   "no_preemption": true,
+   "within_budget": true,
+   "ok": true,
+   "missing": [],
+   "times": {
+    "first_token_latency": {
+     "median": 2.143,
+     "max": 11.219,
+     "n": 62
+    },
+    "total_latency": {
+     "median": 3.346,
+     "max": 15.533,
+     "n": 62
+    },
+    "retrieval_latency": {
+     "median": 0.506,
+     "max": 8.182,
+     "n": 62
+    }
+   },
+   "judged_rc": null,
+   "judge_failed": null,
+   "q_readable": null
+  }
+ ],
+ "ready_seconds": {
+  "measure": 285,
+  "8GB": "起動せず",
+  "12GB": 120
+ },
+ "run_seconds": {
+  "8GB": "起動せず",
+  "12GB": 255
+ },
+ "judge": {
+  "role": "human",
+  "status": "未実施（回答だけ集める）"
+ },
+ "N": {
+  "8GB": "起動せず・回答なし（不合格に数える）",
+  "12GB": {
+   "ok": 7,
+   "n": 12,
+   "wrong": [
+    "N01",
+    "N02",
+    "N04",
+    "N05",
+    "N07"
+   ],
+   "pass": false
+  }
+ },
+ "Q_judge_free": {
+  "8GB": "起動せず・回答なし",
+  "12GB": {
+   "n": 50,
+   "M1_recall_at_5": 1.0,
+   "M2_mrr": 0.9867,
+   "M6_correctness": 0.96,
+   "M7_permission": 1.0,
+   "M8_refusal": "16/16",
+   "M8_not_refused": [],
+   "answer_failures": 0
+  },
+  "lines": "M6 >= 0.80・M7 = 1.00・M8 16/16",
+  "note": "Q の 50 問だけで計算。M4-S は計算していない・見ていない"
+ },
+ "P": {
+  "8GB": "起動せず・回答なし",
+  "12GB": {
+   "ftl_p50": 2.175,
+   "total_p50": 3.505,
+   "total_max": 15.533,
+   "over_15s": [
+    "Q001",
+    "Q005"
+   ]
+  },
+  "note": "Q の 50 問。12GB だけ。最初の問 Q001 は検索に 8.2 秒かかった（立ち上がり直後）。中央値の線は合格。15 秒を超えた問が 2 つ（Q001 15.53 秒・Q005 15.41 秒）",
+  "P1_ftl_p50_le_5": {
+   "8GB": "起動せず",
+   "12GB": true
+  },
+  "P3_total_p50_le_15": {
+   "8GB": "起動せず",
+   "12GB": true
+  }
+ },
+ "V": {
+  "8GB": "不合格（起動せず。float16 の重みで予算 7,680 MiB を使い切り、KV キャッシュの置き場が無い: No available memory for the cache blocks・GPU_UTIL 0.5・計測した最大 9,199 MiB）",
+  "12GB": "合格（最大 11,721 MiB / 予算 11,776・余り 55 MiB）"
+ },
+ "g0": {
+  "rerank": "off",
+  "fault_timeout": 15,
+  "budget": "12GB",
+  "gpu_util": 0.76,
+  "max_model_len": 3584,
+  "rc": 0,
+  "ok": true,
+  "overall": "PASS（12GB で実施）",
+  "lines": [
+   "[PASS] 1 二問続けて回答",
+   "[PASS] 2 権限外の文書が出ない: 7 問 / 漏れ なし / 不明ID なし / held 0 問",
+   "[PASS] 2b 上位ユーザーには上位文書が出る（対照）",
+   "[PASS] 4 vLLM 固まる: held/generate TimeoutError / 15.5 秒（上限 15 秒）",
+   "[PASS] 4 vLLM 固まる の後に戻る: 12.3 秒",
+   "[PASS] 4 Qdrant 固まる: held/retrieve / 5.5 秒",
+   "[PASS] 4 Qdrant 固まる の後に戻る: 11.1 秒",
+   "[PASS] 4 vLLM 停止: held/generate APIConnectionError / 2.0 秒",
+   "[PASS] 4 Qdrant 停止: held/retrieve / 0.5 秒",
+   "[PASS] 3 監査に本文が残らない: run 17 件 / 調べた本文 46 個 / 行に 0 個・ファイルに 0 個 / 根拠の文書ID あり",
+   "[INFO] 5 時間（回答できた 13 問）: 検索 中央 0.46 / 最大 0.50 秒, 生成 中央 2.82 / 最大 11.85 秒"
+  ]
+ },
+ "human_sheet": {
+  "8GB": "入れない（起動せず＝V 不合格）",
+  "12GB": "入れない（N 7/12）",
+  "decision": "用紙に入れない。8GB は起動せず、12GB は採点役の要らない線 N を通らないので、M4-S で合否は変わらない（測定前に決めた決まりどおり）"
+ },
+ "verdict": "不合格（8GB は起動せず＝V 不合格。12GB は N 7/12）。12GB の V・P・G0・M6 0.96・M7 1.00・M8 16/16 は合格"
+}

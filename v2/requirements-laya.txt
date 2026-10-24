@@ -1,0 +1,9 @@
+# 判断モデル shim（judge/laya_server.py）用。2026-10-17 の実測に使った版。
+# 評価ハーネスやテストは requirements.txt だけで動く（テストは偽の laya を使う）。
+laya==0.4.9
+torch==2.14.1
+transformers==5.20.1
+fastapi==0.143.3
+uvicorn==0.54.0
+httpx==0.28.1
+pydantic==2.14.1

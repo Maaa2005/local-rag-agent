@@ -112,9 +112,17 @@ def _clamp(v) -> float:
 
 # ─── 文単位の Faithfulness 内訳 (オプション) ─────────────────────
 def faithfulness_from_grounded_array(answer: str, grounded: list[int]) -> float:
-    """sentence_grounded 配列が信頼できるときの厳密計算。"""
+    """文ごとの 0/1 配列から忠実さを計算する。
+
+    切り詰め・補完はしない。回答の文が 0 個なら 0.0。文の数と配列の長さが違う、
+    または値が int の 0/1 でない (bool・float・文字列を含む) なら ValueError。
+    """
     sentences = split_sentences(answer)
-    if not sentences or not grounded:
+    if not sentences:
         return 0.0
-    n = min(len(sentences), len(grounded))
-    return sum(grounded[:n]) / n
+    if len(sentences) != len(grounded):
+        raise ValueError(f"文の数 {len(sentences)} と配列の長さ {len(grounded)} が違う")
+    for v in grounded:
+        if type(v) is not int or v not in (0, 1):
+            raise ValueError(f"grounded の値が int の 0/1 でない: {v!r}")
+    return sum(grounded) / len(grounded)
