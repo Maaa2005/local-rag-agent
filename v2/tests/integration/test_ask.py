@@ -127,3 +127,67 @@ def test_held_run_is_also_audited(tmp_path, no_gateway):
         assert QUESTION not in json.dumps(store.events(res.run.audit_run_id), ensure_ascii=False)
     finally:
         store.close()
+
+
+# ---- code 経路 + decider（既定の無しでは従来どおり保留）
+
+class _CodeVerdict:
+    def __init__(self, kind, text="", used=(), record=None):
+        self.kind, self.answer_text, self.used_chunks = kind, text, tuple(used)
+        self.decision_record = record or {}
+
+
+class _Decider:
+    def __init__(self, verdict):
+        self.verdict, self.calls = verdict, 0
+
+    def decide(self, question, chunks):
+        self.calls += 1
+        return self.verdict
+
+
+def test_ask_decider_default_is_none():
+    assert inspect.signature(ask).parameters["decider"].default is None
+
+
+def test_code_route_without_decider_is_still_held_at_c1(no_gateway):
+    res = ask(StubC1("code"), USER, QUESTION, POLICY, FakeRetriever(), FakeGenerator())
+    assert res.run.outcome == "held" and res.run.stopped_at == "C1"
+
+
+def test_code_route_with_decider_answers_from_code(no_gateway):
+    g, d = FakeGenerator(), _Decider(_CodeVerdict("decided", "結論: 必要", used=[CHUNK], record={"rule_id": "R-x", "outcome_key": "all_true"}))
+    res = ask(StubC1("code"), USER, QUESTION, POLICY, FakeRetriever(), g, decider=d)
+    assert res.run.outcome == "answered" and res.run.output_text == "結論: 必要"
+    assert g.calls == 0 and d.calls == 1
+    assert [e.stage for e in res.run.audit][:2] == ["C1", "retrieve"] and res.run.audit[0].result == "code"
+
+
+def test_code_route_with_decider_held_stops_at_decide(no_gateway):
+    g = FakeGenerator()
+    res = ask(StubC1("code"), USER, QUESTION, POLICY, FakeRetriever(), g,
+              decider=_Decider(_CodeVerdict("held", record={"hold_code": "facts:missing"})))
+    assert res.run.outcome == "held" and res.run.stopped_at == "decide" and g.calls == 0
+
+
+def test_local_route_does_not_use_decider(no_gateway):
+    d = _Decider(_CodeVerdict("decided", "結論: 必要", used=[CHUNK]))
+    res = ask(StubC1("local"), USER, QUESTION, POLICY, FakeRetriever(), FakeGenerator(), decider=d)
+    # decider は C1 が code を選んだ時だけ使う。local は従来どおりモデルが答える
+    assert res.run.outcome == "answered" and res.run.output_text == ANSWER and d.calls == 0
+
+
+def test_code_route_audit_has_no_bodies(tmp_path, no_gateway):
+    store = AuditStore(tmp_path / "audit.db")
+    try:
+        text = "結論: 必要（総務部長の承認が要る）"
+        res = ask(StubC1("code"), USER, QUESTION, POLICY, FakeRetriever(), FakeGenerator(), audit_sink=store,
+                  decider=_Decider(_CodeVerdict("decided", text, used=[CHUNK], record={"rule_id": "R-x", "outcome_key": "all_true"})))
+        (row,) = store.runs()
+        assert row["outcome"] == "answered" and row["c1_route"] == "code"
+        dumped = json.dumps([row, store.events(res.run.audit_run_id)], ensure_ascii=False, default=str)
+        for body in (QUESTION, CHUNK.content, text):
+            assert body not in dumped
+        assert "R-x" in dumped
+    finally:
+        store.close()

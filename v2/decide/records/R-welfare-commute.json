@@ -1,0 +1,64 @@
+{
+  "rule_id": "R-welfare-commute",
+  "doc_path": "/watched/general/福利厚生規程.md",
+  "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
+  "description": "通勤距離が2km以下の社員には通勤手当を支給しない",
+  "supported": true,
+  "subject": {
+    "groups": [
+      [
+        "通勤手当"
+      ],
+      [
+        "支給"
+      ]
+    ]
+  },
+  "facts": [
+    {
+      "role": "distance",
+      "label": "通勤距離",
+      "kind": "quantity",
+      "unit": "km",
+      "cues": [
+        "通勤距離"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "distance",
+      "op": "<=",
+      "threshold": {
+        "type": "number",
+        "value": 2
+      },
+      "evidence": {
+        "quote": "通勤距離が2km以下の社員には、通勤手当を支給しない",
+        "line": 15
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "支給されない",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "通勤距離が2km以下の社員には、通勤手当を支給しない",
+        "line": 15
+      }
+    },
+    "any_false": {
+      "value": "支給される",
+      "basis": "inferred_negation",
+      "evidence": {
+        "quote": "通勤距離が2km以下の社員には、通勤手当を支給しない",
+        "line": 15
+      }
+    }
+  },
+  "options": [
+    "支給される",
+    "支給されない"
+  ]
+}

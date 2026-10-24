@@ -1,0 +1,83 @@
+{
+  "rule_id": "R-expense-dept-head",
+  "doc_path": "/watched/general/経費精算規程.md",
+  "doc_version": "560049797b6669e46fa4d4b52f545a4f3e00b56792f85ef668516eea53cd84c9",
+  "description": "経費精算の申請金額が10万円を超えると部門長の承認が追加で要る",
+  "supported": true,
+  "subject": {
+    "groups": [
+      [
+        "経費",
+        "精算"
+      ],
+      [
+        "部門長",
+        "承認"
+      ]
+    ],
+    "exclude": [
+      {
+        "terms": [
+          "出張",
+          "旅費",
+          "宿泊"
+        ],
+        "reason": "出張に伴う旅費・宿泊費は別の規程（出張旅費規程）が定める",
+        "evidence": {
+          "quote": "出張に伴う旅費および宿泊費は「出張旅費規程」による",
+          "line": 9
+        }
+      }
+    ]
+  },
+  "facts": [
+    {
+      "role": "amount",
+      "label": "申請金額",
+      "kind": "money",
+      "cues": [
+        "申請",
+        "精算金額",
+        "金額",
+        "立替",
+        "立て替"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "amount",
+      "op": ">",
+      "threshold": {
+        "type": "number",
+        "value": 100000
+      },
+      "evidence": {
+        "quote": "10万円を超える申請は部門長の承認を追加で要する",
+        "line": 21
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "必要",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "10万円を超える申請は部門長の承認を追加で要する",
+        "line": 21
+      }
+    },
+    "any_false": {
+      "value": "不要",
+      "basis": "inferred_negation",
+      "evidence": {
+        "quote": "10万円を超える申請は部門長の承認を追加で要する",
+        "line": 21
+      }
+    }
+  },
+  "options": [
+    "必要",
+    "不要"
+  ]
+}
