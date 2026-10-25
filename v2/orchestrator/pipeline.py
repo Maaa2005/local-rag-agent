@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Literal, Mapping, Protocol, Sequence
+from typing import Any, Callable, Literal, Mapping, Protocol, Sequence
 
 from common.schemas import (
     C1Decision,
@@ -22,7 +22,7 @@ from common.schemas import (
 from judge.base import call_c2
 from orchestrator.audit_store import AuditSink, persist_run
 from orchestrator.candidate import ContractViolation, SendCandidate, build_candidate
-from orchestrator.policy import ApprovedText, Contract, Policy, check_eligibility, load_policy
+from orchestrator.policy import JST, ApprovedText, Contract, Policy, check_eligibility, load_policy
 
 # answered はローカル回答（orchestrator.local_answer）だけが使う。外部送信の経路では使わない
 Outcome = Literal["sent", "held", "rejected", "answered"]
@@ -147,6 +147,11 @@ def stopped_at_c1(decision: C1Decision | None, reason: str, *, error: bool = Fal
     return RunResult(outcome=outcome, stopped_at="C1", reason=reason, audit=audit)
 
 
+def _aware(dt: datetime) -> datetime:
+    """naive は JST とみなす（check_eligibility と同じ扱い）。"""
+    return dt if dt.tzinfo else dt.replace(tzinfo=JST)
+
+
 def _free_text_authority(pol: Policy, user: str, contract: Contract) -> bool | None:
     """依頼文の外部利用を承認できる権限（設計書 項目 8）。依頼文を取らない契約では None。"""
     if contract.free_text_max is None:
@@ -171,7 +176,14 @@ def run_contract(
     audit_prefix: Sequence[AuditEvent] = (),
     c1_decision: C1Decision | None = None,
     audit_bodies: Sequence[str] = (),
+    reload_policy: Callable[[], Policy] | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> RunResult:
+    """reload_policy / clock は権限再確認（手順 5）で使う最新の設定と今の時刻。
+
+    利用者の確認には時間がかかるので、その間の権限の取り消し・承認期限切れ・設定の変更を
+    確認の後に見直す。渡さなければ開始時の設定と now のまま（固定ケースの評価用）。
+    """
     pol = policy or load_policy()
     audit: list[AuditEvent] = list(audit_prefix)
     vis: dict[str, Any] = {}  # 応答の可視範囲・承認者と対象。以降の全 RunResult に載せる
@@ -246,17 +258,34 @@ def run_contract(
     audit.append(AuditEvent("confirm", "ok", f"{confirmed} approver={user} destination={cand.payload.destination}"))
     vis.update(approver=user, approver_authority=_free_text_authority(pol, user, elig.contract))
 
-    # 5. 権限再確認
-    elig2 = check_eligibility(pol, user, input, destination, now)
-    vis.update(approver_authority=_free_text_authority(pol, user, elig.contract))  # 再確認時点の権限で上書き
-    if not elig2.ok or elig2.approved is None or elig2.approved.sha256 != cand.approved_sha256:
-        reason = elig2.reason if not elig2.ok else "承認済みテキストが候補作成後に変わった"
+    # 5. 権限再確認（確認の後の時刻と最新の設定で。読めなければ送らない）
+    try:
+        pol2 = reload_policy() if reload_policy else pol
+        now2 = clock() if clock else now
+    except Exception as e:  # noqa: BLE001
+        reason = f"権限を再確認できない: {type(e).__name__}: {e}"
+        audit.append(AuditEvent("recheck", "error", reason))
+        return stop("held", "eligibility", reason, c2_verdict=verdict, **ids)
+    elig2 = check_eligibility(pol2, user, input, destination, now2)
+    vis.update(approver_authority=_free_text_authority(pol2, user, elig.contract))  # 再確認時点の権限で上書き
+    if not elig2.ok or elig2.approved is None or elig2.approved.sha256 != cand.approved_sha256 or elig2.contract != elig.contract:
+        if not elig2.ok:
+            reason = elig2.reason
+        elif elig2.contract != elig.contract:
+            reason = "契約の定義が候補作成後に変わった"
+        else:
+            reason = "承認済みテキストが候補作成後に変わった"
         audit.append(AuditEvent("recheck", "deny", reason))
         return stop("rejected", "eligibility", reason, c2_verdict=verdict, **ids)
+    expires_at_dt = now + PREPARE_TTL
+    if _aware(now2) >= _aware(expires_at_dt):
+        reason = f"確認までに候補の期限（作成から {int(PREPARE_TTL.total_seconds() // 60)} 分）が過ぎた。新しい候補として C2 と確認をやり直す"
+        audit.append(AuditEvent("recheck", "expired", reason))
+        return stop("held", "confirm", reason, c2_verdict=verdict, **ids)
     audit.append(AuditEvent("recheck", "ok"))
 
     # 6. prepare → Gateway が計算した digest と確認済み digest を照合
-    expires_at = (now + PREPARE_TTL).timestamp()
+    expires_at = expires_at_dt.timestamp()
     try:
         prep = gateway.prepare(PrepareRequest(request_id=cand.request_id, payload=cand.payload, expires_at=expires_at))
     except Exception as e:  # noqa: BLE001

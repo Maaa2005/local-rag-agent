@@ -26,7 +26,7 @@ from orchestrator.pipeline import (
     run_contract,
     stopped_at_c1,
 )
-from orchestrator.policy import JST, Policy
+from orchestrator.policy import JST, Policy, load_policy
 
 CONTRACT_A = "A-faq-format@1"
 C1_TIMEOUT_S = 30.0
@@ -164,5 +164,8 @@ def run_contract_a(
         audit_prefix=[gate.event],
         c1_decision=gate.decision,
         audit_bodies=[request_text],
+        # 時刻・設定を外から固定していなければ、確認の後の権限再確認は今の時刻と読み直した設定で行う
+        reload_policy=None if policy is not None else load_policy,
+        clock=None if now is not None else (lambda: datetime.now(JST)),
     )
     return FlowResult(run.outcome, run.reason, gate.decision, run)

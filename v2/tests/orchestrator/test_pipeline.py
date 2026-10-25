@@ -435,3 +435,95 @@ def test_c2_timeout_none_waits_without_timeout():
     # c2_timeout_s=None はタイムアウトなし（従来互換）。遅い C2 でも結果を待って使う
     res, gw = run(c2=FakeC2(delay=0.1), c2_timeout_s=None)
     assert res.outcome == "sent" and len(gw.commits) == 1
+
+
+# ---- 確認の間の変化（設計書「送信状態と障害時の動き」の 期限切れ・権限変更）----
+# 利用者の確認には時間がかかる。権限再確認は確認の後の時刻と読み直した設定で行い、
+# 変わっていれば Gateway に何も渡さない。
+
+def _edit_json(path: Path, fn) -> None:
+    d = json.loads(path.read_text(encoding="utf-8"))
+    fn(d)
+    path.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+
+
+def _recheck(res) -> tuple[str, str]:
+    (ev,) = [e for e in res.audit if e.stage == "recheck"]
+    return ev.result, ev.detail
+
+
+def test_permission_revoked_during_confirm_rejected(policy_copy: Path):
+    _edit_json(policy_copy / "users.json", lambda d: d["u_general"].update(contracts=[]))
+    res, gw = run(reload_policy=lambda: load_policy(policy_copy))
+    assert (res.outcome, res.stopped_at) == ("rejected", "eligibility")
+    assert gw.calls == 0 and not res.gateway_received
+    assert _recheck(res)[0] == "deny" and "利用権限がない" in res.reason
+
+
+def test_free_text_authority_revoked_during_confirm_rejected(policy_copy: Path):
+    _edit_json(policy_copy / "users.json", lambda d: d["u_manager"].update(free_text_approval=[]))
+    res, gw = run(user="u_manager", inp=B_INPUT, dest="codex", reload_policy=lambda: load_policy(policy_copy))
+    assert (res.outcome, res.stopped_at) == ("rejected", "eligibility") and gw.calls == 0
+    assert res.approver_authority is False  # 再確認時点の権限で残す
+
+
+def test_approval_expired_during_confirm_rejected():
+    res, gw = run(now=datetime(2026, 12, 31, 23, 58, tzinfo=JST), clock=lambda: datetime(2027, 1, 1, 0, 1, tzinfo=JST))
+    assert (res.outcome, res.stopped_at) == ("rejected", "eligibility") and gw.calls == 0
+    assert "承認期限" in res.reason
+
+
+def test_approved_text_reapproved_during_confirm_rejected(policy_copy: Path):
+    # 本文と hash を揃えて再承認された（hash 検査は通る）が、確認した候補とは別の本文
+    def reapprove(d):
+        d["body"] = d["body"].replace("翌月10日", "翌月20日")
+        d["sha256"] = sha256_text(d["body"])
+
+    _edit_json(policy_copy / "approved" / "expl-keihi-001@1.json", reapprove)
+    res, gw = run(reload_policy=lambda: load_policy(policy_copy))
+    assert (res.outcome, res.stopped_at) == ("rejected", "eligibility") and gw.calls == 0
+    assert res.reason == "承認済みテキストが候補作成後に変わった"
+
+
+def test_contract_changed_during_confirm_rejected(policy_copy: Path):
+    _edit_json(policy_copy / "contracts.json", lambda d: d["A-faq-format@1"]["limits"].update(output_chars=3000))
+    res, gw = run(reload_policy=lambda: load_policy(policy_copy))
+    assert (res.outcome, res.stopped_at) == ("rejected", "eligibility") and gw.calls == 0
+    assert res.reason == "契約の定義が候補作成後に変わった"
+
+
+def test_contract_disabled_during_confirm_rejected(policy_copy: Path):
+    _edit_json(policy_copy / "contracts.json", lambda d: d["A-faq-format@1"].update(enabled=False))
+    res, gw = run(reload_policy=lambda: load_policy(policy_copy))
+    assert (res.outcome, res.stopped_at) == ("rejected", "eligibility") and gw.calls == 0
+    assert "契約が無効" in res.reason
+
+
+def test_policy_unreadable_at_recheck_held():
+    def broken():
+        raise OSError("policy dir missing")
+
+    res, gw = run(reload_policy=broken)
+    assert (res.outcome, res.stopped_at) == ("held", "eligibility") and gw.calls == 0
+    assert _recheck(res)[0] == "error"
+
+
+def test_confirm_slower_than_ttl_held_before_prepare():
+    from orchestrator.pipeline import PREPARE_TTL
+
+    res, gw = run(clock=lambda: NOW + PREPARE_TTL)
+    assert (res.outcome, res.stopped_at) == ("held", "confirm") and gw.calls == 0
+    assert _recheck(res)[0] == "expired" and "やり直す" in res.reason
+
+
+def test_naive_clock_is_treated_as_jst():
+    res, gw = run(clock=lambda: datetime(2026, 10, 20, 10, 5))  # naive・NOW の 5 分後（JST）
+    assert res.outcome == "sent" and len(gw.commits) == 1
+
+
+def test_unchanged_policy_and_time_within_ttl_still_sent(policy_copy: Path):
+    from datetime import timedelta
+
+    res, gw = run(reload_policy=lambda: load_policy(policy_copy), clock=lambda: NOW + timedelta(minutes=9))
+    assert res.outcome == "sent" and len(gw.commits) == 1
+    assert gw.prepared[0].expires_at == pytest.approx((NOW + timedelta(minutes=10)).timestamp())

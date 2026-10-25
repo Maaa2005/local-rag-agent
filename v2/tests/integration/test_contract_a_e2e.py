@@ -473,3 +473,40 @@ def test_contract_a_response_visibility_source_level_requester_only(gw):
     assert run.can_view(USER, 1)
     assert not run.can_view("u_manager", 2)  # 依頼者以外は不可
     assert not run.can_view(USER, None)  # レベル不明なら見せない
+
+
+# 確認の間に権限が取り消された: 時刻・設定を外から固定しない呼び方では、再確認で読み直した設定で止まる
+def test_permission_revoked_while_confirming_sends_nothing(gw, tmp_path, monkeypatch):
+    import json
+    import integration.flow as flow_mod
+    from orchestrator.policy import DEFAULT_POLICY_DIR
+
+    svc, store, fake, _ = gw
+    d = tmp_path / "policies"
+    shutil.copytree(DEFAULT_POLICY_DIR, d)
+    users = json.loads((d / "users.json").read_text(encoding="utf-8"))
+    users[USER]["contracts"] = []
+    (d / "users.json").write_text(json.dumps(users, ensure_ascii=False), encoding="utf-8")
+    # 開始時は既定の設定（権限あり）。再確認で読む設定だけを取り消し後のものに差し替える
+    monkeypatch.setattr(flow_mod, "load_policy", lambda: load_policy(d))
+    counting = CountingGateway(svc)
+    res = run_contract_a(USER, REF, OPTS, DEST, c1=c1(), c2=c2_allow(), confirmer=DigestConfirmer(),
+                         gateway=counting, request_text="経費精算の説明を FAQ にして")
+    assert (res.outcome, res.run.stopped_at) == ("rejected", "eligibility"), res.reason
+    assert counting.calls == [] and fake.received == [] and _rows(store) == 0
+    assert [e.result for e in res.run.audit if e.stage == "recheck"] == ["deny"]
+
+
+def test_fixed_time_and_policy_keep_snapshot(gw, monkeypatch):
+    # now / policy を渡した評価用の呼び方では読み直さない（固定ケースの再現性）
+    import integration.flow as flow_mod
+
+    def must_not_reload():
+        raise AssertionError("policy を渡したのに読み直した")
+
+    monkeypatch.setattr(flow_mod, "load_policy", must_not_reload)
+    svc, store, fake, probe = gw
+    res = run_contract_a(USER, REF, OPTS, DEST, c1=c1(), c2=c2_allow(), confirmer=DigestConfirmer(), gateway=svc,
+                         request_text="経費精算の説明を FAQ にして", now=datetime.now(JST),
+                         policy=POLICY)
+    assert res.outcome == "sent", res.reason

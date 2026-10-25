@@ -256,18 +256,22 @@ C2 が全部止める理由（2 段まで）: C2 の質問は 1 問に 8 種類�
 
 Gateway の状態は `PREPARED → ATTEMPTING → SUCCEEDED / FAILED`。`FAILED` は `not_sent / rejected / unknown` を区別する。
 
-| 事象 | 動作 |
-|---|---|
-| C2 停止・タイムアウト・入力切り捨て | Gateway に本文を渡さず、ローカル処理または保留 |
-| 送信前の記録に失敗 | 外部 API を呼ばない |
-| 同じ要求 ID・同じ内容の再呼び出し | 保存済みの状態を返す。新しく送らない |
-| 同じ要求 ID・異なる内容 | 拒否 |
-| Orchestrator が応答を受け取れない | 要求 ID で Gateway に状態を照会する |
-| 外部 API への送信結果が不明 | `unknown` のまま。自動で再送しない |
-| 再起動時に `ATTEMPTING` が残っている | 成功とみなさず結果不明として扱う |
-| 期限切れ・権限変更 | 新しい候補として再評価・再確認 |
+| 事象 | 動作 | 確かめる試験（`v2/tests/`） |
+|---|---|---|
+| C2 停止・タイムアウト・入力切り捨て | Gateway に本文を渡さず、ローカル処理または保留 | `orchestrator/test_pipeline.py::test_c2_failures_held_and_persisted`（例外・時間切れ・切り捨て・版なし）・`test_c2_dict_allow_truncated_held_keeps_judge_question_version`・`evalharness/test_run_v2_e2e.py::test_c2_timeout_holds_without_adapter_call` |
+| 送信前の記録に失敗 | 外部 API を呼ばない | `gateway/test_gateway.py::test_record_failure_does_not_call_adapter` |
+| 同じ要求 ID・同じ内容の再呼び出し | 保存済みの状態を返す。新しく送らない | `gateway/test_gateway.py::test_reprepare_same_content_returns_existing`・`test_second_commit_does_not_resend`・`test_concurrent_commit_sends_once` |
+| 同じ要求 ID・異なる内容 | 拒否 | `gateway/test_gateway.py::test_same_id_different_content_rejected`・`test_digest_mismatch` |
+| Orchestrator が応答を受け取れない | 要求 ID で Gateway に状態を照会する | `integration/test_contract_a_e2e.py::test_commit_timeout_resolves_by_status_without_retry`・`test_gateway_unreachable_marks_not_received` |
+| 外部 API への送信結果が不明 | `unknown` のまま。自動で再送しない | `gateway/test_gateway.py::test_unknown_is_not_resent`・`test_failure_kinds` |
+| 再起動時に `ATTEMPTING` が残っている | 成功とみなさず結果不明として扱う | `gateway/test_gateway.py::test_recover_on_startup` |
+| 期限切れ・権限変更 | 新しい候補として再評価・再確認 | Gateway 側: `gateway/test_gateway.py::test_prepare_expired_rejected`・`test_commit_expired_rejected`。確認の間の変化: `orchestrator/test_pipeline.py` の「確認の間の変化」10 件・`integration/test_contract_a_e2e.py::test_permission_revoked_while_confirming_sends_nothing`・`integration/test_contract_b_e2e.py::test_free_text_authority_revoked_while_confirming_sends_nothing` |
 
 SDK の自動再試行は切る。同時 `commit` は DB の条件付き更新で 1 件だけ通す。
+
+送った本文が確認した本文と同じ事は、受信先が受け取った本文の digest を計算し直し、確認画面の digest・実行記録の digest と照らして確かめる（`integration/test_contract_a_e2e.py` / `test_contract_b_e2e.py` の `_assert_sent`）。
+
+10/25 の直し: 確認の後の権限再確認が、候補を作った時と同じ設定・同じ時刻を使っていたため、確認画面を開いている間に権限が外れたり承認の期限が切れたりしても気づけなかった。再確認では設定を読み直し、今の時刻で確かめる。契約の定義が変わった時・承認済みテキストが再承認された時は拒否、設定が読めない時と確認が候補の期限（作成から `PREPARE_TTL`）より遅れた時は保留し、どれも Gateway を呼ばない。評価用に時刻と設定を外から固定した呼び方（`evalharness/run_v2_e2e.py`）は固定のまま確かめる。
 
 ## 進め方
 

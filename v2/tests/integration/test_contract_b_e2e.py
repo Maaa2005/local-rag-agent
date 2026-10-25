@@ -452,3 +452,25 @@ def test_contract_b_response_visibility_requester_only_no_exec(gw):
     assert run.visible_to == USER and run.no_exec is True and run.min_view_level is None
     assert run.can_view(USER, 2)
     assert not run.can_view("u_exec", 3)  # 上位レベルでも依頼者以外は取得できない
+
+
+# 確認の間に依頼文の承認権限が取り消された → 再確認で止まり、何も送らない
+def test_free_text_authority_revoked_while_confirming_sends_nothing(gw, tmp_path, monkeypatch):
+    import json
+    import shutil as _sh
+
+    import integration.flow_b as flow_b_mod
+    from orchestrator.policy import DEFAULT_POLICY_DIR, load_policy
+
+    svc, store, fake, _ = gw
+    d = tmp_path / "policies"
+    _sh.copytree(DEFAULT_POLICY_DIR, d)
+    users = json.loads((d / "users.json").read_text(encoding="utf-8"))
+    users[USER]["free_text_approval"] = []
+    (d / "users.json").write_text(json.dumps(users, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(flow_b_mod, "load_policy", lambda: load_policy(d))
+    counting = CountingGateway(svc)
+    res = run_contract_b(USER, SPEC, FREE, OPTS, DEST, c1=c1(), c2=c2(), confirmer=DigestConfirmer(),
+                         gateway=counting)
+    assert (res.outcome, res.run.stopped_at) == ("rejected", "eligibility"), res.reason
+    _assert_nothing_sent(counting, store, fake)

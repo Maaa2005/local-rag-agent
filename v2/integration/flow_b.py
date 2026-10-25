@@ -19,7 +19,7 @@ from common.schemas import C1Decision
 from integration.flow import C1_MAX_INPUT_CHARS, C1_TIMEOUT_S, C1Router, FlowResult, route_with_c1
 from orchestrator.audit_store import AuditSink, persist_run
 from orchestrator.pipeline import C2Checker, Confirmer, Gateway, RunResult, run_contract
-from orchestrator.policy import JST, Policy
+from orchestrator.policy import JST, Policy, load_policy
 
 CONTRACT_B = "B-csv-codegen@1"
 
@@ -78,5 +78,8 @@ def run_contract_b(
         audit_prefix=[gate.event],
         c1_decision=gate.decision,
         audit_bodies=[free_text],
+        # 時刻・設定を外から固定していなければ、確認の後の権限再確認は今の時刻と読み直した設定で行う
+        reload_policy=None if policy is not None else load_policy,
+        clock=None if now is not None else (lambda: datetime.now(JST)),
     )
     return FlowResult(run.outcome, run.reason, gate.decision, run)
