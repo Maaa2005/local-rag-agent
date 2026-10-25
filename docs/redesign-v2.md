@@ -326,6 +326,14 @@ RAG 接続（F2・F3。2026-10-19 実装、Mac で偽のモジュールを使っ
 - 監査には件数・document_id・字数だけを残す。質問・根拠・回答の本文は残さない
 - v1 との接続は `orchestrator/rag_backend.py`。`app.services.retriever.retrieve` と `app.services.llm.stream_answer` を呼ばれた時点で import する（backend/ を PYTHONPATH に入れる）。v1 は Qdrant のクライアントを使い回すため、専用スレッドの 1 本のイベントループを共有して呼ぶ。上限時間は検索 30 秒・生成 180 秒で、超えたら保留。LLM には根拠のファイル名だけを渡し、フルパスは渡さない
 
+説明表示（F8。2026-10-25 実装、表示の関数と試験まで。利用者の画面にはつないでいない。契約の流れを操作する画面がまだ無く、確認も `Confirmer` の差し替え口だけのため）:
+
+- `v2/orchestrator/explain.py` の `explain(run, viewer_id=, viewer_level=, view=, c1=)` が 1 回の実行の説明を組み、`to_text` / `to_html` で表示する。入力は `RunResult` と、確認画面に出した内容（`confirmation_view`）だけ。HTTP の層は持たない
+- 送信の状態は outcome ではなく Gateway の記録から決める。outcome `rejected` は権限での拒否と送信先の拒否の両方を含むため。commit を呼んでいなければ「送っていない（確定）」、`SUCCEEDED` は「送信した」、`FAILED` で種類が `not_sent` なら「送っていない（確定）」、`rejected` なら「送信先が受け付けなかった」、それ以外（`unknown`・種類なし・`ATTEMPTING`・`PREPARED`・照会失敗）は「届いたか分からない」とし、要求 ID と「自動では送り直さない」を出す。このため `RunResult` に `gateway_failure`（FAILED の種類）を足した
+- 確定本文は、確認画面の digest と実行記録の digest が一致し、かつ `can_view` を通る閲覧者にだけ出す。digest は計算し直さない（本文の一致は送信の試験で確かめる）。応答も `can_view` を通る時だけ出す。状態と理由は誰にでも出す
+- 応答は信頼しないテキスト。HTML では全部エスケープし、文字表示では制御文字を除く
+- 試験は `v2/tests/orchestrator/test_explain.py`（全部の出口の送信の状態・実際の流れでの 4 種類の失敗・閲覧の権限・digest 不一致・エスケープ）。デモ用に、決まった 6 場面を偽の送信役で通して 1 枚の HTML にする `python -m evalharness.explain_demo --out <path>` がある（外部の読み込みとスクリプトを禁じる）
+
 ### 非機能要求
 
 | # | 要求 |
