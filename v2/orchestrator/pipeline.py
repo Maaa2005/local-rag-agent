@@ -91,6 +91,8 @@ class RunResult:
     approver_authority: bool | None = None
     approved_ref: str | None = None  # 事前承認済みテキストの key（"id@version"）
     approved_by: str | None = None  # その事前承認の承認者（policy 上の記録）
+    # Gateway が FAILED を返したときの種類（not_sent / rejected / unknown）。説明表示（F8）で未送信と結果不明を分ける
+    gateway_failure: str | None = None
 
     def can_view(self, user_id: str, level: int | None = None) -> bool:
         """user_id（閲覧レベル level）がこの応答を取得してよいか。制約が不明なら見せない。"""
@@ -316,5 +318,5 @@ def run_contract(
     if st.state == SendState.FAILED:
         kind = st.failure.value if st.failure else "unknown"
         outcome: Outcome = "rejected" if kind == "rejected" else "held"
-        return stop(outcome, "none", f"Gateway 送信失敗: {kind}", **common)
+        return stop(outcome, "none", f"Gateway 送信失敗: {kind}", gateway_failure=kind, **common)
     return stop("held", "none", f"送信結果が未確定: {st.state.value}。自動で再送しない", **common)

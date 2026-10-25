@@ -473,4 +473,6 @@ def test_free_text_authority_revoked_while_confirming_sends_nothing(gw, tmp_path
     res = run_contract_b(USER, SPEC, FREE, OPTS, DEST, c1=c1(), c2=c2(), confirmer=DigestConfirmer(),
                          gateway=counting)
     assert (res.outcome, res.run.stopped_at) == ("rejected", "eligibility"), res.reason
+    # 最初の資格検査ではなく、確認の後の再確認で止まった
+    assert [e.result for e in res.run.audit if e.stage == "recheck"] == ["deny"]
     _assert_nothing_sent(counting, store, fake)
