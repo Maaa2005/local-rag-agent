@@ -158,6 +158,12 @@ for p in /docs /internal-data /models /qdrant/storage /var/run/docker.sock /run/
 done
 
 echo "== 3. Gateway → frontend → 社内 の迂回 =="
+# 陽性対照: frontend が公開されていなければ、下の「届かない」は何も試していない
+if curl -s -o /dev/null -m 3 "http://127.0.0.1:$FRONTEND_PORT/"; then
+  info "公開 frontend 127.0.0.1:$FRONTEND_PORT にホストからは到達可（陽性対照）"
+else
+  fail "公開 frontend 127.0.0.1:$FRONTEND_PORT にホストから届かない（迂回の試験が無効）"
+fi
 expect_closed "gateway → host.docker.internal:$FRONTEND_PORT (公開 frontend)" "$(tcp gateway host.docker.internal "$FRONTEND_PORT")"
 GW_GW="$(echo "$PROBE_GW" | pyexec gateway 2>/dev/null | tail -1)"
 if [ -n "$GW_GW" ]; then

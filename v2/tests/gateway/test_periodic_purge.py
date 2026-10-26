@@ -409,3 +409,27 @@ def test_cli_missing_db_does_not_create(tmp_path, capsys):
     assert purge_mod.main(["--db", str(db)]) == 1
     assert json.loads(capsys.readouterr().err) == {"error": "DatabaseNotFound"}
     assert not db.exists()
+
+
+# ---- 件数ログがコンテナの標準エラーに出ること（10/26 dind で出ていなかった） ----
+
+def test_configure_logging_shows_purge_counts_on_stderr(tmp_path, capsys):
+    import gateway.app as app_mod
+
+    log = logging.getLogger("gateway")
+    saved_level, saved_handlers = log.level, list(log.handlers)
+    try:
+        app_mod.configure_logging()
+        app_mod.configure_logging()  # 2 回呼んでも二重に出さない
+        ours = [h for h in log.handlers if h.get_name() == app_mod.LOG_HANDLER_NAME]
+        assert len(ours) == 1
+        svc = GatewayService(SendStore(tmp_path / "gateway.db"), {"claude": FakeAdapter()})
+        svc.purge_expired()
+        err = capsys.readouterr().err
+        assert err.count("purge bodies=0 sends=0 history=0") == 1
+        assert "INFO gateway" in err
+    finally:
+        for h in list(log.handlers):
+            if h not in saved_handlers:
+                log.removeHandler(h)
+        log.setLevel(saved_level)

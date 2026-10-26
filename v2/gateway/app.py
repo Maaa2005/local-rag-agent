@@ -197,9 +197,29 @@ def build_service_from_env() -> GatewayService:
     return GatewayService(store, adapters)
 
 
+LOG_HANDLER_NAME = "gateway-stderr"
+
+
+def configure_logging() -> None:
+    """"gateway" ロガーの INFO（保持期限削除の件数など）を標準エラーに出す。
+
+    uvicorn の log_level は uvicorn 自身のロガーにしか効かない。何もしないと INFO は捨てられ、
+    WARNING 以上だけが出る（10/26 コンテナで purge の件数が出ないことを確認）。何度呼んでも 1 つだけ付ける。
+    """
+    log = logging.getLogger("gateway")
+    log.setLevel(logging.INFO)
+    if any(h.get_name() == LOG_HANDLER_NAME for h in log.handlers):
+        return
+    handler = logging.StreamHandler()
+    handler.set_name(LOG_HANDLER_NAME)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    log.addHandler(handler)
+
+
 def main() -> None:
     import uvicorn
 
+    configure_logging()
     sock = os.environ.get("GATEWAY_SOCKET", "/run/gateway/gateway.sock")
     # workers=1 固定（モジュール docstring の単一ワーカー前提を参照）
     uvicorn.run(create_app(build_service_from_env()), uds=sock, workers=1,

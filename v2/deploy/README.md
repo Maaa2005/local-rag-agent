@@ -90,10 +90,11 @@ Gateway は起動時に送信中（ATTEMPTING）の行をすべて「結果不�
 
 ## 未試験・未確定
 
-- **分離試験は未実行**（Mac には GPU も起動済み compose もない）。`docker compose config` と静的テストのみ確認済み。
-- **Docker Desktop と WSL 内 Engine のどちらで試すかは未決（10/12 に特定）。** host.docker.internal や 127.0.0.1 公開ポートへのコンテナからの到達性は両者で挙動が異なりうるため、決めた方式で isolation_test.sh を通すまで「分離済み」と書かない。
+- **分離試験は標準の Docker Engine でだけ通した（10/26）。** Mac 上の docker:29-dind（Docker Engine 29.9.2・iptables）で、vllm と judge-clef を CPU の代役に差し替えて laya 29 件・clef 28 件すべて PASS。GPU 実機（本物の vllm・llama.cpp）では未実行。
+- **OrbStack ではゾーン分離が成立しない（10/26）。** 同じ試験を Mac の OrbStack で直接走らせると 6 件 FAIL（gateway から qdrant・vllm・frontend の IP に直接届く、host.docker.internal 経由で公開 frontend に届く）。最小再現でも、普通の bridge から `--internal` ネットワークのコンテナに IP で届いた。OrbStack はネットワーク間を遮断しないため、OrbStack での結果は 1（社内→外部）・4（正常経路）・堅牢化の確認にしか使えない。試験側に OrbStack 用の例外は入れない。
+- **Docker Desktop と WSL 内 Engine のどちらで動かすかは未決（10/12 に特定）。** 上の通り分離は実行環境の実装に依存する。決めた方式の実機で isolation_test.sh を通すまで「本番で分離済み」と書かない。
 - frontend は公開のため非 internal の `frontend-publish` にも参加する。frontend が社内への中継や外部への出口にならないことは、本物の frontend（リバースプロキシ設定）ができてから試験を追加する。
-- UDS の所有者・権限: gateway は uid 10001、internal-app は uid 10002・gid 10001 で共有グループにしているが、ソケットファイルのモード（uvicorn の umask 依存）で internal-app が接続できるかは未確認。接続できなければ起動ラッパーで umask を設定する。
-- qdrant（unprivileged イメージ）・vllm・llama.cpp を read_only / 非 root / cap_drop ALL で起動できるかは未確認（v1 では vllm の read_only を見送っていた）。必要な書込先は tmpfs で足りるかを実測する。
+- UDS の所有者・権限: gateway は uid 10001、internal-app は uid 10002・gid 10001 で共有グループ。10/26 の dind 試験で internal-app からソケットに接続でき、`/status/{id}` が 404 を返した（umask の調整は不要だった）。
+- qdrant（unprivileged イメージ）は read_only / 非 root / cap_drop ALL で起動を確認（10/26。snapshots の tmpfs を uid 1000 所有にする必要があった）。vllm・llama.cpp は未確認（v1 では vllm の read_only を見送っていた）。必要な書込先は tmpfs で足りるかを GPU 実機で実測する。
 - judge-laya・internal-app・frontend はプレースホルダ。judge-clef のモデルパス・GPU レイヤ数も仮置き。
 - IPv6 経路、DNS 以外の名前解決（/etc/hosts の注入等）は試験対象外。

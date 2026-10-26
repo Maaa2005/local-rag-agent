@@ -9,6 +9,8 @@
 #   社内ゾーン   : internal-app / qdrant / vllm / judge-* / frontend  → ネットワーク "internal"（internal: true）
 #   Gateway ゾーン: gateway                                         → ネットワーク "egress" のみ
 #   受け渡し     : 名前付き volume "gateway-sock" 上の Unix ソケットだけ（ネットワークは共有しない）
+#   ※ ゾーン分離は Linux の Docker Engine（iptables）が守る。OrbStack はネットワーク間を遮断しないので
+#     OrbStack 上では分離されない（10/26 確認。詳細は deploy/README.md「未試験・未確定」）。
 #
 # 共通の堅牢化: read_only / cap_drop: [ALL] / no-new-privileges / 非 root ユーザ。
 
