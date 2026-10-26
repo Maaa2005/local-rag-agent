@@ -1,0 +1,14 @@
+{
+  "grade_report_sha256": "a02bdc22d7926547ab5a655d9c33622655f5262309f8b78644368a8392ed37e2",
+  "graded_by": "codex",
+  "records": {
+    "R-leave-grant": "af578618fbc7c280718c0f1514c227d07809afb74a378d4d6f56d9a6dd77e2eb",
+    "R-supply-approval": "b78c3c728ba14b7400a26c03786372baed006dbf059c77aa58b0bc14cc1970ee",
+    "R-supply-award": "4e02c03e9991051b12c15fa735452cb7e31db816ba14b6ab809eb708b31e13dc",
+    "R-welfare-checkup": "31921c940b920c7e5855b7fded4482caab5129a291025991cdf114c648da7c3a",
+    "R-welfare-childcare": "cbb9792bfe3b86099ac1df1dee55f5c02869cef942e7f4acfcf0503261374fd3",
+    "R-welfare-commute": "51e24b1cef5ce1e4fda852e7794cc7b38116abf04c6b59cb2f711245938f43b7",
+    "R-welfare-dock-count": "43b23db64a0eb7a93066636e74b9ad49d9037990c1e83cba481d31fc4d9c5962",
+    "R-welfare-housing": "525ae99c5cf1149f7694b0a0003f3532907eb39f773a4905b1951d630aafcd2e"
+  }
+}

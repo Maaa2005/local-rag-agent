@@ -1,0 +1,82 @@
+{
+  "label": "2回目",
+  "total": 96,
+  "by_kind": {
+    "decided": 16,
+    "held": 22,
+    "no_record": 58
+  },
+  "by_hold_code_or_stage": {
+    "decided": 16,
+    "outcome:option_mismatch": 4,
+    "subject": 58,
+    "other_requirements:unstated": 6,
+    "facts:role_undecided": 4,
+    "facts:conflict": 1,
+    "facts:missing": 2,
+    "outcome:unknown": 3,
+    "exception:cue": 2
+  },
+  "correct": 27,
+  "by_set": {
+    "boundary": {
+      "correct": 14,
+      "total": 48
+    },
+    "hold": {
+      "correct": 11,
+      "total": 24
+    },
+    "variation": {
+      "correct": 2,
+      "total": 24
+    }
+  },
+  "by_question_kind": {
+    "condition_combo": {
+      "correct": 0,
+      "total": 6
+    },
+    "conflict": {
+      "correct": 4,
+      "total": 6
+    },
+    "exception_unclear": {
+      "correct": 0,
+      "total": 6
+    },
+    "irrelevant_numbers": {
+      "correct": 2,
+      "total": 6
+    },
+    "missing_info": {
+      "correct": 3,
+      "total": 6
+    },
+    "multiple_subjects": {
+      "correct": 0,
+      "total": 6
+    },
+    "out_of_scope": {
+      "correct": 4,
+      "total": 6
+    },
+    "paraphrase": {
+      "correct": 0,
+      "total": 6
+    }
+  },
+  "revised_to_hold": {
+    "total": 0,
+    "correct": 0
+  },
+  "missing_expected": 0,
+  "code_identity": "cd0c8b64d269706375e4038f6e517070298b3d5ed3a1a30b30440b57d186330a",
+  "verified_sha256": "f98945e8a29a38371c5eaadcce8287a67494f86fa757e44b9a267229cb86b9ba",
+  "n_records": 10,
+  "unmeasured": [
+    "取り出し（検索）",
+    "閲覧レベル",
+    "実際の経路（C1・検索・モデルの生成）"
+  ]
+}
