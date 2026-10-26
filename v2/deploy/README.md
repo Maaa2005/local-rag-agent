@@ -53,6 +53,12 @@ Gateway は起動時に送信中（ATTEMPTING）の行をすべて「結果不�
 - ロックはプロセスが終われば解放される。`/data/gateway.db.lock` は残ってよい（消さない）。
 - `python -m gateway.purge` はロックを取らないので、Gateway の稼働中に実行してよい。
 - `flock` はローカルの FS（Docker の local volume）前提。NFS 等の共有 FS に DB を置かない。
+- ロックは uvicorn を起動する前に取る。uvicorn 0.54 は起動に失敗してもソケットのパスを消すため、以前は拒否された
+  2 つ目が動いている 1 つ目の `/run/gateway/gateway.sock` を消し、社内から届かなくなっていた（10/26 コンテナで発見・修正）。
+  修正後は `docker exec … python -m gateway.app` と `docker compose run --rm --no-deps gateway` の 2 つ目がどちらも
+  終了コード 1 で止まり、1 つ目はソケット経由で応答し続けることを確認した。
+- 起動は必ず `python -m gateway.app`（イメージの既定）で行う。`uvicorn` コマンドで同じソケットを指定して直接起動すると、
+  拒否されたときに上と同じくソケットが消える。
 
 ## 監査 DB と定期 purge
 

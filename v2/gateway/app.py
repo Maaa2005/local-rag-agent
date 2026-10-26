@@ -99,8 +99,13 @@ def acquire_single_worker_lock(db_path: str) -> int:
     return fd
 
 
-def create_app(service: GatewayService, purge_interval: float | None = None) -> FastAPI:
-    """purge_interval: 定期 purge の間隔（秒）。None なら環境変数から読む。"""
+def create_app(service: GatewayService, purge_interval: float | None = None, *,
+               held_lock_fd: int | None = None) -> FastAPI:
+    """purge_interval: 定期 purge の間隔（秒）。None なら環境変数から読む。
+
+    held_lock_fd: 呼び出し側（main）が先に取った単一ワーカーロックの fd。渡せば lifespan では取り直さず
+    これを使い、終了時に閉じる（flock は同一プロセスでも別 open なら競合するため取り直せない）。
+    """
     interval = purge_interval_from_env() if purge_interval is None else purge_interval
     if not interval > 0:
         raise ValueError("purge_interval must be positive")
@@ -108,7 +113,7 @@ def create_app(service: GatewayService, purge_interval: float | None = None) -> 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         # 単一ワーカー前提の強制（モジュール docstring）。recover_on_startup より前に取る。
-        lock_fd = acquire_single_worker_lock(service.store.path)
+        lock_fd = held_lock_fd if held_lock_fd is not None else acquire_single_worker_lock(service.store.path)
         try:
             async with _serve(_app):
                 yield
@@ -221,8 +226,12 @@ def main() -> None:
 
     configure_logging()
     sock = os.environ.get("GATEWAY_SOCKET", "/run/gateway/gateway.sock")
+    service = build_service_from_env()
+    # ロックは uvicorn.run より前に取る。uvicorn 0.54 の run() は起動に失敗しても finally でソケットの
+    # パスを消すため、lifespan で拒否されると動いている 1 つ目の受け口まで消してしまう（10/26 コンテナで確認）。
+    lock_fd = acquire_single_worker_lock(service.store.path)
     # workers=1 固定（モジュール docstring の単一ワーカー前提を参照）
-    uvicorn.run(create_app(build_service_from_env()), uds=sock, workers=1,
+    uvicorn.run(create_app(service, held_lock_fd=lock_fd), uds=sock, workers=1,
                 log_level="info", access_log=False)
 
 

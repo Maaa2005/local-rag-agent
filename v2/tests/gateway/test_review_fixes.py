@@ -247,16 +247,25 @@ def test_validation_error_hides_input(tmp_path):
 
 
 # ---- 8. 単一ワーカー ----
-def test_main_runs_single_worker(monkeypatch):
+def test_main_runs_single_worker(monkeypatch, tmp_path):
+    import os
     import types
 
     called: dict = {}
     fake_uvicorn = types.SimpleNamespace(run=lambda app, **kw: called.update(kw))
     monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
     monkeypatch.setattr(app_mod, "build_service_from_env",
-                        lambda: GatewayService.__new__(GatewayService))
-    app_mod.main()
-    assert called["workers"] == 1
+                        lambda: GatewayService(SendStore(tmp_path / "gw.db"), {"claude": FakeAdapter()}))
+    taken: list[int] = []
+    real_acquire = app_mod.acquire_single_worker_lock
+    monkeypatch.setattr(app_mod, "acquire_single_worker_lock", lambda p: taken.append(real_acquire(p)) or taken[-1])
+    try:
+        app_mod.main()
+        assert called["workers"] == 1
+        assert len(taken) == 1  # uvicorn に入る前にロックを取っている
+    finally:
+        for fd in taken:
+            os.close(fd)
 
 
 # ---- 9. request_id の形式 ----

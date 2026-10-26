@@ -81,3 +81,31 @@ def test_lock_conflicts_across_processes(tmp_path):
         holder.wait(timeout=10)
     fd = acquire_single_worker_lock(db)
     os.close(fd)
+
+
+def test_refused_second_main_keeps_the_live_socket(tmp_path, monkeypatch):
+    # uvicorn 0.54 の run() は起動に失敗しても finally でソケットのパスを消す。拒否された 2 つ目が
+    # そこまで進むと、動いている 1 つ目の受け口が消えて社内から届かなくなる（10/26 コンテナで発見）。
+    import logging
+
+    import gateway.app as app_mod
+
+    db, sock = tmp_path / "gw.db", tmp_path / "gw.sock"
+    sock.write_text("1 つ目のソケットの代わり")  # uvicorn は存在だけを見て消す
+    monkeypatch.setenv("GATEWAY_DB", str(db))
+    monkeypatch.setenv("GATEWAY_SOCKET", str(sock))
+    monkeypatch.delenv("GATEWAY_CLAUDE_MODEL", raising=False)
+    monkeypatch.delenv("GATEWAY_CODEX_MODEL", raising=False)
+    log = logging.getLogger("gateway")
+    saved_level, saved_handlers = log.level, list(log.handlers)
+    fd = acquire_single_worker_lock(str(db))
+    try:
+        with pytest.raises(GatewayAlreadyRunning):
+            app_mod.main()
+        assert sock.exists()
+    finally:
+        os.close(fd)
+        for h in list(log.handlers):
+            if h not in saved_handlers:
+                log.removeHandler(h)
+        log.setLevel(saved_level)
