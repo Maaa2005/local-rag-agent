@@ -65,7 +65,8 @@ services:
     volumes:
       - qdrant-data:/qdrant/storage
     tmpfs:
-      - /qdrant/snapshots
+      # tmpfs は既定で root 所有 755。1000 番で動く qdrant が起動時に snapshots/tmp を作れず止まる（10/26 Mac で確認）
+      - /qdrant/snapshots:uid=1000,gid=1000,mode=0700
       - /tmp
     environment:
       QDRANT__SERVICE__GRPC_PORT: "6334"
