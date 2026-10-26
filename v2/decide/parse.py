@@ -124,7 +124,7 @@ _MONEY = re.compile(r"(?P<t>(?:\d[\d,]*(?:\.\d+)?(?:億|万|千)?)+)円")
 _MONEY_TOKEN = re.compile(r"(\d[\d,]*(?:\.\d+)?)(億|万|千)?")
 _UNITS = (
     r"%|割|日間|日|回|時間|人|名|km|キロメートル|キロ|件|個|台|枚|歳|年間|年|"
-    r"[かヶカケヵ]月間?|週間|点|kg"
+    r"[かヶカケヵ]月間?|週間|点|kg|分間|分(?!の\d|かる|かり|かっ|から)|箱"
 )
 _QTY = re.compile(r"(?P<n>\d[\d,]*(?:\.\d+)?)(?P<u>" + _UNITS + r")")
 _BIZDAY = re.compile(r"\d+営業日")
@@ -133,11 +133,11 @@ _UNIT_KIND = {
     "%": "%", "割": "%", "日間": "日", "日": "日", "回": "回", "時間": "時間",
     "人": "人", "名": "人", "km": "km", "キロメートル": "km", "キロ": "km",
     "件": "件", "個": "個", "台": "台", "枚": "枚", "歳": "歳", "年間": "年",
-    "年": "年", "週間": "週間", "点": "点", "kg": "kg",
+    "年": "年", "週間": "週間", "点": "点", "kg": "kg", "分": "分", "分間": "分", "箱": "箱",
 }
 _KIND_LABEL = {"%": "%", "円": "円"}
 # 単位が違っても同じ家族なら「単位がそろわない」として保留の理由にする
-_TIME_FAMILY = {"日", "年", "か月", "週間", "時間"}
+_TIME_FAMILY = {"日", "年", "か月", "週間", "時間", "分"}
 _MULT = {"億": Decimal(10**8), "万": Decimal(10**4), "千": Decimal(10**3), None: Decimal(1), "": Decimal(1)}
 
 
@@ -214,17 +214,23 @@ def _quantities(text: str, masked_spans: list[tuple[int, int]]) -> list[_Qty]:
             if mm:
                 val += Decimal(mm[1])
                 out.append(_Qty("%", val, m.start(), m.end() + mm.end()))
+                taken.append((m.start(), m.end() + mm.end()))  # 「3割5分」の 5分 を分の単位として二重に読まない
                 continue
             out.append(_Qty("%", val, m.start(), m.end()))
             continue
         if u in ("年", "年間"):
             if rest.startswith("度") or _dec(m["n"]) >= 1900:
                 continue
+        if u in ("分", "分間") and t[:m.start()].endswith("時"):
+            continue  # 「9時30分」は時刻であって、長さの分ではない
         if re.fullmatch(r"[かヶカケヵ]月間?", u):
             kind = "か月"
         else:
             kind = _UNIT_KIND[u]
-        out.append(_Qty(kind, _dec(m["n"]), m.start(), m.end()))
+        value, end = _dec(m["n"]), m.end()
+        if u == "時間" and rest.startswith("半"):
+            value, end = value + Decimal("0.5"), end + 1  # 「1時間半」= 1.5 時間（半を落として 1 時間と読まない）
+        out.append(_Qty(kind, value, m.start(), end))
     out.sort(key=lambda q: q.start)
     return out
 
@@ -351,13 +357,15 @@ def extract(question: str, base_year: int | None = None, bare: bool = False) -> 
 
 # ---------------------------------------------------------------- 単位
 
-_FAMILY = {"年": "time", "か月": "time", "日": "time", "週間": "time", "時間": "time"}
+_FAMILY = {"年": "time", "か月": "time", "日": "time", "週間": "time", "時間": "time", "分": "time"}
 # 換算表を持つ組だけ換算する。それ以外（年と日など）は換算せず「単位のずれ」として保留する。
 _CONVERT = {
     ("年", "か月"): Fraction(12),
     ("か月", "年"): Fraction(1, 12),
     ("週間", "日"): Fraction(7),
     ("日", "週間"): Fraction(1, 7),
+    ("時間", "分"): Fraction(60),
+    ("分", "時間"): Fraction(1, 60),
 }
 
 
@@ -471,6 +479,57 @@ def day_count_tokens(quote: str) -> list[tuple[int, int]]:
             continue
         out.append((m.end(), int(m["n"])))
     return out
+
+
+_START_COUNT = re.compile(r"翌日を数え始めとして(?P<n>\d+)日目")
+
+
+def start_count_tokens(quote: str) -> list[tuple[int, int]]:
+    """「翌日を数え始めとしてN日目」の類 [(終わり位置, 日数)]。「翌日から数えてN日」と同じ意味（基準日 + N 日）。"""
+    text = _normalize(quote)
+    return [(m.end(), int(m["n"])) for m in _START_COUNT.finditer(text)]
+
+
+# 境目に名前を付ける言い方: 「〈境目の式〉を〈名前〉とし、…〈名前〉以前／〈名前〉を過ぎた／それより前 …」
+# 名前は「〜日」で終わる漢字・カタカナの語（期限日・受付開始日 など）。
+_NAME_DEF = re.compile(r"目?を(?P<name>[一-龥ァ-ヶー]{1,8}日)と(?:し|して|する)")
+_SEG_BREAKS = "。、，,\n"
+
+
+def named_boundary_refs(quote: str, pos: int) -> list[tuple[str | None, str]] | None:
+    """pos（境目の式の終わり）の直後が名付け（「…を期限日とし」）なら、その名前の参照の一覧を返す。名付けでなければ None。
+
+    参照 = (比べ方, 比べ方の語の後ろから次の句読点までの文)。比べ方が読めない参照は None。
+    - 名前が出る所（名付け自身を除く）の直後の言い回しを日付の表で読む。名付けより前に出る名前は読めない参照（None）にする。
+    - 「それ」は名付けより後ろで、直後に比べ方の語が続く時だけ、その名前の参照として数える（「それより前」）。
+    """
+    text = _normalize(quote)
+    m = _NAME_DEF.match(text, pos)
+    if m is None:
+        return None
+    name, dstart, dend = m["name"], m.start(), m.end()
+    found: list[tuple[int, str | None, str]] = []
+
+    def seg_after(end: int) -> str:
+        stop = [i for i in (text.find(c, end) for c in _SEG_BREAKS) if i != -1]
+        return text[end:(min(stop) if stop else len(text))]
+
+    for r in re.finditer(re.escape(name), text):
+        if dstart <= r.start() < dend:
+            continue
+        if r.start() < dstart:
+            found.append((r.start(), None, ""))
+            continue
+        hit = _match_phrase(text, r.end(), _DATE_RE)
+        found.append((r.start(), None, "") if hit is None else (r.start(), hit[1], seg_after(hit[0])))
+    for r in re.finditer("それ", text):
+        if r.start() < dend:
+            continue
+        hit = _match_phrase(text, r.end(), _DATE_RE)
+        if hit is not None:
+            found.append((r.start(), hit[1], seg_after(hit[0])))
+    found.sort(key=lambda x: x[0])
+    return [(op, seg) for _, op, seg in found]
 
 
 def add_months(d: date, k: int) -> tuple[int, int]:

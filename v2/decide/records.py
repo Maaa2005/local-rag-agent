@@ -415,12 +415,73 @@ def _check_condition(rec: Record, c: Condition, ctx: str) -> None:
         _all_agree([parse.phrase_op(q, end, "date") for end, _ in toks], c.op, f"{ctx}: 境目 {th.value.isoformat()}")
     elif th.type == "month_day":
         toks = [t for t in parse.month_day_tokens(q) if t[1] == th.month_offset and t[3] == "day" and t[2] == th.day]
-        _all_agree([parse.phrase_op(q, t[0], "date") for t in toks], c.op, f"{ctx}: 境目 翌月{th.day}日")
-    else:  # offset_days
-        if "翌日から数えて" not in parse._normalize(q):
-            raise RecordError(f"{ctx}: count_from=next_day なのに引用に「翌日から数えて」が無い")
-        toks = [t for t in parse.day_count_tokens(q) if t[1] == th.days]
-        _all_agree([parse.phrase_op(q, t[0], "date") for t in toks], c.op, f"{ctx}: 境目 {th.days}日")
+        _check_boundary(rec, c, q, [(t[0], False) for t in toks], f"{ctx}: 境目 翌月{th.day}日")
+    else:  # offset_days: 「翌日から数えてN日」か「翌日を数え始めとしてN日目」（後者は名前を付けて比べる形だけ）
+        nq = parse._normalize(q)
+        starts = parse.start_count_tokens(q)
+        if "翌日から数えて" not in nq and not starts:
+            raise RecordError(f"{ctx}: count_from=next_day なのに引用に「翌日から数えて」（または「翌日を数え始めとしてN日目」）が無い")
+        ends = [(t[0], False) for t in parse.day_count_tokens(q) if t[1] == th.days] if "翌日から数えて" in nq else []
+        ends += [(e, True) for e, n in starts if n == th.days]
+        _check_boundary(rec, c, q, ends, f"{ctx}: 境目 {th.days}日")
+
+
+_COMPLEMENT = {">": "<=", "<=": ">", ">=": "<", "<": ">="}
+
+
+def _check_boundary(rec: Record, c: Condition, q: str, ends: list[tuple[int, bool]], label: str) -> None:
+    """日数・翌月N日の境目（ends: [(式の終わり位置, 名前付きだけを受けるか)]）の直後の読みが、条件の比べ方と一致するか。
+
+    直後が比べ方の語（「を過ぎた」）なら今まで通り。直後が名付け（「を期限日とし」）なら、後に出る名前の参照で比べ方を取る。
+    """
+    if not ends:
+        raise RecordError(f"{label}: 引用に境目の語が無い")
+    direct: list[str | None] = []
+    named: list[list[tuple[str | None, str]]] = []
+    for end, named_only in ends:
+        refs = parse.named_boundary_refs(q, end)
+        if refs is not None:
+            named.append(refs)
+        elif named_only:
+            raise RecordError(f"{label}: 「翌日を数え始めとして」は境目に名前を付けて（「…日目を期限日とし」）比べる形だけ受ける")
+        else:
+            direct.append(parse.phrase_op(q, end, "date"))
+    if direct:
+        _all_agree(direct, c.op, label)
+    for refs in named:
+        _check_named(rec, c, refs, label)
+
+
+def _check_named(rec: Record, c: Condition, refs: list[tuple[str | None, str]], label: str) -> None:
+    if not refs:
+        raise RecordError(f"{label}: 境目に名前を付けているが、名前で比べる言い回しが引用に無い（名前が定義されていない／参照されていない）")
+    ops = [op for op, _ in refs]
+    if any(op is None for op in ops):
+        raise RecordError(f"{label}: 名前の直後に比べ方の語が無い（または名前が定義より前に出ている）")
+    want, comp = c.op, _COMPLEMENT[c.op]
+    if len(ops) == 1:
+        if ops[0] != want:
+            raise RecordError(f"{label}: 名前の参照の比べ方が {want!r} と一致しない（引用の読み: {ops}）")
+        return
+    if any(op not in (want, comp) for op in ops):
+        raise RecordError(f"{label}: 名前の参照の比べ方が {want!r} とその反対の側のどちらでもない（引用の読み: {ops}）")
+    if set(ops) != {want, comp}:
+        raise RecordError(f"{label}: 同じ名前の参照が全部同じ比べ方で、成り立つ側と成り立たない側の言い方が矛盾している（引用の読み: {ops}）")
+    # 両側が書かれた引用: 参照の後ろの文に結論の言い方（options）が在れば、記録の結論の側と合っていなければならない。
+    # （在る事だけを確かめる。options の語が無い文は判断しない）
+    for op, seg in refs:
+        hit = [o for o in rec.options if o in seg]
+        hit = [o for o in hit if not any(o != o2 and o in o2 for o2 in hit)]
+        if len(hit) != 1:
+            continue
+        if op == comp:
+            out = rec.any_false
+        elif len(rec.conditions) == 1:
+            out = rec.all_true  # 条件が 1 つの時だけ「この条件が成り立つ = all_true」
+        else:
+            continue
+        if out is not None and out.value != "unknown" and out.value != hit[0]:
+            raise RecordError(f"{label}: 引用で比べ方 {op!r} の側は「{hit[0]}」なのに、記録はその側の結論を「{out.value}」にしている")
 
 
 def validate_against_document(rec: Record, text: str) -> None:
