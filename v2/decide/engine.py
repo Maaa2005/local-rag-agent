@@ -298,7 +298,8 @@ def _extract_facts(rec: Record, ex: parse.Extracted, needed: set[str]) -> dict[s
 _MONTH_WORD = {0: "当月", 1: "翌月", 2: "翌々月"}
 
 
-def _threshold_value(c: Condition, f: Fact, vals: dict[str, _Val]) -> tuple[Any, str]:
+def _threshold_value(c: Condition, f: Fact, vals: dict[str, _Val],
+                     by: dict[str, Fact] | None = None) -> tuple[Any, str]:
     """境目の値と、答えの文に書く説明。"""
     th = c.threshold
     if th.type == "number":
@@ -306,6 +307,9 @@ def _threshold_value(c: Condition, f: Fact, vals: dict[str, _Val]) -> tuple[Any,
     if th.type == "date":
         return th.value, parse.fmt_date(th.value)
     base = vals[th.base].value  # type: ignore[index]
+    if th.type == "fact":  # 問の中の別の日付そのものが境目（base が取れていなければ、呼ぶ前の事実の段で保留している）
+        label = by[th.base].label if by is not None and th.base in by else th.base  # type: ignore[index]
+        return base, f"{parse.fmt_date(base)}（{label}）"
     if th.type == "offset_days":
         d = base + timedelta(days=th.days)  # type: ignore[arg-type]
         return d, f"{parse.fmt_date(d)}（{parse.fmt_date(base)}の翌日から数えて{th.days}日）"
@@ -431,7 +435,7 @@ class DecisionEngine:
         comp = []
         for c in rec.conditions:
             f = by[c.fact]
-            tv, tdesc = _threshold_value(c, f, vals)
+            tv, tdesc = _threshold_value(c, f, vals, by)
             lhs = vals[c.fact].value
             ok = parse.holds(lhs, c.op, tv)
             results.append(ok)

@@ -8,6 +8,8 @@
       （単位のない量の事実は unit: null と明示する。境目の数は単位なし「5以上」でも、単位付きでもよい）
     * 境目の直後の言い回し（超える・以上・未満・過ぎた・まで 等。質問側と同じ表で読む）が、条件の比べ方と一致する
       （同じ境目が引用に何度も出るなら、全部の言い回しが一致していなければならない）
+    * 境目が問の中の別の日付（type: fact）なら、引用の中のその日付の名前（label）の直後の言い回し（より前・以後 等）を
+      条件の比べ方と照らす。名前が引用に無ければ拒否。成り立つ側・成り立たない側の両方が書かれた引用は名前付き境目と同じ検査
   で確かめる。不一致は RecordError（黙って読み込まない）。
 版が違う（SHA 不一致・文書なし）記録は構造だけ検査して stale として読み込み、engine が「版」で保留する。
 
@@ -73,9 +75,9 @@ class Fact:
 
 @dataclass(frozen=True)
 class Threshold:
-    type: str  # number / date / offset_days / month_day
+    type: str  # number / date / offset_days / month_day / fact
     value: Any = None  # Fraction（number）か date（date）
-    base: str | None = None
+    base: str | None = None  # offset_days / month_day / fact の基準になる事実の role（fact は問の中の別の日付そのもの）
     days: int | None = None
     count_from: str | None = None
     month_offset: int | None = None
@@ -217,6 +219,9 @@ def _threshold(d: Any, ctx: str) -> Threshold:
         if not isinstance(day, int) or isinstance(day, bool) or not 1 <= day <= 31:
             raise RecordError(f"{ctx}: day は 1〜31")
         return Threshold("month_day", base=_str(d["base"], f"{ctx}.base"), month_offset=mo, day=day)
+    if t == "fact":
+        d = _obj(d, {"type": True, "base": True}, ctx)
+        return Threshold("fact", base=_str(d["base"], f"{ctx}.base"))
     raise RecordError(f"{ctx}: 知らない境目の型 {t!r}")
 
 
@@ -324,6 +329,18 @@ def parse_record(data: Any) -> Record:
             raise RecordError(f"{ctx}.conditions[{i}]: 知らない事実 {c['fact']!r}")
         th = _threshold(c["threshold"], f"{ctx}.conditions[{i}].threshold")
         f = by_role[c["fact"]]
+        if th.type == "fact":
+            cc = f"{ctx}.conditions[{i}]"
+            b = by_role.get(th.base)  # type: ignore[arg-type]
+            if b is None:
+                raise RecordError(f"{cc}: fact の境目の base {th.base!r} が facts に無い")
+            if th.base == c["fact"]:
+                raise RecordError(f"{cc}: fact の境目の base は比べる事実と別の role にする（自分自身とは比べられない）")
+            if f.kind != "date" or b.kind != "date":
+                raise RecordError(f"{cc}: fact の境目は日付（date）の事実どうしだけ。日付以外は「前・後・以前・以後」の"
+                                  "比べ方が決まらず、単位や換算も合わないので使えない")
+            if f.label == b.label:
+                raise RecordError(f"{cc}: 比べる事実と base の label が同じで、引用の中で見分けられない")
         if th.type == "number" and f.kind == "date":
             raise RecordError(f"{ctx}.conditions[{i}]: 日付の事実に数の境目は使えない")
         if th.type != "number" and f.kind != "date":
@@ -416,6 +433,8 @@ def _check_condition(rec: Record, c: Condition, ctx: str) -> None:
     elif th.type == "month_day":
         toks = [t for t in parse.month_day_tokens(q) if t[1] == th.month_offset and t[3] == "day" and t[2] == th.day]
         _check_boundary(rec, c, q, [(t[0], False) for t in toks], f"{ctx}: 境目 翌月{th.day}日")
+    elif th.type == "fact":
+        _check_fact_boundary(rec, c, q, f"{ctx}: 境目 {rec.fact(th.base).label}")  # type: ignore[arg-type]
     else:  # offset_days: 「翌日から数えてN日」か「翌日を数え始めとしてN日目」（後者は名前を付けて比べる形だけ）
         nq = parse._normalize(q)
         starts = parse.start_count_tokens(q)
@@ -450,6 +469,30 @@ def _check_boundary(rec: Record, c: Condition, q: str, ends: list[tuple[int, boo
         _all_agree(direct, c.op, label)
     for refs in named:
         _check_named(rec, c, refs, label)
+
+
+def _check_fact_boundary(rec: Record, c: Condition, q: str, label: str) -> None:
+    """問の中の別の日付（base の事実）と比べる境目。引用の中の base の名前（label）の直後の言い回しを日付の表で読み、
+    条件の比べ方と照らす。名前が出る所が複数なら、成り立つ側と成り立たない側の両方が書かれた引用として _check_named と同じ検査をする。
+    """
+    text = parse._normalize(q)
+    name = parse._normalize(rec.fact(c.fact).label)
+    base = parse._normalize(rec.fact(c.threshold.base).label)  # type: ignore[arg-type]
+    # 比べる事実の名前が base の名前を含む（「登録申請日」と「申請日」）時は、その中の出現を base の出現と数えない
+    masked = [m.span() for m in re.finditer(re.escape(name), text)] if base != name and base in name else []
+    hits = [m.span() for m in re.finditer(re.escape(base), text)
+            if not any(a <= m.start() < b for a, b in masked)]
+    if not hits:
+        raise RecordError(f"{label}: 引用に base の名前「{rec.fact(c.threshold.base).label}」が無い"  # type: ignore[arg-type]
+                          "（比べ方の言い回しは名前の直後で読む）")
+    refs: list[tuple[str | None, str]] = []
+    for i, (_, end) in enumerate(hits):
+        stop = [x for x in (text.find(ch, end) for ch in "。\n") if x != -1]
+        limit = min(stop) if stop else len(text)
+        if i + 1 < len(hits):
+            limit = min(limit, hits[i + 1][0])
+        refs.append((parse.phrase_op(q, end, "date"), text[end:limit]))
+    _check_named(rec, c, refs, label)
 
 
 def _check_named(rec: Record, c: Condition, refs: list[tuple[str | None, str]], label: str) -> None:
