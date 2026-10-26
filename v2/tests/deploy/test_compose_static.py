@@ -152,7 +152,7 @@ def test_vllm_uses_local_model_path(services):
 
 
 def test_vllm_does_not_force_quantization(services):
-    # 既定モデルは compressed-tensors。--quantization awq を付けると vLLM が起動時に止まる（10/26 Colab で確認）
+    # 既定モデルは compressed-tensors。--quantization awq を付けると vLLM が起動時に止まる（固定版 vLLM 0.25.1 のソースで確認）
     assert "--quantization" not in services["vllm"]["command"]
 
 

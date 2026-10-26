@@ -93,7 +93,8 @@ services:
       - /tmp
     # モデルは事前取得済みのローカルパス（revision 固定は取得手順側で行う）。取得用トークンは渡さない。
     # --quantization は付けない。既定モデルの config は compressed-tensors で、awq を指定すると起動時に止まる
-    # （無指定なら config から読む。10/26 Colab で確認）。下の値は 6GB 想定のままで、8〜12GB 向けには未調整。
+    # （固定版 0.25.1 のソースで確認）。無指定なら config から読む（10/19 Colab・vLLM 0.32.0 で確認。0.25.1 での起動は未確認）。
+    # 下の値は 6GB 想定のままで、8〜12GB 向けには未調整。
     command: >
       --model /models/${LLM_MODEL_DIR:-gemma-4-E2B-it-AWQ-INT4}
       --dtype auto
