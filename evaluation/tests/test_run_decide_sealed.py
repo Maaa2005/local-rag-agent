@@ -371,3 +371,35 @@ def test_runner_does_not_use_git_or_open_the_sealed_dir():
     src = (ROOT / "evaluation/v2/run_decide_sealed.py").read_text(encoding="utf-8")
     for banned in ("subprocess", "os.system", "rag-sealed"):
         assert banned not in src
+
+
+# ---------------------------------------------------------------- 登録できた規程に限った数
+
+def test_registration_groups_count_only_questions_whose_rules_are_all_recorded(world, capsys):
+    qs = [
+        {**QUESTIONS[0], "rule_id": "R-test-approval"},                        # 登録済み・正解
+        {**QUESTIONS[2], "rule_id": "R-test-approval"},                        # 登録済み・不正解
+        {**QUESTIONS[1], "rule_id": ["R-test-approval", "R-not-recorded"]},    # 一部だけ
+        {**QUESTIONS[5], "rule_id": "R-not-recorded"},                         # 未登録
+        {**QUESTIONS[3], "rule_id": None},                                      # 規程に当たらない
+        {**QUESTIONS[4]},                                                       # rule_id 欄なし
+    ]
+    world["questions"].write_text("\n".join(json.dumps(q, ensure_ascii=False) for q in qs) + "\n", encoding="utf-8")
+    assert rds.main(argv(world)) == 0
+    printed = capsys.readouterr().out
+    s = json.loads(world["summary"].read_text(encoding="utf-8"))
+    assert s["by_registration"] == {"registered": {"correct": 1, "total": 2}, "partial": {"correct": 1, "total": 1},
+                                    "unregistered": {"correct": 0, "total": 1}, "none": {"correct": 1, "total": 2}}
+    assert s["n_rules_in_questions"] == 2 and s["n_rules_in_questions_registered"] == 1
+    assert "R-not-recorded" not in printed and "R-not-recorded" not in world["summary"].read_text(encoding="utf-8")
+
+
+def test_registration_is_read_after_the_answer_and_does_not_change_it(world):
+    engine, _ = rds.build_engine(world["records"], world["root"])
+    chunks = rds.doc_chunks(world["root"])
+    reg = frozenset({"R-test-approval"})
+    for q in QUESTIONS:
+        a, ta = rds.run_row(engine, {**q, "rule_id": "R-test-approval"}, chunks, reg)
+        b, tb = rds.run_row(engine, q, chunks)
+        assert (a["kind"], a["final_answer"], a["correct"]) == (b["kind"], b["final_answer"], b["correct"])
+        assert ta["reg"] == "registered" and tb["reg"] is None  # 登録の集合を渡さなければ数えない

@@ -120,8 +120,20 @@ def route_final_of(kind: str) -> str:
     return {"decided": "code", "held": "held", "no_record": "model_only_not_run"}.get(kind, "other")
 
 
-def run_row(engine: DecisionEngine, row: dict, chunks: list[Chunk]) -> tuple[dict, dict]:
-    """1 問を流す。(--out の行, 集計用の行) を返す。正解欄は engine が返した後で初めて読む。"""
+def registration_of(rule_ids, registered: frozenset[str] | None) -> str | None:
+    """問の rule_id（1 つか一覧か無し）が、確認済みの記録にどれだけ入っているか。registered が None なら数えない。"""
+    if registered is None:
+        return None
+    ids = [r for r in (rule_ids if isinstance(rule_ids, list) else [rule_ids]) if r is not None]
+    if not ids:
+        return "none"  # 規程に当たらない問（範囲外など）
+    n = sum(r in registered for r in ids)
+    return "registered" if n == len(ids) else "unregistered" if n == 0 else "partial"
+
+
+def run_row(engine: DecisionEngine, row: dict, chunks: list[Chunk],
+            registered: frozenset[str] | None = None) -> tuple[dict, dict]:
+    """1 問を流す。(--out の行, 集計用の行) を返す。正解欄・rule_id 欄は engine が返した後で初めて読む。"""
     res = engine.decide(row["question"], chunks)
     # ---- ここまでが答えを作る側。ここから先が採点
     expected = next((row[k] for k in EXPECTED_FIELDS if k in row), None)
@@ -134,7 +146,9 @@ def run_row(engine: DecisionEngine, row: dict, chunks: list[Chunk]) -> tuple[dic
     dr = res.decision_record
     tally = {"kind": res.kind, "stage": dr.get("hold_code") or dr.get("stage") or "-", "correct": correct,
              "set": row.get("set"), "qkind": row.get("kind"), "revised": row.get("revised_to_hold") is True,
-             "missing_expected": missing}
+             "missing_expected": missing, "reg": registration_of(row.get("rule_id"), registered)}
+    q_ids = row.get("rule_id")
+    tally["_q_rule_ids"] = [r for r in (q_ids if isinstance(q_ids, list) else [q_ids]) if isinstance(r, str)]
     return out, tally
 
 
@@ -149,8 +163,10 @@ def _grouped(tallies: list[dict], key: str) -> dict:
     return dict(sorted(g.items()))
 
 
-def summarize(tallies: list[dict], *, label: str, records_dir: Path, n_records: int) -> dict:
+def summarize(tallies: list[dict], *, label: str, records_dir: Path, n_records: int,
+              registered: frozenset[str] | None = None) -> dict:
     revised = [t for t in tallies if t["revised"]]
+    in_q = {r for t in tallies for r in t.get("_q_rule_ids", [])}
     return {
         "label": label,
         "total": len(tallies),
@@ -160,6 +176,10 @@ def summarize(tallies: list[dict], *, label: str, records_dir: Path, n_records: 
         "by_set": _grouped(tallies, "set"),
         "by_question_kind": _grouped(tallies, "qkind"),
         "revised_to_hold": {"total": len(revised), "correct": sum(t["correct"] for t in revised)},
+        # 問の rule_id が全部記録にある（registered）／一部だけ（partial）／無い（unregistered）／rule_id 無し（none）。数だけ
+        "by_registration": _grouped(tallies, "reg"),
+        "n_rules_in_questions": len(in_q),
+        "n_rules_in_questions_registered": len(in_q & registered) if registered is not None else None,
         # 正解欄が見つからなかった行の数。0 でなければ欄の名前の取り違えを疑う（その行は不正解に数えている）
         "missing_expected": sum(t["missing_expected"] for t in tallies),
         "code_identity": code_identity(),
@@ -194,13 +214,15 @@ def main(argv=None) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     tallies = []
+    registered = frozenset(r.rule_id for r in getattr(engine, "records", []))
     with out.open("w", encoding="utf-8") as f:
         for row in rows:
-            line, tally = run_row(engine, row, chunks)
+            line, tally = run_row(engine, row, chunks, registered)
             f.write(json.dumps(line, ensure_ascii=False) + "\n")  # 1 問ごとに、終わった時点で 1 回
             f.flush()
             tallies.append(tally)
-    summary = summarize(tallies, label=args.label, records_dir=Path(args.records), n_records=n_records)
+    summary = summarize(tallies, label=args.label, records_dir=Path(args.records), n_records=n_records,
+                        registered=registered)
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
