@@ -453,6 +453,21 @@ def phrase_op(quote: str, pos: int, kind: str) -> str | None:
     return None if r is None else r[1]
 
 
+def range_spans(text: str) -> list[tuple[int, int]]:
+    """text（正規化済み）の中の、数・日付の直後に付く比べ方の言い回しの範囲 [(開始, 終わり)]。
+
+    「14日未満」の「未満」、「3万円を超えない」の「を超えない」など。表は上の _NUM_PHRASES / _DATE_PHRASES をそのまま使う。
+    否定を読む側（polarity）が「否定ではなく範囲の言葉」として外す為に使う。
+    """
+    ex = extract(text, bare=True)
+    out: list[tuple[int, int]] = []
+    for c in ex.cands:
+        r = _match_phrase(ex.text, c.end, _BOTH_RE)
+        if r is not None and r[0] > c.end:
+            out.append((c.end, r[0]))
+    return out
+
+
 def month_day_tokens(quote: str) -> list[tuple[int, int, int, str, int]]:
     """「翌月10日」の類 [(終わり位置, 月の足し幅, 日, 'day'|'eom', 0)]。"""
     text = _normalize(quote)

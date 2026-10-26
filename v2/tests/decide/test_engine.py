@@ -464,3 +464,105 @@ def test_file_doc_lookup_resolves_only_md_under_given_dirs(tmp_path):
                 "/etc/passwd", "../outside.md", None, "/watched/general/missing.md", "/watched/a/b/c.md"):
         assert fl.lookup(bad) is None, bad
         assert fl.read_text(bad) is None if isinstance(bad, str) else True
+
+
+# ---------------------------------------------------------------- 否定の読み取り（前提・例外）
+# 手がかりの語の否定は decide/polarity.py が読む（単位の試験は test_polarity.py）。ここは結論（決める／保留）の側で固定する。
+
+def _deadline_with_cue(cue):
+    d = copy.deepcopy(DEADLINE)
+    d["other_requirements"][0]["cues"] = [cue]
+    return d
+
+
+def _monthday_with_cue(cue):
+    d = copy.deepcopy(MONTHDAY)
+    d["exceptions"][0]["cues"] = [cue]
+    return d
+
+
+def test_receipt_absent_is_held_as_unmet():
+    # 「領収書はありません」は否定。一覧に無い「ません」でも保留（§6）
+    res = held(decide(dq("2026年9月1日", "2026年9月10日", "領収書はありません。"), DEADLINE), "other_requirements:unmet")
+    assert "満たしていない" in res.reason
+
+
+@pytest.mark.parametrize("tail", [
+    "領収書はなかった。", "領収書がなくて困っています。", "領収書は出せず困っています。", "領収書は無い。",
+    "領収書は未提出です。", "領収書は不備があります。", "領収書を忘れました。", "領収書は、ありません。",
+    "領収書も承認もない。", "領収書がないわけではない。", "領収書は確認中です。", "領収書があるかどうか分からない。",
+])
+def test_receipt_unmet_or_unknown_is_held(tail):
+    held(decide(dq("2026年9月1日", "2026年9月10日", tail), DEADLINE), "other_requirements:unmet")
+    held(decide(dq("2026年9月1日", "2026年9月20日", tail), DEADLINE), "other_requirements:unmet")
+
+
+def test_unknown_reading_is_stated_in_the_reason():
+    res = held(decide(dq("2026年9月1日", "2026年9月10日", "領収書が分からない状態です。"), DEADLINE), "other_requirements:unmet")
+    assert "分からない" in res.reason
+
+
+@pytest.mark.parametrize("tail", [
+    "領収書の添付は問題ない。", "領収書の添付は問題なし。", "領収書は支障ありません。", "領収書は心配ない。",
+    "領収書は間違いない。", "領収書は紛失していません。", "領収書は添付済みです。",
+    "領収書は添付済みだが承認はまだない。", "承認はないが領収書は添付済みです。",
+])
+def test_receipt_met_does_not_hold(tail):
+    assert last(decide(dq("2026年9月1日", "2026年9月10日", tail), DEADLINE)) == "結論: 受け付けられる"
+    assert last(decide(dq("2026年9月1日", "2026年9月20日", tail), DEADLINE)) == "結論: 受け付けられない"
+
+
+def test_range_word_mi_is_not_a_negation():
+    # 「未満」の「未」を否定と読んで保留しない。同じ節に範囲の言葉を含んでも決める
+    d = _deadline_with_cue("受講報告書")
+    tail = "受講報告書は受講から14日未満で提出済みです。"
+    assert last(decide(dq("2026年9月1日", "2026年9月10日", tail), d)) == "結論: 受け付けられる"
+    held(decide(dq("2026年9月1日", "2026年9月10日", "受講報告書は受講から14日未満で未提出です。"), d), "other_requirements:unmet")
+
+
+def test_met_requirement_with_unassumable_flag_does_not_hold_when_stated_met():
+    d = copy.deepcopy(DEADLINE)
+    d["other_requirements"][0]["assume_met_if_unstated"] = False
+    assert last(decide(dq("2026年9月1日", "2026年9月10日", "領収書の添付は問題ない。"), d)) == "結論: 受け付けられる"
+    held(decide(dq("2026年9月1日", "2026年9月10日", "領収書はありません。"), d), "other_requirements:unmet")
+
+
+def test_exception_cue_negated_does_not_apply_and_decides():
+    d = _monthday_with_cue("災害")
+    for tail in ("災害による遅延ではありません。", "災害ではなく寝坊です。", "災害は関係ありません。"):
+        assert last(decide(mq("2026年9月15日", "2026年10月11日", tail), d)) == "結論: 受理されない", tail
+        assert last(decide(mq("2026年9月15日", "2026年10月10日", tail), d)) == "結論: 受理される", tail
+
+
+def test_exception_idiom_negated_does_not_apply():
+    assert last(decide(mq("2026年9月15日", "2026年10月11日", "やむを得ない事情はありませんでした。"), MONTHDAY)) == "結論: 受理されない"
+
+
+def test_exception_unknown_is_held():
+    d = _monthday_with_cue("災害")
+    for tail in ("災害かどうか分からない。", "災害の可能性は確認中です。"):
+        res = held(decide(mq("2026年9月15日", "2026年10月11日", tail), d), "exception:cue")
+        assert "分からない" in res.reason
+
+
+def test_exception_applicable_is_held_even_with_other_negation_in_the_sentence():
+    d = _monthday_with_cue("災害")
+    held(decide(mq("2026年9月15日", "2026年10月11日", "災害による遅延がありました。"), d), "exception:cue")
+    held(decide(mq("2026年9月15日", "2026年10月11日", "災害で書類を紛失しました。"), d), "exception:cue")
+    held(decide(mq("2026年9月15日", "2026年10月11日", "やむを得ない事情がありました。"), MONTHDAY), "exception:cue")
+
+
+def test_exception_stated_with_another_negated_predicate_is_still_held():
+    # 事情を述べた文の中の別の述語の否定（「申請できなかった」）を、事情の否定と読んで決めてはならない
+    d = _monthday_with_cue("災害")
+    for tail in ("災害の影響で申請が間に合わなかった。", "災害で電車が動かず遅れました。"):
+        held(decide(mq("2026年9月15日", "2026年10月11日", tail), d), "exception:cue")
+    held(decide(mq("2026年9月15日", "2026年10月11日", "やむを得ない事情で期限までに申請できませんでした。"), MONTHDAY), "exception:cue")
+
+
+@pytest.mark.parametrize("tail", [
+    "領収書を、紛失しました。", "領収書については、ありません。", "領収書は、残念ながら、ありません。",
+    "領収書は購入から14日未満ですが、ありません。",
+])
+def test_receipt_predicate_after_comma_is_held(tail):
+    held(decide(dq("2026年9月1日", "2026年9月10日", tail), DEADLINE), "other_requirements:unmet")
