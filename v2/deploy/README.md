@@ -23,7 +23,7 @@
 
 | ゾーン | サービス | ネットワーク | volume |
 |---|---|---|---|
-| 社内 | internal-app（Orchestrator・本体未実装のプレースホルダ） | internal | docs(ro), internal-data, audit-data, models(ro), gateway-sock |
+| 社内 | internal-app（Orchestrator・本体未実装のプレースホルダ。purge だけ動く） | internal | docs(ro), internal-data, audit-data, models(ro), gateway-sock |
 | 社内 | qdrant | internal | qdrant-data |
 | 社内 | vllm（profile laya） | internal | models(ro) |
 | 社内 | judge-laya（profile laya・プレースホルダ）/ judge-clef（profile clef） | internal（別名 `judge`） | models(ro) |
@@ -73,7 +73,8 @@ Gateway は起動時に送信中（ATTEMPTING）の行をすべて「結果不�
 - `--db` を省略すると `ORCHESTRATOR_AUDIT_DB` を使う（アプリと同じ DB を必ず対象にするため、cron 側でパスを書かない）。`--dry-run` で削除せず件数だけを確認できる。
 - 出力は件数だけの JSON（run_id・本文は出ない）。DB ファイルが無い・場所が未設定なら終了コード 1。
 - WSL 内 Engine で動かす場合は WSL 側で cron サービスを起動しておく（WSL は既定で cron を起動しない）。Docker Desktop の場合は Windows のタスクスケジューラから同じコマンドを 1 日 1 回呼ぶ。
-- **現時点の internal-app はプレースホルダ**で orchestrator パッケージを含まないため、この cron はまだ動かない。Orchestrator 本体のイメージに差し替えた時点で有効になる。常駐プロセスができたら、Gateway と同様にプロセス内で定期実行する方式へ移す。
+- internal-app は本体未実装のプレースホルダだが、イメージ（`deploy/internal-app.Dockerfile`）に orchestrator パッケージを入れてあるので purge は動く。10/26 に OrbStack で `up -d --no-deps internal-app` → 上の cron と同じ `exec -T internal-app python -m orchestrator.purge` が終了コード 0・`{"runs": 0, "events": 0}` を返すことを確認した。依存パッケージは入れていないので、動くのは標準ライブラリだけで書いた audit_store と purge のみ。ホストの cron／タスクスケジューラへの登録は、実行環境が決まってから試す。常駐プロセスができたら、Gateway と同様にプロセス内で定期実行する方式へ移す。
+- audit-data / internal-data の所有者は internal-app イメージで 10002:10001・0700 にしている。名前付き volume は空のときにイメージ内の同じパスの所有者を写すため。以前は python:3.11-slim をそのまま使っていて volume が root 所有 755 になり、internal-app が監査 DB を作れなかった（10/26 発見・修正）。中身の入った volume には写らないので、所有者を変えたいときは volume を作り直す。
 
 ## 保証すること（静的に検査済み: `tests/deploy/test_compose_static.py`）
 
@@ -83,7 +84,8 @@ Gateway は起動時に送信中（ATTEMPTING）の行をすべて「結果不�
 - gateway の DB は `gateway-data`（gateway 専用）。監査 DB は `audit-data`（internal-app 専用。`tests/orchestrator/test_audit_deploy.py` で検査）。API キーは compose secrets で gateway にだけ渡し、環境変数に置かない。
 - 全サービス read_only / cap_drop ALL / no-new-privileges / 非 root ユーザ。
 - Clef-flash 構成（profile clef）では vllm を起動しない。
-- gateway イメージは v2/common と v2/gateway だけを含む。
+- gateway イメージは v2/common と v2/gateway だけを含む。internal-app イメージは v2/common と v2/orchestrator だけを含み、/run/gateway を作らない（gateway-sock の所有者は gateway イメージで決める）。
+- 書き込む volume（:ro でない物。internal-app の gateway-sock を除く）は、イメージ側でサービスの user に chown してある。
 
 静的検査は「設定がそう書かれている」ことしか示さない。分離が成立したかは `isolation_test.sh` を実環境で走らせて判断する。
 

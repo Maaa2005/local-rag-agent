@@ -1,6 +1,7 @@
 """deploy/compose.yml の静的要件検査（N3・N5・N6 の配置面）。実際の分離は deploy/isolation_test.sh で試す。"""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -163,3 +164,31 @@ def test_gateway_dockerfile_copies_only_common_and_gateway():
     assert "FROM python:3.11-slim" in text
     users = [ln for ln in text.splitlines() if ln.startswith("USER")]
     assert users and "root" not in users[-1] and not users[-1].split()[1].startswith("0")
+
+
+def _dockerfile_lines(svc: dict) -> list[str]:
+    text = (DEPLOY / Path(svc["build"]["dockerfile"]).name).read_text(encoding="utf-8")
+    return [ln for ln in text.splitlines() if not ln.lstrip().startswith("#")]
+
+
+@pytest.mark.parametrize("name", ["gateway", "internal-app"])
+def test_writable_volumes_owned_by_service_user_in_image(services, name):
+    # 名前付き volume は空のときイメージ内の同じパスの所有者を写す。パスが無いと root 所有 755 になり、
+    # 非 root のサービスが書けない（10/26 internal-app が監査 DB を作れなかった）
+    svc = services[name]
+    body = "\n".join(_dockerfile_lines(svc))
+    for v in svc["volumes"]:
+        src, dst, *mode = str(v).split(":")
+        if mode == ["ro"] or (name != "gateway" and src == "gateway-sock"):
+            continue
+        assert re.search(rf"chown {svc['user']} [^&\n]*{re.escape(dst)}(\s|$)", body), (name, dst)
+
+
+def test_internal_app_dockerfile_copies_only_common_and_orchestrator(services):
+    lines = _dockerfile_lines(services["internal-app"])
+    copies = [ln.split()[1] for ln in lines if ln.startswith("COPY")]
+    assert sorted(copies) == ["common/", "orchestrator/"]
+    # gateway-sock の所有者は gateway イメージで決める。internal-app 側で作ると先に起動した側が写る
+    assert not any("/run/gateway" in ln for ln in lines)
+    users = [ln for ln in lines if ln.startswith("USER")]
+    assert users and users[-1].split()[1] == services["internal-app"]["user"]

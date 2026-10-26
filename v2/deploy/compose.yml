@@ -31,9 +31,13 @@ services:
   # --- 社内ゾーン ---------------------------------------------------------
   internal-app:
     <<: *hardening
-    # Orchestrator（FastAPI）本体は未実装。現時点は分離試験用のプレースホルダ。
-    # 本体ができたら build と command を差し替える。
-    image: python:3.11-slim
+    # Orchestrator（FastAPI）本体は未実装。現時点は待つだけのプレースホルダで、監査 DB の purge だけが動く。
+    # 書込先 volume の所有者はイメージ側で 10002 にしている（deploy/internal-app.Dockerfile）。
+    # 本体ができたら Dockerfile と command を差し替える。
+    build:
+      context: ..
+      dockerfile: deploy/internal-app.Dockerfile
+    image: local-rag-agent-v2/internal-app:dev
     command: ["python", "-c", "import time; print('internal-app placeholder (Orchestrator 未実装)', flush=True); time.sleep(10**9)"]
     user: "10002:10001"
     environment:

@@ -5,8 +5,8 @@
 # 対象: internal-app コンテナの環境変数 ORCHESTRATOR_AUDIT_DB（/audit-data/audit.db）。--db は付けない
 #       （アプリと cron が必ず同じ DB を見るように、場所の指定は compose.yml の 1 か所に寄せる）。
 # 出力: 件数だけの JSON（run_id・本文は出ない）。失敗時は終了コード 1 と {"error": ...} を stderr に出す。
-# 前提: internal-app が起動中で、イメージに orchestrator パッケージが入っていること。
-#       現時点の internal-app はプレースホルダなので、Orchestrator 本体のイメージができるまでは動かない。
+# 前提: internal-app が起動中であること。本体は未実装だが、イメージ（deploy/internal-app.Dockerfile）に
+#       orchestrator パッケージを入れてあり、このコマンドは 10/26 に OrbStack で終了コード 0 を確認した。
 # 実行時刻: 03:17（毎正時を避ける）。append と同時に走ってもよい（BEGIN IMMEDIATE で直列化）。
 V2_DIR=/path/to/local-rag-agent/v2
 PATH=/usr/local/bin:/usr/bin:/bin
