@@ -103,4 +103,5 @@ Gateway は起動時に送信中（ATTEMPTING）の行をすべて「結果不�
 - UDS の所有者・権限: gateway は uid 10001、internal-app は uid 10002・gid 10001 で共有グループ。10/26 の dind 試験で internal-app からソケットに接続でき、`/status/{id}` が 404 を返した（umask の調整は不要だった）。
 - qdrant（unprivileged イメージ）は read_only / 非 root / cap_drop ALL で起動を確認（10/26。snapshots の tmpfs を uid 1000 所有にする必要があった）。vllm・llama.cpp は未確認（v1 では vllm の read_only を見送っていた）。必要な書込先は tmpfs で足りるかを GPU 実機で実測する。
 - judge-laya・internal-app・frontend はプレースホルダ。judge-clef のモデルパス・GPU レイヤ数も仮置き。
+- vllm の起動値（`--max-model-len 4096` / `--gpu-memory-utilization 0.6`）は 6GB 想定のまま。目標を 8〜12GB に移した後、採用モデルは決まっていない（候補はすべて不合格）。`--quantization awq` は既定モデル（compressed-tensors）で起動を止めるため 10/26 に外した。
 - IPv6 経路、DNS 以外の名前解決（/etc/hosts の注入等）は試験対象外。

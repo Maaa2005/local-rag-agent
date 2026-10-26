@@ -92,9 +92,10 @@ services:
     tmpfs:
       - /tmp
     # モデルは事前取得済みのローカルパス（revision 固定は取得手順側で行う）。取得用トークンは渡さない。
+    # --quantization は付けない。既定モデルの config は compressed-tensors で、awq を指定すると起動時に止まる
+    # （無指定なら config から読む。10/26 Colab で確認）。下の値は 6GB 想定のままで、8〜12GB 向けには未調整。
     command: >
       --model /models/${LLM_MODEL_DIR:-gemma-4-E2B-it-AWQ-INT4}
-      --quantization awq
       --dtype auto
       --max-model-len 4096
       --gpu-memory-utilization 0.6

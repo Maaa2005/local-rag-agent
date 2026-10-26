@@ -151,6 +151,11 @@ def test_vllm_uses_local_model_path(services):
     assert "--model /models/" in services["vllm"]["command"]
 
 
+def test_vllm_does_not_force_quantization(services):
+    # 既定モデルは compressed-tensors。--quantization awq を付けると vLLM が起動時に止まる（10/26 Colab で確認）
+    assert "--quantization" not in services["vllm"]["command"]
+
+
 def test_gateway_dockerfile_copies_only_common_and_gateway():
     text = (DEPLOY / "gateway.Dockerfile").read_text(encoding="utf-8")
     copies = [ln.split()[1] for ln in text.splitlines() if ln.startswith("COPY")]

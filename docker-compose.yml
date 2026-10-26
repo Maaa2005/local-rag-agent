@@ -26,11 +26,12 @@ services:
       - hf_cache:/root/.cache/huggingface
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
-    # 6GB VRAM 向け: Gemma 4-E2B AWQ-INT4 (~2.5GB重み) gpu-memory-utilization=0.6
+    # Gemma 4-E2B AWQ-INT4 の重みは 7.06 GiB（約 7 割が fp16 の埋め込み。safetensors ヘッダで確認）。6GB VRAM には載らない。
+    # このモデルの config は compressed-tensors（W4A16）なので --quantization は付けない。
+    # awq を指定すると vLLM が起動時に止まる。無指定なら config から読み Marlin を選ぶ（10/26 Colab で確認）。
     # embedding は CPU 動作のため VRAM 専有なし
     command: >
       --model ${LLM_MODEL:-cyankiwi/gemma-4-E2B-it-AWQ-INT4}
-      --quantization awq
       --dtype auto
       --max-model-len 4096
       --gpu-memory-utilization 0.6
