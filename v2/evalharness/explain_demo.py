@@ -83,7 +83,9 @@ def render_page(items: list[tuple[str, Explanation]]) -> str:
         "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'\">"
         "<title>説明表示のデモ</title>"
         "<style>body{font-family:sans-serif;max-width:56rem;margin:2rem auto;line-height:1.6}"
-        "dl{display:grid;grid-template-columns:14rem 1fr;gap:.2rem 1rem}dt{font-weight:bold}dd{margin:0}"
+        # 64 文字の digest や要求 ID で値の列が枠からはみ出さないよう、どこでも折り返す
+        "dl{display:grid;grid-template-columns:14rem minmax(0,1fr);gap:.2rem 1rem}dt{font-weight:bold}"
+        "dd{margin:0;overflow-wrap:anywhere}"
         "pre{white-space:pre-wrap;background:#f4f4f4;padding:.5rem}"
         ".explain{border:1px solid #ccc;padding:1rem;margin-bottom:2rem}"
         "[data-send-status=unknown],[data-send-status=refused]{border-color:#c60}</style></head><body>"

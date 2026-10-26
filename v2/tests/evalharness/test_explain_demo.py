@@ -22,6 +22,8 @@ def test_each_scene_has_the_expected_send_status(tmp_path):
     page = out.read_text(encoding="utf-8")
     assert "<script" not in page and "default-src 'none'" in page
     assert page.count('class="explain"') == len(SCENES)
+    # 長い digest で値の列が枠を越えない（10/26 に目で見て直した。見た目そのものは画面で確かめる）
+    assert "minmax(0,1fr)" in page and "overflow-wrap:anywhere" in page
 
 
 def test_main_writes_page(tmp_path, capsys):
