@@ -38,6 +38,22 @@ STOPPED_AT_LABELS: dict[str, str] = {
     "none": "途中で止めていない",
 }
 
+# stopped_at="none" は「関所では止めていない」の意味で、Gateway の段階の失敗（prepare 失敗・送信失敗・
+# 結果不明）も含む。送信も社内回答もしていないのに「途中で止めていない」と出すと読み違えるので言い換える
+SEND_STAGE_LABEL = "送信の段階（Gateway・送信先）"
+
+GATEWAY_FAILURE_LABELS: dict[str, str] = {
+    "not_sent": "送信役が送る前に失敗した。外部へは送っていない",
+    "rejected": "送信先が受け付けなかった",
+    "unknown": "送信先から返事が無く、届いたか分からない",
+}
+
+C2_DECISION_LABELS: dict[str, str] = {
+    "allow": "通す",
+    "block": "止める",
+    "hold": "保留",
+}
+
 ROUTE_LABELS: dict[str, str] = {
     "local": "社内だけで回答",
     "code": "コードで処理（未実装のため保留）",
@@ -69,7 +85,8 @@ class Explanation:
     outcome_label: str
     stopped_at: str
     stopped_at_label: str
-    reason: str
+    reason: str  # 実行記録の理由（そのまま）
+    reason_label: str  # 表示する理由。言い換えた時は記録の理由を後ろに残す
     route: str | None
     route_label: str
     destination: str | None
@@ -124,8 +141,21 @@ def _approval(run: RunResult) -> tuple[tuple[str, str], ...]:
     ]
     if run.c2_verdict is not None:
         v = run.c2_verdict
-        rows.append(("送る前の内容検査（C2）", f"{v.decision}（{v.model}@{v.revision}）: {v.reason}"))
+        decision = C2_DECISION_LABELS.get(v.decision, v.decision)
+        # 判定者の理由は規則やモデルが書いた原文。言い換えずに出す
+        rows.append(("送る前の内容検査（C2）", f"{decision}（判定: {v.model}@{v.revision}。判定者の理由: {v.reason}）"))
     return tuple(rows)
+
+
+def _stopped_at_label(run: RunResult) -> str:
+    if run.stopped_at == "none" and run.outcome not in ("sent", "answered"):
+        return SEND_STAGE_LABEL
+    return STOPPED_AT_LABELS[run.stopped_at]
+
+
+def _reason_label(run: RunResult) -> str:
+    plain = GATEWAY_FAILURE_LABELS.get(run.gateway_failure or "") if run.attempted else None
+    return f"{plain}（記録: {run.reason}）" if plain else run.reason
 
 
 def explain(
@@ -167,8 +197,9 @@ def explain(
         outcome=run.outcome,
         outcome_label=OUTCOME_LABELS[run.outcome],
         stopped_at=run.stopped_at,
-        stopped_at_label=STOPPED_AT_LABELS[run.stopped_at],
+        stopped_at_label=_stopped_at_label(run),
         reason=run.reason,
+        reason_label=_reason_label(run),
         route=route,
         route_label=ROUTE_LABELS.get(route, f"不明（{route}）") if route is not None else "記録なし",
         destination=destination,
@@ -189,7 +220,7 @@ def explain(
 def _rows(e: Explanation) -> list[tuple[str, str]]:
     return [
         ("結果", f"{e.outcome_label}（止めた所: {e.stopped_at_label}）"),
-        ("理由", e.reason),
+        ("理由", e.reason_label),
         ("経路", e.route_label),
         ("送信先", e.destination or "なし"),
         ("契約", e.contract or "なし"),

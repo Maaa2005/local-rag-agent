@@ -12,8 +12,11 @@ from gateway.store import SendStore
 from integration.flow import run_contract_a
 from judge.base import C1Decision, C2Verdict
 from orchestrator.explain import (
+    C2_DECISION_LABELS,
+    GATEWAY_FAILURE_LABELS,
     OUTCOME_LABELS,
     ROUTE_LABELS,
+    SEND_STAGE_LABEL,
     STOPPED_AT_LABELS,
     explain,
     send_status,
@@ -75,6 +78,43 @@ def test_send_status_for_every_exit(fields, expected):
         assert "送っていない" not in text and "未送信" not in text
     if expected == "unknown":
         assert "req-1" in text and "送り直さない" in text
+
+
+@pytest.mark.parametrize("fields", [f for _, f, _ in EXITS], ids=[i for i, _, _ in EXITS])
+def test_send_stage_failure_is_not_shown_as_not_stopped(fields):
+    # 送信も社内回答もしていないのに「途中で止めていない」と並べない（10/26 にデモの画面で見つけた）
+    run = _run(**fields)
+    e = explain(run, viewer_id=USER)
+    if run.outcome in ("sent", "answered"):
+        assert e.stopped_at_label == STOPPED_AT_LABELS[run.stopped_at]
+    else:
+        assert "途中で止めていない" not in to_text(e)
+        if run.stopped_at == "none":
+            assert e.stopped_at_label == SEND_STAGE_LABEL
+
+
+@pytest.mark.parametrize("kind", ["not_sent", "rejected", "unknown"])
+def test_gateway_failure_reason_is_plain_and_keeps_the_record(kind):
+    reason = f"Gateway 送信失敗: {kind}"
+    run = _run(reason=reason, gateway_received=True, attempted=True, gateway_state=SendState.FAILED,
+               gateway_failure=kind)
+    e = explain(run, viewer_id=USER)
+    assert e.reason == reason
+    assert e.reason_label == f"{GATEWAY_FAILURE_LABELS[kind]}（記録: {reason}）"
+    assert f"理由: {e.reason_label}" in to_text(e)
+
+
+def test_reason_is_shown_as_recorded_when_not_a_gateway_failure():
+    run = _run(outcome="rejected", stopped_at="eligibility", reason="未登録の利用者: u_x", request_id=None)
+    assert explain(run, viewer_id=USER).reason_label == "未登録の利用者: u_x"
+
+
+@pytest.mark.parametrize("decision,label", sorted(C2_DECISION_LABELS.items()))
+def test_c2_decision_is_shown_in_plain_words_with_judge_reason(decision, label):
+    v = C2Verdict(decision=decision, reason="no rule matched", model="rules", revision="rules-v1",
+                  question_version="stub@1")
+    text = to_text(explain(_run(c2_verdict=v), viewer_id=USER))
+    assert f"送る前の内容検査（C2）: {label}（判定: rules@rules-v1。判定者の理由: no rule matched）" in text
 
 
 # ---- 実際の流れ（偽の送信先）から組む ----
