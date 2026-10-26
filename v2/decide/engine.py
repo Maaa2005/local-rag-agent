@@ -19,7 +19,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any, Callable, Protocol, Sequence
 
-from . import parse, render
+from . import parse, polarity, render
 from .records import Condition, Fact, Record
 
 
@@ -99,7 +99,6 @@ class FileDocLookup:
 # ---------------------------------------------------------------- 質問の読み取り
 
 _OPTION_RE = re.compile(r"結論\s*[:：]\s*([^」\n]+?)\s*」")
-_NEGATIVE_MARKS = ("ない", "なし", "無い", "無し", "紛失", "忘れ", "未", "分から", "わから", "不明", "まだ")
 
 
 def _n(s: str) -> str:
@@ -402,17 +401,20 @@ class DecisionEngine:
 
         # 5. 例外
         for e in rec.exceptions:
-            cue = _term_hit(text, e.cues)
-            if cue:
-                raise _Hold("exception", "cue", f"例外に当たりうる事情（{cue}）が述べられている: {e.description}")
+            # 「述べた」は否定された言及を含めない（「災害による遅延ではありません」は例外に当たらない）。分からない読みは保留
+            rd = polarity.read_cues(text, e.cues, polarity.EVENT, _clause_bounds)
+            if rd is not None and rd.status != polarity.UNMET:
+                how = ("が述べられている" if rd.status == polarity.MET else "が当たるか分からない言い方で述べられている")
+                raise _Hold("exception", "cue", f"例外に当たりうる事情（{rd.cue}）{how}: {e.description}（{rd.why}）")
 
         # 6. 質問が触れない前提
         for o in rec.other_requirements:
-            cue = _term_hit(text, o.cues)
-            if cue:
-                a, b = _clause_bounds(text, text.find(_n(cue)))
-                if any(m in text[a:b] for m in _NEGATIVE_MARKS):
-                    raise _Hold("other_requirements", "unmet", f"{o.description}が満たされていない／分からないと読める")
+            rd = polarity.read_cues(text, o.cues, polarity.REQUIREMENT, _clause_bounds)
+            if rd is not None:
+                if rd.status != polarity.MET:
+                    raise _Hold("other_requirements", "unmet",
+                                f"{o.description}が{polarity.LABEL[polarity.REQUIREMENT][rd.status]}と読める"
+                                f"（{rd.cue}: {rd.why}）")
             elif not o.assume_met_if_unstated:
                 raise _Hold("other_requirements", "unstated", f"{o.description}について質問が触れていない")
 
