@@ -1,0 +1,32 @@
+# backend の単体テストを回す。重いモデル (sentence-transformers / docling) は
+# tests/conftest.py がスタブするので、CI では入れずに数分で終わらせる。
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: install (重いモデル以外)
+        run: |
+          grep -v -E '^(sentence-transformers|docling)' requirements.txt > /tmp/req-ci.txt
+          pip install -r /tmp/req-ci.txt pytest==9.1.1
+      - run: python -m pytest -q tests
