@@ -1,0 +1,88 @@
+{
+  "note": "試運転・合否には使わない",
+  "gpu": "Tesla T4",
+  "compute_cap": "7.5",
+  "total_mib": 15360,
+  "baseline_mib": 0,
+  "vllm": "0.32.0",
+  "model": "LiquidAI/LFM2.5-1.2B-JP-202606",
+  "model_revision": {
+    "model": "LiquidAI/LFM2.5-1.2B-JP-202606",
+    "sha": "52b8b4475311a63bf839c6494f78f8ad59d13515"
+  },
+  "dtype": "float16",
+  "measure": {
+    "max_model_len": 8192,
+    "gpu_util": 0.85,
+    "max_prompt_tokens": 2087,
+    "max_id": "N07",
+    "n": 62,
+    "rc": 0,
+    "needed_max_model_len": 3584,
+    "dtype": "float16"
+  },
+  "trial_ids": [
+    "Q010",
+    "Q039",
+    "Q012",
+    "Q045",
+    "Q017",
+    "Q018",
+    "N02",
+    "N03",
+    "N07"
+  ],
+  "trials": [
+    {
+      "label": "8GB",
+      "gpu_util": 0.5,
+      "started": true,
+      "peak_mib": 7569,
+      "budget_mib": 7680,
+      "all_answered": true,
+      "longest_ok": true,
+      "no_oom": true,
+      "no_preemption": true,
+      "within_budget": true,
+      "ok": true,
+      "missing": [],
+      "judged_rc": 0
+    },
+    {
+      "label": "12GB",
+      "gpu_util": 0.76,
+      "started": true,
+      "peak_mib": 11605,
+      "budget_mib": 11776,
+      "all_answered": true,
+      "longest_ok": true,
+      "no_oom": true,
+      "no_preemption": true,
+      "within_budget": true,
+      "ok": true,
+      "missing": [],
+      "judged_rc": 0
+    }
+  ],
+  "judge": {
+    "model": "sbintuitions/sarashina2.2-3b-instruct-v0.1",
+    "revision": "4f3626fb1b64b3e97c908e67f27b2d627ba2a999",
+    "role": "flow-check-only",
+    "started": true,
+    "precheck": "pass",
+    "precheck_rc": 0
+  },
+  "judged": {
+    "8GB": {
+      "rc": 0,
+      "out_dir": "/content/step05/judged_8GB"
+    },
+    "12GB": {
+      "rc": 0,
+      "out_dir": "/content/step05/judged_12GB"
+    }
+  },
+  "skipped": [
+    "計画 6: Gemma 4 E2B の llama-server 起動の確認（このノートは vLLM だけ）"
+  ]
+}

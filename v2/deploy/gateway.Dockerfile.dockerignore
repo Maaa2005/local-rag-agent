@@ -1,0 +1,5 @@
+# BuildKit: gateway.Dockerfile 専用の除外（build context は v2/）。common と gateway 以外を送らない。
+*
+!common/
+!gateway/
+**/__pycache__

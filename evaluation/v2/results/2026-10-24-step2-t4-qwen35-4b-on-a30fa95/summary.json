@@ -1,0 +1,357 @@
+{
+ "step": "2",
+ "candidate": "条件付き: Qwen3.5-4B（GGUF Q8_0・llama.cpp b11836 の llama-server・考え ON・考える文は 80 トークンで打ち切り）",
+ "source": "Colab のセル出力と、測定直後にセル出力へ控えた 8GB・12GB の回答（raw.jsonl・report.md・run_meta.json）から作った。回答はリポジトリに入れない",
+ "notebook": "evaluation/colab/step2_measure_llamacpp.ipynb @ a30fa95",
+ "ran_at_jst": "2026-10-24 13:11-13:50（8GB 13:11-13:26・12GB 13:27-13:43・G0 はその後、結果の取り出し 13:50）",
+ "attempts_lost": "記録していない（この回は GPU（Tesla T4）が取れた 1 回分だけを数える）",
+ "gpu": "Tesla T4",
+ "compute_cap": "7.5",
+ "total_mib": 15360,
+ "baseline_mib": 0,
+ "runtime": "llama.cpp b11836",
+ "server_version": [
+  "version: 0.7.0-dev (build 11836, commit f5027fb21)",
+  "built with GNU 13.3.0 for Linux x86_64"
+ ],
+ "model": "Qwen/Qwen3.5-4B",
+ "gguf": {
+  "repo": "unsloth/Qwen3.5-4B-GGUF",
+  "file": "Qwen3.5-4B-Q8_0.gguf",
+  "revision": {
+   "sha": "e87f176479d0855a907a41277aca2f8ee7a09523",
+   "now": "e87f176479d0855a907a41277aca2f8ee7a09523"
+  }
+ },
+ "quant": "Q8_0",
+ "server_args": [
+  "-m",
+  "Qwen3.5-4B-Q8_0.gguf",
+  "-ngl",
+  "999",
+  "-c",
+  "3072",
+  "--jinja",
+  "--reasoning",
+  "on",
+  "--reasoning-budget",
+  "80",
+  "-np",
+  "1",
+  "--alias",
+  "local-llm",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8001",
+  "-v"
+ ],
+ "embedding": "intfloat/multilingual-e5-large (CPU)",
+ "rerank": "off",
+ "index": {
+  "documents": 13,
+  "chunks": 40
+ },
+ "measure": {
+  "ctx": 8192,
+  "max_prompt_tokens": 1871,
+  "max_id": "N07",
+  "n": 62,
+  "rc": 0,
+  "needed_ctx": 3072,
+  "gpu_check": {
+   "offloaded": "33/33",
+   "all_layers_on_gpu": true,
+   "model_buffers_mib": {
+    "CUDA0": 4264.29,
+    "CPU": 644.14
+   },
+   "no_kernel_image": false,
+   "ok": true
+  },
+  "warmup_seconds": 25.8,
+  "precheck": {
+   "prompt_tokens": 56,
+   "completion_tokens": 87,
+   "content_chars": 6,
+   "reasoning_chars": 217,
+   "reasoning_tokens": 80,
+   "japanese": false,
+   "has_conclusion": true,
+   "thinking_marks": false,
+   "ok": true,
+   "question_id": "D01",
+   "reasoning_budget": 80,
+   "slack": 16,
+   "max_tokens": 1104
+  }
+ },
+ "n_questions": 62,
+ "runs": [
+  {
+   "label": "8GB",
+   "ctx": 3072,
+   "started": true,
+   "gpu_ok": true,
+   "peak_mib": 4629,
+   "budget_mib": 7680,
+   "all_answered": true,
+   "longest_ok": true,
+   "no_oom": true,
+   "no_preemption": true,
+   "within_budget": true,
+   "ok": true,
+   "missing": [],
+   "debug_active": 30866,
+   "slot_n_ctx": [
+    3072
+   ],
+   "warmup_seconds": 0.6,
+   "gpu_check": {
+    "offloaded": "33/33",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+     "CUDA0": 4264.29,
+     "CPU": 644.14
+    },
+    "no_kernel_image": false,
+    "ok": true
+   },
+   "times": {
+    "first_token_latency": {
+     "median": 3.869,
+     "max": 7.155,
+     "n": 62
+    },
+    "total_latency": {
+     "median": 5.337,
+     "max": 33.475,
+     "n": 62
+    },
+    "retrieval_latency": {
+     "median": 0.522,
+     "max": 3.837,
+     "n": 62
+    }
+   },
+   "slot_n_ctx_ok": true,
+   "debug_active_ok": true
+  },
+  {
+   "label": "12GB",
+   "ctx": 3072,
+   "started": true,
+   "gpu_ok": true,
+   "peak_mib": 4629,
+   "budget_mib": 11776,
+   "all_answered": true,
+   "longest_ok": true,
+   "no_oom": true,
+   "no_preemption": true,
+   "within_budget": true,
+   "ok": true,
+   "missing": [],
+   "debug_active": 33744,
+   "slot_n_ctx": [
+    3072
+   ],
+   "warmup_seconds": 0.6,
+   "gpu_check": {
+    "offloaded": "33/33",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+     "CUDA0": 4264.29,
+     "CPU": 644.14
+    },
+    "no_kernel_image": false,
+    "ok": true
+   },
+   "times": {
+    "first_token_latency": {
+     "median": 3.841,
+     "max": 6.269,
+     "n": 62
+    },
+    "total_latency": {
+     "median": 6.135,
+     "max": 32.78,
+     "n": 62
+    },
+    "retrieval_latency": {
+     "median": 0.499,
+     "max": 2.92,
+     "n": 62
+    }
+   },
+   "slot_n_ctx_ok": true,
+   "debug_active_ok": true
+  }
+ ],
+ "judge": {
+  "role": "human",
+  "status": "未実施（回答だけ集める）"
+ },
+ "differences": [
+  "Qwen3.5-4B 考え OFF の回と同じ手帳・同じ GGUF（unsloth/Qwen3.5-4B-GGUF・版 e87f1764・Q8_0）で、考える機能だけを替えた",
+  "--reasoning on と --reasoning-budget 80 で、考える文を 80 トークンで打ち切る",
+  "出力の上限は 1104（答えの 1024 + 考える 80）。サンプラーは llama-server の既定（温度 0.1）",
+  "流す前の 1 問で、考える文が 80 トークンで止まり、答えに結論が入ることを確かめた（考える文 217 文字・答え 6 文字）",
+  "会話の型は GGUF に入っている物を --jinja で使う。起動ごとに慣らしの 1 問を入れ、数えない",
+  "-v を付け、全層が GPU に載ったか（33/33）と文脈の長さを記録で確かめた",
+  "8GB と 12GB は同じ設定（文脈 3,072・1 本ずつ）。一番長い入力は 1,871 トークン（N07）"
+ ],
+ "N": {
+  "8GB": {
+   "ok": 7,
+   "n": 12,
+   "wrong": [
+    "N02",
+    "N04",
+    "N05",
+    "N08",
+    "N10"
+   ],
+   "pass": false
+  },
+  "12GB": {
+   "ok": 5,
+   "n": 12,
+   "wrong": [
+    "N02",
+    "N04",
+    "N05",
+    "N07",
+    "N08",
+    "N09",
+    "N11"
+   ],
+   "pass": false
+  }
+ },
+ "Q_judge_free": {
+  "8GB": {
+   "n": 50,
+   "M1_recall_at_5": 1.0,
+   "M2_mrr": 0.9867,
+   "M6_correctness": 0.8033,
+   "M7_permission": 1.0,
+   "M8_refusal": "16/16",
+   "M8_not_refused": [],
+   "answer_failures": 0
+  },
+  "12GB": {
+   "n": 50,
+   "M1_recall_at_5": 1.0,
+   "M2_mrr": 0.9867,
+   "M6_correctness": 0.84,
+   "M7_permission": 1.0,
+   "M8_refusal": "16/16",
+   "M8_not_refused": [],
+   "answer_failures": 0
+  },
+  "lines": "M6 >= 0.80・M7 = 1.00・M8 16/16",
+  "note": "Q の 50 問だけで計算。M4-S は計算していない・見ていない"
+ },
+ "P": {
+  "8GB": {
+   "ftl_p50": 3.833,
+   "total_p50": 4.836,
+   "total_max": 33.475,
+   "over_15s": [
+    "Q001",
+    "Q003",
+    "Q006",
+    "Q008",
+    "Q010",
+    "Q015",
+    "Q017",
+    "Q019",
+    "Q021",
+    "Q026",
+    "Q033",
+    "Q035",
+    "Q038",
+    "Q039",
+    "Q041",
+    "Q045",
+    "Q046",
+    "Q047"
+   ]
+  },
+  "12GB": {
+   "ftl_p50": 3.841,
+   "total_p50": 5.2,
+   "total_max": 32.78,
+   "over_15s": [
+    "Q001",
+    "Q003",
+    "Q004",
+    "Q005",
+    "Q006",
+    "Q010",
+    "Q014",
+    "Q019",
+    "Q021",
+    "Q024",
+    "Q026",
+    "Q027",
+    "Q028",
+    "Q033",
+    "Q038",
+    "Q039",
+    "Q041",
+    "Q045",
+    "Q046",
+    "Q048",
+    "Q049"
+   ]
+  },
+  "note": "Q の 50 問。8GB は B だけの決まり（問ごとに 検索の時間 r + (320/272) x (実測 - r)）で換算: 最初の 1 文字 中央 4.42 秒・完了 中央 5.59 秒（最大 38.7 秒）。12GB は実測: 最初の 1 文字 中央 3.84 秒・完了 中央 5.20 秒（最大 32.8 秒）。15 秒を超えた問は 8GB 換算で 18 問・12GB で 21 問",
+  "P1_ftl_p50_le_5": {
+   "8GB": true,
+   "12GB": true
+  },
+  "P3_total_p50_le_15": {
+   "8GB": true,
+   "12GB": true
+  }
+ },
+ "V": {
+  "8GB": "合格（最大 4,629 MiB / 予算 7,680。文脈 3,072 が記録で確かめられた・記録の行 30,866・メモリ不足 0・文脈あふれ 0）",
+  "12GB": "合格（最大 4,629 MiB / 予算 11,776。文脈 3,072・記録の行 33,744・メモリ不足 0・文脈あふれ 0）"
+ },
+ "g0": {
+  "rerank": "off",
+  "fault_timeout": 15,
+  "budget": "12GB",
+  "ctx": 3072,
+  "gpu_check": {
+   "offloaded": "33/33",
+   "all_layers_on_gpu": true,
+   "model_buffers_mib": {
+    "CUDA0": 4264.29,
+    "CPU": 644.14
+   },
+   "no_kernel_image": false,
+   "ok": true
+  },
+  "rc": 0,
+  "ok": true,
+  "overall": "PASS",
+  "items": [
+   "1 二問続けて回答 PASS",
+   "2 権限外の文書が出ない PASS（7 問・漏れなし）",
+   "2b 上位ユーザーの対照 PASS",
+   "3 監査に本文が残らない PASS（本文 48 個中 0 個）",
+   "4 生成役・検索役の固まり/停止 PASS（すべて 15 秒の上限内で保留・その後に戻る）"
+  ],
+  "time_info": "回答できた 13 問で 検索 中央 0.45 秒・生成 中央 5.00 秒（最大 28.38 秒）"
+ },
+ "speed": "出せない（出力の数に考える文が入り、最初の 1 文字の時間とずれるので他の回と比べられない）。Q の 50 問のうち 16 問は出力が上限 1104 に届いた（両方の予算とも）",
+ "human_sheet": {
+  "8GB": "入れない（N 7/12）",
+  "12GB": "入れない（N 5/12）",
+  "decision": "用紙に入れない。どちらの予算も採点役の要らない線 N を通らないので、M4-S で合否は変わらない（測定前に決めた決まりどおり・測り直しもしない）"
+ },
+ "verdict": "不合格（N 8GB 7/12・落ちた問 N02・N04・N05・N08・N10／12GB 5/12・落ちた問 N02・N04・N05・N07・N08・N09・N11）。M8 16/16・V・P・M6（0.80・0.84）・M7・G0 は両方とも合格。考え OFF（N 9/12）より悪い"
+}

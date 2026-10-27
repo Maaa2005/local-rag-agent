@@ -1,0 +1,229 @@
+# local-rag-agent v2 配置構成（初版）
+#
+# 使い方（v2/ から）:
+#   通常構成（生成 LLM + Laya）:  docker compose -f deploy/compose.yml --profile laya up -d
+#   Clef-flash 構成（vLLM 停止）:  docker compose -f deploy/compose.yml --profile clef up -d
+#   ※ laya と clef を同時に指定しない（6GB GPU に同居させない静的切替）。
+#
+# ゾーン:
+#   社内ゾーン   : internal-app / qdrant / vllm / judge-* / frontend  → ネットワーク "internal"（internal: true）
+#   Gateway ゾーン: gateway                                         → ネットワーク "egress" のみ
+#   受け渡し     : 名前付き volume "gateway-sock" 上の Unix ソケットだけ（ネットワークは共有しない）
+#   ※ ゾーン分離は Linux の Docker Engine（iptables）が守る。OrbStack はネットワーク間を遮断しないので
+#     OrbStack 上では分離されない（10/26 確認。詳細は deploy/README.md「未試験・未確定」）。
+#
+# 共通の堅牢化: read_only / cap_drop: [ALL] / no-new-privileges / 非 root ユーザ。
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+
+x-offline-env: &offline-env
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+  HF_DATASETS_OFFLINE: "1"
+
+services:
+  # --- 社内ゾーン ---------------------------------------------------------
+  internal-app:
+    <<: *hardening
+    # Orchestrator（FastAPI）本体は未実装。現時点は待つだけのプレースホルダで、監査 DB の purge だけが動く。
+    # 書込先 volume の所有者はイメージ側で 10002 にしている（deploy/internal-app.Dockerfile）。
+    # 本体ができたら Dockerfile と command を差し替える。
+    build:
+      context: ..
+      dockerfile: deploy/internal-app.Dockerfile
+    image: local-rag-agent-v2/internal-app:dev
+    command: ["python", "-c", "import time; print('internal-app placeholder (Orchestrator 未実装)', flush=True); time.sleep(10**9)"]
+    user: "10002:10001"
+    environment:
+      <<: *offline-env
+      GATEWAY_SOCKET: /run/gateway/gateway.sock
+      QDRANT_URL: http://qdrant:6333
+      VLLM_BASE_URL: http://vllm:8000/v1
+      JUDGE_BASE_URL: http://judge:8080
+      INTERNAL_DB: /internal-data/internal.db
+      # 監査 DB（orchestrator.audit_store）。既定パスは持たないので必ず指定する（未指定なら起動時エラー）。
+      # 保持期限削除は deploy/audit-purge.cron からこのコンテナ内で python -m orchestrator.purge を 1 日 1 回実行。
+      ORCHESTRATOR_AUDIT_DB: /audit-data/audit.db
+      MODELS_DIR: /models
+      HOME: /tmp
+    volumes:
+      - docs:/docs:ro
+      - internal-data:/internal-data
+      # 監査 DB 専用（internal-app だけがマウントする。gateway には渡さない）
+      - audit-data:/audit-data
+      - models:/models:ro
+      - gateway-sock:/run/gateway
+    tmpfs:
+      - /tmp
+    networks:
+      - internal
+
+  qdrant:
+    <<: *hardening
+    image: qdrant/qdrant:v1.12.4-unprivileged
+    user: "1000:1000"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    tmpfs:
+      # tmpfs は既定で root 所有 755。1000 番で動く qdrant が起動時に snapshots/tmp を作れず止まる（10/26 Mac で確認）
+      - /qdrant/snapshots:uid=1000,gid=1000,mode=0700
+      - /tmp
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+      QDRANT__TELEMETRY_DISABLED: "true"
+    networks:
+      - internal
+
+  vllm:
+    <<: *hardening
+    # Clef-flash 構成（profile clef）では起動しない。
+    profiles: ["laya"]
+    image: vllm/vllm-openai:v0.25.1
+    runtime: nvidia
+    user: "10003:10003"
+    environment:
+      <<: *offline-env
+      HOME: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
+    volumes:
+      - models:/models:ro
+    tmpfs:
+      - /tmp
+    # モデルは事前取得済みのローカルパス（revision 固定は取得手順側で行う）。取得用トークンは渡さない。
+    # --quantization は付けない。既定モデルの config は compressed-tensors で、awq を指定すると起動時に止まる
+    # （固定版 0.25.1 のソースで確認）。無指定なら config から読む（10/19 Colab・vLLM 0.32.0 で確認。0.25.1 での起動は未確認）。
+    # 下の値は 6GB 想定のままで、8〜12GB 向けには未調整。
+    command: >
+      --model /models/${LLM_MODEL_DIR:-gemma-4-E2B-it-AWQ-INT4}
+      --dtype auto
+      --max-model-len 4096
+      --gpu-memory-utilization 0.6
+      --served-model-name local-llm
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - internal
+
+  judge-laya:
+    <<: *hardening
+    profiles: ["laya"]
+    # 判断モデル（Laya-multilingual・CPU）。/v1/systemone の shim は judge/laya_server.py（依存は requirements-laya.txt）。
+    # 2026-10-17 の実測で C1・C2 とも不採用（docs/redesign-v2.md）のため image 化せずプレースホルダのまま。
+    image: python:3.11-slim
+    command: ["python", "-c", "import time; print('judge-laya placeholder', flush=True); time.sleep(10**9)"]
+    user: "10004:10004"
+    environment:
+      <<: *offline-env
+      JUDGE_MODEL_PATH: /models/laya-multilingual
+      HOME: /tmp
+    volumes:
+      - models:/models:ro
+    tmpfs:
+      - /tmp
+    networks:
+      internal:
+        aliases: [judge]
+
+  judge-clef:
+    <<: *hardening
+    profiles: ["clef"]
+    # 判断モデル（Clef-flash Q4・llama.cpp）。vLLM を止めて GPU を使う静的構成。起動確認は未実施。
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    runtime: nvidia
+    user: "10004:10004"
+    environment:
+      <<: *offline-env
+      HOME: /tmp
+    volumes:
+      - models:/models:ro
+    tmpfs:
+      - /tmp
+    command: ["-m", "/models/clef-flash-Q4/model.gguf", "--host", "0.0.0.0", "--port", "8080", "--n-gpu-layers", "${CLEF_GPU_LAYERS:-20}"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      internal:
+        aliases: [judge]
+
+  frontend:
+    <<: *hardening
+    # UI 刷新は後回し。現時点はプレースホルダ（nginx 非特権イメージ）。
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    user: "101:101"
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:8080"
+    networks:
+      - internal
+      - frontend-publish
+
+  # --- Gateway ゾーン -----------------------------------------------------
+  gateway:
+    <<: *hardening
+    build:
+      context: ..
+      dockerfile: deploy/gateway.Dockerfile
+    image: local-rag-agent-v2/gateway:dev
+    user: "10001:10001"
+    environment:
+      GATEWAY_DB: /data/gateway.db
+      GATEWAY_SOCKET: /run/gateway/gateway.sock
+      GATEWAY_CLAUDE_MODEL: ${GATEWAY_CLAUDE_MODEL:-}
+      GATEWAY_CODEX_MODEL: ${GATEWAY_CODEX_MODEL:-}
+      GATEWAY_CLAUDE_KEY_FILE: /run/secrets/anthropic_api_key
+      GATEWAY_CODEX_KEY_FILE: /run/secrets/openai_api_key
+      # 保持期限削除（N7）の定期実行間隔（秒）。既定 24 時間。不正値・0 以下は既定値、60 未満は 60。
+      GATEWAY_PURGE_INTERVAL_SECONDS: ${GATEWAY_PURGE_INTERVAL_SECONDS:-86400}
+    secrets:
+      - anthropic_api_key
+      - openai_api_key
+    # 社内 volume（docs / internal-data / models / qdrant-data）と Docker ソケットはマウントしない。
+    volumes:
+      - gateway-data:/data
+      - gateway-sock:/run/gateway
+    tmpfs:
+      - /tmp
+    networks:
+      - egress
+
+networks:
+  internal:
+    internal: true
+  # Gateway の外向き専用。社内サービスは参加しない。
+  egress:
+    driver: bridge
+  # frontend を 127.0.0.1 に公開するためだけのネットワーク（internal ネットワークは公開できないため）。
+  frontend-publish:
+    driver: bridge
+
+volumes:
+  docs:
+  internal-data:
+  audit-data:
+  models:
+  qdrant-data:
+  gateway-data:
+  gateway-sock:
+
+secrets:
+  anthropic_api_key:
+    file: ${ANTHROPIC_API_KEY_FILE:-./secrets/anthropic_api_key}
+  openai_api_key:
+    file: ${OPENAI_API_KEY_FILE:-./secrets/openai_api_key}

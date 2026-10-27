@@ -8,8 +8,8 @@ from app.config import settings
 
 @lru_cache(maxsize=1)
 def _load_model() -> SentenceTransformer:
-    # CPU で動作させ VRAM を LLM 専用にする
-    return SentenceTransformer(settings.embed_model, device="cpu")
+    # 既定は CPU (VRAM を LLM 専用にする)。GPU に載せる場合は embed_device で切り替える
+    return SentenceTransformer(settings.embed_model, device=settings.embed_device)
 
 
 def _embed_sync(texts: list[str], is_query: bool) -> list[list[float]]:

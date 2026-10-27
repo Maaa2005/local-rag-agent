@@ -1,0 +1,303 @@
+{
+ "step": "2",
+ "candidate": "条件付き: Gemma 4 E4B（GGUF Q4_K_M・llama.cpp b11836 の llama-server・考え OFF）",
+ "source": "Colab のセル出力と、測定直後にセル出力へ控えた 8GB・12GB の回答（raw.jsonl・report.md・run_meta.json）から作った。回答はリポジトリに入れない",
+ "notebook": "evaluation/colab/step2_measure_llamacpp.ipynb @ f4b493d",
+ "ran_at_jst": "2026-10-24 12:33-12:50（8GB 12:42-12:44・12GB 12:44-12:47・G0 はその後、結果の取り出し 12:50）",
+ "attempts_lost": "記録していない（この回は GPU（Tesla T4）が取れた 1 回分だけを数える）",
+ "gpu": "Tesla T4",
+ "compute_cap": "7.5",
+ "total_mib": 15360,
+ "baseline_mib": 0,
+ "runtime": "llama.cpp b11836",
+ "server_version": [
+  "version: 0.7.0-dev (build 11836, commit f5027fb21)",
+  "built with GNU 13.3.0 for Linux x86_64"
+ ],
+ "model": "google/gemma-4-E4B-it",
+ "gguf": {
+  "repo": "unsloth/gemma-4-E4B-it-GGUF",
+  "file": "gemma-4-E4B-it-Q4_K_M.gguf",
+  "revision": {
+   "sha": "bfc15c382204943c3a8fff0c750b94ae2364d7a3",
+   "now": "bfc15c382204943c3a8fff0c750b94ae2364d7a3"
+  }
+ },
+ "quant": "Q4_K_M",
+ "server_args": [
+  "-m",
+  "gemma-4-E4B-it-Q4_K_M.gguf",
+  "-ngl",
+  "999",
+  "-c",
+  "3072",
+  "--jinja",
+  "--reasoning",
+  "off",
+  "-np",
+  "1",
+  "--alias",
+  "local-llm",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8001",
+  "-v"
+ ],
+ "embedding": "intfloat/multilingual-e5-large (CPU)",
+ "rerank": "off",
+ "index": {
+  "documents": 13,
+  "chunks": 40
+ },
+ "measure": {
+  "ctx": 8192,
+  "max_prompt_tokens": 1907,
+  "max_id": "N07",
+  "n": 62,
+  "rc": 0,
+  "needed_ctx": 3072,
+  "gpu_check": {
+   "offloaded": "43/43",
+   "all_layers_on_gpu": true,
+   "model_buffers_mib": {
+    "CUDA0": 2883.51,
+    "CPU": 2208.0
+   },
+   "no_kernel_image": false,
+   "ok": true
+  },
+  "warmup_seconds": 36.9,
+  "precheck": {
+   "prompt_tokens": 22,
+   "content_chars": 11,
+   "reasoning_chars": 0,
+   "japanese": true,
+   "thinking_marks": false,
+   "ok": true
+  }
+ },
+ "n_questions": 62,
+ "runs": [
+  {
+   "label": "8GB",
+   "ctx": 3072,
+   "started": true,
+   "gpu_ok": true,
+   "peak_mib": 3349,
+   "budget_mib": 7680,
+   "all_answered": true,
+   "longest_ok": true,
+   "no_oom": true,
+   "no_preemption": true,
+   "within_budget": true,
+   "ok": true,
+   "missing": [],
+   "debug_active": 1854,
+   "slot_n_ctx": [
+    3072
+   ],
+   "warmup_seconds": 0.6,
+   "gpu_check": {
+    "offloaded": "43/43",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+     "CUDA0": 2883.51,
+     "CPU": 2208.0
+    },
+    "no_kernel_image": false,
+    "ok": true
+   },
+   "times": {
+    "first_token_latency": {
+     "median": 1.554,
+     "max": 6.675,
+     "n": 62
+    },
+    "total_latency": {
+     "median": 1.952,
+     "max": 9.639,
+     "n": 62
+    },
+    "retrieval_latency": {
+     "median": 0.494,
+     "max": 5.425,
+     "n": 62
+    }
+   },
+   "slot_n_ctx_ok": true,
+   "debug_active_ok": true
+  },
+  {
+   "label": "12GB",
+   "ctx": 3072,
+   "started": true,
+   "gpu_ok": true,
+   "peak_mib": 3349,
+   "budget_mib": 11776,
+   "all_answered": true,
+   "longest_ok": true,
+   "no_oom": true,
+   "no_preemption": true,
+   "within_budget": true,
+   "ok": true,
+   "missing": [],
+   "debug_active": 1908,
+   "slot_n_ctx": [
+    3072
+   ],
+   "warmup_seconds": 0.5,
+   "gpu_check": {
+    "offloaded": "43/43",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+     "CUDA0": 2883.51,
+     "CPU": 2208.0
+    },
+    "no_kernel_image": false,
+    "ok": true
+   },
+   "times": {
+    "first_token_latency": {
+     "median": 1.562,
+     "max": 6.564,
+     "n": 62
+    },
+    "total_latency": {
+     "median": 1.985,
+     "max": 10.228,
+     "n": 62
+    },
+    "retrieval_latency": {
+     "median": 0.467,
+     "max": 5.353,
+     "n": 62
+    }
+   },
+   "slot_n_ctx_ok": true,
+   "debug_active_ok": true
+  }
+ ],
+ "judge": {
+  "role": "human",
+  "status": "未実施（回答だけ集める）"
+ },
+ "differences": [
+  "Qwen3.5-4B の回と同じ手帳で、モデルの GGUF だけを替えた（unsloth/gemma-4-E4B-it-GGUF・版 bfc15c38・Q4_K_M）",
+  "サンプラーは llama-server の既定（温度 0.1・出力の上限 1024 は同じ）",
+  "会話の型は GGUF に入っている物を --jinja で使う",
+  "考える機能は --reasoning off で切った（流す前の 1 問で考える文の欄が 0 文字・考える印なしを確かめた）",
+  "起動ごとに慣らしの 1 問を入れ、数えない",
+  "-v を付け、全層が GPU に載ったか（43/43）と文脈の長さを記録で確かめた",
+  "8GB と 12GB は同じ設定（文脈 3,072・1 本ずつ）。一番長い入力は 1,907 トークン（N07）"
+ ],
+ "N": {
+  "8GB": {
+   "ok": 8,
+   "n": 12,
+   "wrong": [
+    "N04",
+    "N05",
+    "N09",
+    "N11"
+   ],
+   "pass": false
+  },
+  "12GB": {
+   "ok": 8,
+   "n": 12,
+   "wrong": [
+    "N04",
+    "N05",
+    "N09",
+    "N11"
+   ],
+   "pass": false
+  }
+ },
+ "Q_judge_free": {
+  "8GB": {
+   "n": 50,
+   "M1_recall_at_5": 1.0,
+   "M2_mrr": 0.9867,
+   "M6_correctness": 0.9633,
+   "M7_permission": 1.0,
+   "M8_refusal": "16/16",
+   "M8_not_refused": [],
+   "answer_failures": 0
+  },
+  "12GB": {
+   "n": 50,
+   "M1_recall_at_5": 1.0,
+   "M2_mrr": 0.9867,
+   "M6_correctness": 0.9633,
+   "M7_permission": 1.0,
+   "M8_refusal": "16/16",
+   "M8_not_refused": [],
+   "answer_failures": 0
+  },
+  "lines": "M6 >= 0.80・M7 = 1.00・M8 16/16",
+  "note": "Q の 50 問だけで計算。M4-S は計算していない・見ていない"
+ },
+ "P": {
+  "8GB": {
+   "ftl_p50": 1.534,
+   "total_p50": 1.957,
+   "total_max": 9.639,
+   "over_15s": []
+  },
+  "12GB": {
+   "ftl_p50": 1.552,
+   "total_p50": 2.013,
+   "total_max": 10.228,
+   "over_15s": []
+  },
+  "note": "Q の 50 問。15 秒を超えた問は無い（最大 8GB 9.6 秒・12GB 10.2 秒）",
+  "P1_ftl_p50_le_5": {
+   "8GB": true,
+   "12GB": true
+  },
+  "P3_total_p50_le_15": {
+   "8GB": true,
+   "12GB": true
+  }
+ },
+ "V": {
+  "8GB": "合格（最大 3,349 MiB / 予算 7,680。文脈 3,072 が記録で確かめられた・記録の行 1,854・メモリ不足 0・文脈あふれ 0）",
+  "12GB": "合格（最大 3,349 MiB / 予算 11,776。文脈 3,072・記録の行 1,908・メモリ不足 0・文脈あふれ 0）"
+ },
+ "g0": {
+  "rerank": "off",
+  "fault_timeout": 15,
+  "budget": "12GB",
+  "ctx": 3072,
+  "gpu_check": {
+   "offloaded": "43/43",
+   "all_layers_on_gpu": true,
+   "model_buffers_mib": {
+    "CUDA0": 2883.51,
+    "CPU": 2208.0
+   },
+   "no_kernel_image": false,
+   "ok": true
+  },
+  "rc": 0,
+  "ok": true,
+  "overall": "PASS",
+  "items": [
+   "1 二問続けて回答 PASS",
+   "2 権限外の文書が出ない PASS（7 問・漏れなし）",
+   "2b 上位ユーザーの対照 PASS",
+   "3 監査に本文が残らない PASS（本文 47 個中 0 個）",
+   "4 生成役・検索役の固まり/停止 PASS（すべて 15 秒の上限内で保留・その後に戻る）"
+  ],
+  "time_info": "回答できた 13 問で 検索 中央 0.46 秒・生成 中央 1.34 秒（最大 6.14 秒）"
+ },
+ "speed": "答えの出力は 12GB の回で中央 46.9 トークン/秒（50 問・出力の数を最初の 1 文字から最後までの時間で割った）",
+ "human_sheet": {
+  "8GB": "入れない（N 8/12）",
+  "12GB": "入れない（N 8/12）",
+  "decision": "用紙に入れない。どちらの予算も採点役の要らない線 N を通らないので、M4-S で合否は変わらない（測定前に決めた決まりどおり）"
+ },
+ "verdict": "不合格（8GB・12GB とも N 8/12・落ちた問 N04・N05・N09・N11）。M8 16/16・V・P・M6・M7・G0 は両方とも合格"
+}

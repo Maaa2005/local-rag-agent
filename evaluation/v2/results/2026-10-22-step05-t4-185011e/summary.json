@@ -1,0 +1,99 @@
+{
+  "note": "試運転・合否には使わない",
+  "gpu": "Tesla T4",
+  "compute_cap": "7.5",
+  "total_mib": 15360,
+  "baseline_mib": 0,
+  "vllm": "0.32.0",
+  "model": "sbintuitions/sarashina2.2-3b-instruct-v0.1",
+  "model_revision": {
+    "model": "sbintuitions/sarashina2.2-3b-instruct-v0.1",
+    "sha": "4f3626fb1b64b3e97c908e67f27b2d627ba2a999"
+  },
+  "dtype": "float16",
+  "measure": {
+    "max_model_len": 8192,
+    "gpu_util": 0.85,
+    "max_prompt_tokens": 1686,
+    "max_id": "N07",
+    "n": 62,
+    "rc": 0,
+    "needed_max_model_len": 3072,
+    "dtype": "float16"
+  },
+  "trial_ids": [
+    "Q010",
+    "Q039",
+    "Q012",
+    "Q045",
+    "Q017",
+    "Q018",
+    "N02",
+    "N03",
+    "N07"
+  ],
+  "trials": [
+    {
+      "label": "8GB",
+      "gpu_util": 0.5,
+      "started": false,
+      "peak_mib": 7785,
+      "budget_mib": 7680,
+      "all_answered": null,
+      "longest_ok": null,
+      "no_oom": null,
+      "no_preemption": null,
+      "within_budget": null,
+      "ok": null,
+      "missing": null,
+      "judged_rc": null
+    },
+    {
+      "label": "8GB-2",
+      "gpu_util": 0.49,
+      "started": false,
+      "peak_mib": 7795,
+      "budget_mib": 7680,
+      "all_answered": null,
+      "longest_ok": null,
+      "no_oom": null,
+      "no_preemption": null,
+      "within_budget": null,
+      "ok": null,
+      "missing": null,
+      "judged_rc": null
+    },
+    {
+      "label": "12GB",
+      "gpu_util": 0.76,
+      "started": true,
+      "peak_mib": 11559,
+      "budget_mib": 11776,
+      "all_answered": true,
+      "longest_ok": true,
+      "no_oom": true,
+      "no_preemption": true,
+      "within_budget": true,
+      "ok": true,
+      "missing": [],
+      "judged_rc": 0
+    }
+  ],
+  "judge": {
+    "model": "sbintuitions/sarashina2.2-3b-instruct-v0.1",
+    "revision": "4f3626fb1b64b3e97c908e67f27b2d627ba2a999",
+    "role": "flow-check-only",
+    "started": true,
+    "precheck": "pass",
+    "precheck_rc": 0
+  },
+  "judged": {
+    "12GB": {
+      "rc": 0,
+      "out_dir": "/content/step05/judged_12GB"
+    }
+  },
+  "skipped": [
+    "計画 6: Gemma 4 E2B の llama-server 起動の確認（このノートは vLLM だけ）"
+  ]
+}

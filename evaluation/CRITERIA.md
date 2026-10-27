@@ -133,17 +133,20 @@ on/off を同一データセットで横並びに評価する (`--rerank both`) 
 
 ## 6. 実行手順
 
-```bash
-cd backend
+repo ルートから `-m` で呼ぶ（`run_eval.py` を直接呼ぶと `evaluation/types.py` が標準の `types` を隠して起動しない）。
 
+```bash
 # 現在の settings (rerank 含む) で評価
-.venv/bin/python ../evaluation/run_eval.py --provider vllm
+backend/.venv/bin/python -m evaluation.run_eval --provider vllm
 
 # リランク on/off を A/B 比較
-.venv/bin/python ../evaluation/run_eval.py --provider vllm --rerank both
+backend/.venv/bin/python -m evaluation.run_eval --provider vllm --rerank both
 
 # 性能・機械的メトリクスのみ (LLM-judge をスキップ)
-.venv/bin/python ../evaluation/run_eval.py --provider vllm --no-judge
+backend/.venv/bin/python -m evaluation.run_eval --provider vllm --no-judge
+
+# 保存した回答を別の実行で採点 (採点役を VLLM_BASE_URL / LLM_MODEL に載せてから)
+backend/.venv/bin/python -m evaluation.run_eval --judge-from evaluation/results/<ts>/raw.jsonl
 ```
 
 `--provider` には `vllm` 以外指定できない（他プロバイダはレジストリ未登録

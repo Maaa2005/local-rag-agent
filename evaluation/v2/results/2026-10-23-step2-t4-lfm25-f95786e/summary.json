@@ -1,0 +1,245 @@
+{
+ "step": "2",
+ "candidate": 1,
+ "source": "Colab のセル出力と、測定直後にセル出力へ控えた 8GB・12GB の回答（raw.jsonl・report.md・run_meta.json）から作った。回答はリポジトリに入れない",
+ "notebook": "evaluation/colab/step2_measure.ipynb @ f95786e",
+ "ran_at_jst": "2026-10-23 16:10-16:30（測定 16:15 前後・8GB 16:20-16:22・12GB 16:23-16:26・G0 〜16:30）",
+ "attempts_lost": "同日 3 回、途中で Colab の接続が切れて流し直した（3 回目は Mac のふたが閉じて眠ったため）。今回が 4 回目で、最後まで流れた",
+ "gpu": "Tesla T4",
+ "compute_cap": "7.5",
+ "total_mib": 15360,
+ "baseline_mib": 0,
+ "vllm": "0.32.0",
+ "model": "LiquidAI/LFM2.5-1.2B-JP-202606",
+ "model_revision": "52b8b4475311a63bf839c6494f78f8ad59d13515",
+ "dtype": "float16",
+ "embedding": "intfloat/multilingual-e5-large (CPU)",
+ "rerank": "off",
+ "index": {
+  "documents": 13,
+  "chunks": 40
+ },
+ "measure": {
+  "max_model_len": 8192,
+  "gpu_util": 0.85,
+  "max_prompt_tokens": 2087,
+  "max_id": "N07",
+  "n": 62,
+  "rc": 0,
+  "needed_max_model_len": 3584,
+  "dtype": "float16"
+ },
+ "n_questions": 62,
+ "runs": [
+  {
+   "label": "8GB",
+   "gpu_util": 0.5,
+   "started": true,
+   "peak_mib": 7509,
+   "budget_mib": 7680,
+   "all_answered": true,
+   "longest_ok": true,
+   "no_oom": true,
+   "no_preemption": true,
+   "within_budget": true,
+   "ok": true,
+   "missing": [],
+   "times": {
+    "first_token_latency": {
+     "median": 0.811,
+     "max": 9.356,
+     "n": 62
+    },
+    "total_latency": {
+     "median": 2.182,
+     "max": 11.037,
+     "n": 62
+    },
+    "retrieval_latency": {
+     "median": 0.52,
+     "max": 8.224,
+     "n": 62
+    }
+   },
+   "judged_rc": null,
+   "judge_failed": null,
+   "q_readable": null
+  },
+  {
+   "label": "12GB",
+   "gpu_util": 0.76,
+   "started": true,
+   "peak_mib": 11605,
+   "budget_mib": 11776,
+   "all_answered": true,
+   "longest_ok": true,
+   "no_oom": true,
+   "no_preemption": true,
+   "within_budget": true,
+   "ok": true,
+   "missing": [],
+   "times": {
+    "first_token_latency": {
+     "median": 0.787,
+     "max": 4.389,
+     "n": 62
+    },
+    "total_latency": {
+     "median": 2.216,
+     "max": 5.539,
+     "n": 62
+    },
+    "retrieval_latency": {
+     "median": 0.487,
+     "max": 3.986,
+     "n": 62
+    }
+   },
+   "judged_rc": null,
+   "judge_failed": null,
+   "q_readable": null
+  }
+ ],
+ "ready_seconds": {
+  "measure": 168,
+  "8GB": 102,
+  "12GB": 57
+ },
+ "run_seconds": {
+  "8GB": 159,
+  "12GB": 153
+ },
+ "judge": {
+  "role": "human",
+  "status": "未実施（回答だけ集める）"
+ },
+ "N": {
+  "8GB": {
+   "ok": 6,
+   "n": 12,
+   "wrong": [
+    "N01",
+    "N02",
+    "N04",
+    "N05",
+    "N07",
+    "N11"
+   ],
+   "pass": false
+  },
+  "12GB": {
+   "ok": 6,
+   "n": 12,
+   "wrong": [
+    "N01",
+    "N02",
+    "N04",
+    "N05",
+    "N07",
+    "N11"
+   ],
+   "pass": false
+  },
+  "note": "8GB・12GB とも同じ 6 問が不一致"
+ },
+ "Q_judge_free": {
+  "8GB": {
+   "n": 50,
+   "M1_recall_at_5": 1.0,
+   "M2_mrr": 0.9867,
+   "M6_correctness": 0.8433,
+   "M7_permission": 1.0,
+   "M8_refusal": "4/16",
+   "M8_not_refused": [
+    "Q010",
+    "Q011",
+    "Q012",
+    "Q039",
+    "Q040",
+    "Q041",
+    "Q044",
+    "Q046",
+    "Q047",
+    "Q048",
+    "Q049",
+    "Q050"
+   ],
+   "answer_failures": 0
+  },
+  "12GB": {
+   "n": 50,
+   "M1_recall_at_5": 1.0,
+   "M2_mrr": 0.9867,
+   "M6_correctness": 0.8267,
+   "M7_permission": 1.0,
+   "M8_refusal": "4/16",
+   "M8_not_refused": [
+    "Q010",
+    "Q011",
+    "Q012",
+    "Q039",
+    "Q040",
+    "Q041",
+    "Q044",
+    "Q046",
+    "Q047",
+    "Q048",
+    "Q049",
+    "Q050"
+   ],
+   "answer_failures": 0
+  },
+  "lines": "M6 >= 0.80・M7 = 1.00・M8 16/16",
+  "note": "Q の 50 問だけで計算。M4-S は計算していない・見ていない"
+ },
+ "P": {
+  "8GB": {
+   "ftl_p50": 0.788,
+   "total_p50": 2.141,
+   "total_max": 11.037,
+   "over_15s": []
+  },
+  "12GB": {
+   "ftl_p50": 0.768,
+   "total_p50": 2.156,
+   "total_max": 5.539,
+   "over_15s": []
+  },
+  "note": "Q の 50 問。8GB は実際に 8GB で流した時間で、換算はしていない",
+  "P1_ftl_p50_le_5": true,
+  "P3_total_p50_le_15": true
+ },
+ "V": {
+  "8GB": "合格（最大 7,509 MiB / 予算 7,680）",
+  "12GB": "合格（最大 11,605 MiB / 予算 11,776）"
+ },
+ "g0": {
+  "rerank": "off",
+  "fault_timeout": 15,
+  "budget": "12GB",
+  "gpu_util": 0.76,
+  "max_model_len": 3584,
+  "rc": 0,
+  "ok": true,
+  "overall": "PASS",
+  "lines": [
+   "[PASS] 1 二問続けて回答",
+   "[PASS] 2 権限外の文書が出ない: 7 問 / 漏れ なし / 不明ID なし / held 0 問",
+   "[PASS] 2b 上位ユーザーには上位文書が出る（対照）",
+   "[PASS] 4 vLLM 固まる: held/generate TimeoutError / 15.5 秒（上限 15 秒）",
+   "[PASS] 4 vLLM 固まる の後に戻る: 2.8 秒",
+   "[PASS] 4 Qdrant 固まる: held/retrieve / 5.5 秒",
+   "[PASS] 4 Qdrant 固まる の後に戻る: 3.2 秒",
+   "[PASS] 4 vLLM 停止: held/generate APIConnectionError / 1.8 秒",
+   "[PASS] 4 Qdrant 停止: held/retrieve / 0.5 秒",
+   "[PASS] 3 監査に本文が残らない: run 17 件 / 調べた本文 51 個 / 行に 0 個・ファイルに 0 個 / 根拠の文書ID あり",
+   "[INFO] 5 時間（回答できた 13 問）: 検索 中央 0.47 / 最大 0.51 秒, 生成 中央 1.97 / 最大 2.97 秒"
+  ]
+ },
+ "human_sheet": {
+  "8GB": "入れない（N 6/12・M8 4/16）",
+  "12GB": "入れない（N 6/12・M8 4/16）",
+  "decision": "用紙に入れない。8GB も 12GB も採点役の要らない線（N・M8）を通らないので、M4-S で合否は変わらない（測定前に決めた決まりどおり）"
+ },
+ "verdict": "不合格（8GB・12GB とも N 6/12・M8 4/16。どれも採点役に関係しない）。V・P・G0・M6・M7 は合格"
+}

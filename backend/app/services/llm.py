@@ -8,12 +8,16 @@
 """
 from __future__ import annotations
 
+import logging
 import ntpath
 import posixpath
 from typing import AsyncIterator
 
 from app.config import settings
+from app.services import numeric_check
 from app.services.providers import LLMProvider, get_meta, get_provider, reset_instances
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """あなたは社内情報専門のアシスタントです。
 以下の【参考情報】のみを根拠として質問に回答してください。
@@ -46,10 +50,27 @@ def _build_context(chunks: list[dict]) -> str:
 
 def _build_messages(question: str, chunks: list[dict]) -> list[dict]:
     context = _build_context(chunks)
+    calc = _numeric_check_block(question, chunks) if settings.numeric_check_enabled else None
+    if calc:
+        user = f"【参考情報】\n{context}\n\n【計算の結果】\n{calc}\n\n【質問】\n{question}"
+    else:
+        user = f"【参考情報】\n{context}\n\n【質問】\n{question}"
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"【参考情報】\n{context}\n\n【質問】\n{question}"},
+        {"role": "user", "content": user},
     ]
+
+
+def _numeric_check_block(question: str, chunks: list[dict]) -> str | None:
+    """数の比べの結果文。保留・失敗の時は None (理由はログに残す)。"""
+    try:
+        result = numeric_check.check(question, [str(c.get("content", "")) for c in chunks])
+    except Exception:
+        logger.exception("numeric_check が失敗したため何も足さない")
+        return None
+    if result.sentence is None:
+        logger.info("numeric_check 保留: %s", result.hold_reason)
+    return result.sentence
 
 
 async def _resolve_provider(name: str) -> LLMProvider:

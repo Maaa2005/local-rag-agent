@@ -87,3 +87,125 @@ def test_dataset_has_permission_and_hallucination_cases():
     cats = [r["category"] for r in rows]
     assert "permission_test" in cats
     assert "hallucination_test" in cats
+
+
+# ─── 8GB カードへの換算 (docs/v2-light-model-plan.md の P) ─────────
+def test_8gb_conversion_scales_only_generation():
+    from evaluation.reporter import predicted_8gb_total
+
+    r = _make_result(first_token_latency=2.0, total_latency=12.0)
+    assert abs(predicted_8gb_total(r) - (2.0 + 10.0 * 320 / 272)) < 1e-9
+
+
+def test_report_8gb_conversion_passes_under_15s():
+    # 2 + 1.18 × 10 = 13.76 秒
+    md = render_report(
+        {"vllm": [_make_result(first_token_latency=2.0, total_latency=12.0, retrieval_latency=0.5)]},
+        judge_name="j", dataset_size=1,
+    )
+    assert "| vllm | 0/1 | 0.50s | 2.00s ✓ | 12.00s ✓ | 13.76s ✓ | 0/1 | 13.76s |" in md
+
+
+def test_report_8gb_conversion_fails_when_t4_is_under_15s():
+    # T4 では 14 秒で CRITERIA の 15 秒以内だが、2 + 1.18 × 12 = 16.12 秒で 8GB 換算は超える
+    md = render_report(
+        {"vllm": [_make_result(first_token_latency=2.0, total_latency=14.0)]},
+        judge_name="j", dataset_size=1,
+    )
+    assert "| 14.00s ✓ | 16.12s ✗ | 1/1 | 16.12s |" in md
+
+
+# ─── N 数値の境目 (docs/v2-light-model-plan.md の N) ───────────────
+def test_conclusion_tally_counts_failed_answers_as_miss():
+    from evaluation.reporter import conclusion_tally
+
+    rows = [
+        _make_result(id="N01", expected_conclusion="必要", conclusion_ok=True),
+        _make_result(id="N02", expected_conclusion="不要", conclusion_ok=False),
+        _make_result(id="N03", expected_conclusion="必要", conclusion_ok=None, error="run_failed: boom"),
+        _make_result(id="Q001"),  # N 以外の問は数えない
+    ]
+    assert conclusion_tally(rows) == (1, 3, ["N02", "N03"])
+
+
+def test_report_shows_numeric_section_only_with_n_rows():
+    n_rows = [
+        _make_result(id="N01", expected_conclusion="必要", conclusion_ok=True),
+        _make_result(id="N02", expected_conclusion="不要", conclusion_ok=True),
+    ]
+    md = render_report({"vllm": n_rows}, judge_name="j", dataset_size=2)
+    assert "| vllm | 2/2 ✓ | — |" in md
+
+    md = render_report({"vllm": [_make_result()]}, judge_name="j", dataset_size=1)
+    assert "数値の境目" not in md
+
+
+# ─── 失敗の数え方 (docs/v2-light-model-plan.md) ──────────────────────
+def test_failed_answer_stays_in_denominator():
+    # 回答に失敗した問は外さず、点は 0・時間は ∞ として数える
+    rows = [_make_result(id="Q001"), _make_result(id="Q002", error="run_failed: timeout")]
+    md = render_report({"vllm": rows}, judge_name="j", dataset_size=2)
+    assert "| vllm | 1/2 | 0.50 ✗ |" in md  # 回答の失敗 1/2・Recall@5 は (1 + 0) / 2
+    assert "| ∞ ✗ | ∞ ✗ |" in md  # FTL p95・Total p50
+    assert "| vllm | 1/2 | 0.00s | ∞ ✗ | ∞ ✗ | ∞ ✗ | 1/2 | ∞ |" in md  # P の表
+
+
+def test_failed_answer_on_refusal_question_counts_as_not_refused():
+    from evaluation.reporter import _aggregate
+
+    rows = [
+        _make_result(id="Q001", category="permission_test"),
+        _make_result(id="Q002", category="permission_test", error="run_failed: boom"),
+    ]
+    assert _aggregate(rows)["refusal_rate"] == 0.5
+
+
+def test_judge_failure_makes_verdict_undecided_but_keeps_latency():
+    rows = [_make_result(error="judge_failed: bad json", total_latency=3.0)]
+    md = render_report({"vllm": rows}, judge_name="j", dataset_size=1)
+    assert "未判定（採点役の失敗 1 問）" in md
+    assert "| vllm | 0/1 |" in md
+    assert "3.00s ✓" in md
+
+
+def test_no_judge_run_has_no_overall_verdict():
+    md = render_report({"vllm": [_make_result()]}, judge_name=None, dataset_size=1)
+    assert "| 採点なし |" in md
+
+
+# ─── V: max-model-len の必要値 ─────────────────────────────────
+def test_needed_max_model_len_rounds_up_to_512():
+    from evaluation.reporter import needed_max_model_len
+
+    rows = [_make_result(id="Q001", prompt_tokens=1200), _make_result(id="Q002", prompt_tokens=3000)]
+    # 3000 + 1024 = 4024 → 4096
+    assert needed_max_model_len(rows) == (3000, "Q002", 4096, [])
+    # ちょうど 512 の倍数なら切り上げない: 3072 + 1024 = 4096
+    assert needed_max_model_len([_make_result(prompt_tokens=3072)])[2] == 4096
+    # 1 つ超えたら次の段: 3073 + 1024 = 4097 → 4608
+    assert needed_max_model_len([_make_result(prompt_tokens=3073)])[2] == 4608
+
+
+def test_needed_max_model_len_unknown_when_any_row_lacks_tokens():
+    from evaluation.reporter import needed_max_model_len
+
+    rows = [_make_result(id="Q001", prompt_tokens=3000), _make_result(id="Q002", error="run_failed: x")]
+    assert needed_max_model_len(rows) == (3000, "Q001", None, ["Q002"])
+    assert needed_max_model_len([_make_result(id="Q003")]) == (None, None, None, ["Q003"])
+
+
+def test_report_shows_max_model_len_section_only_with_tokens():
+    old = render_report({"vllm": [_make_result()]}, judge_name=None, dataset_size=1)
+    assert "max-model-len の必要値" not in old
+
+    rows = [_make_result(id="Q001", prompt_tokens=3000), _make_result(id="Q002", prompt_tokens=1200)]
+    md = render_report({"vllm": rows}, judge_name=None, dataset_size=2)
+    assert "| vllm | 3,000 | Q001 | 4,096 | — |" in md
+    # 節は合格基準の凡例より前
+    assert md.index("max-model-len の必要値") < md.index("## 合格基準")
+
+
+def test_report_max_model_len_section_marks_unknown():
+    rows = [_make_result(id="Q001", prompt_tokens=3000), _make_result(id="Q002")]
+    md = render_report({"vllm": rows}, judge_name=None, dataset_size=2)
+    assert "| vllm | 3,000 | Q001 | 不明 | 1 問（Q002） |" in md
