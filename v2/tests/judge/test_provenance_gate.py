@@ -251,20 +251,23 @@ def test_registration_result_must_be_pass(tmp_path):
 
 
 def test_register_refuses_unacknowledged_hits():
-    t = body_text("dev-spec-staff", "列 staff には 社員番号 E1024 のような値が入る")
-    with pytest.raises(reg.RegistrationRefused, match="employee_id"):
-        reg.register(t, B, "codex", checked_by="test")
-    e = reg.register(t, B, "codex", acknowledged=("employee_id",), checked_by="test")
-    assert e["hits"] == ["employee_id"] and e["acknowledged"] == ["employee_id"] and e["result"] == "pass"
+    t = body_text("dev-spec-limit", "列 limit には 規程上限5,000円 のような値が入る")
+    with pytest.raises(reg.RegistrationRefused, match="amount"):
+        reg.register(t, B, "codex", checked_by="test", reviewed_by="reviewer-x")
+    ack = [{"text": "規程上限5,000円", "reason": "規程上の額（実データではない）。試験用"}]
+    e = reg.register(t, B, "codex", acknowledged=ack, checked_by="test", reviewed_by="reviewer-x")
+    assert e["hits"] == [{"cue": "amount", "text": "5,000円"}] and e["acknowledged"] == ack and e["result"] == "pass"
+    assert e["reviewed_by"] == "reviewer-x" and e["review"] == "pass"
     assert (e["ref"], e["sha256"], e["contract"], e["purpose"], e["destination"]) == (
         t.key, t.sha256, B.key, B.purpose, "codex")
     assert e["check_version"] == reg.REGISTRATION_CHECK_VERSION
 
 
-def test_register_refuses_acknowledgement_of_absent_hits():
-    # 当たっていない項目の承認は記録しない（承認の意味がずれるため）
-    with pytest.raises(reg.RegistrationRefused, match="not hit"):
-        reg.register(SPEC, B, "codex", acknowledged=("amount",), checked_by="test")
+def test_register_refuses_acknowledgement_of_text_absent_from_body():
+    # 本文に出てこない文字列の承認は、記録の誤りとして登録しない
+    with pytest.raises(reg.RegistrationRefused, match="not in"):
+        reg.register(SPEC, B, "codex", acknowledged=[{"text": "10万円", "reason": "本文に無い"}], checked_by="test",
+                     reviewed_by="reviewer-x")
 
 
 @pytest.mark.parametrize("kw,why", [
@@ -277,13 +280,14 @@ def test_register_refuses_use_outside_approval(kw, why):
     args = dict(approved=SPEC, contract=B, destination="codex")
     args.update(kw)
     with pytest.raises(reg.RegistrationRefused, match=why):
-        reg.register(args["approved"], args["contract"], args["destination"], checked_by="test")
+        reg.register(args["approved"], args["contract"], args["destination"], checked_by="test",
+                     reviewed_by="reviewer-x")
 
 
 def test_register_refuses_tampered_body():
     bad = replace(SPEC, body=SPEC.body + "x")  # sha256 は元のまま
     with pytest.raises(reg.RegistrationRefused, match="sha256"):
-        reg.register(bad, B, "codex", checked_by="test")
+        reg.register(bad, B, "codex", checked_by="test", reviewed_by="reviewer-x")
 
 
 def test_registration_check_is_normalized():
@@ -293,7 +297,7 @@ def test_registration_check_is_normalized():
 
 def test_registry_file_matches_policy():
     # policies/ の承認済み本文の使い道はすべて登録済みで、記録は今の本文・今の検査と一致する
-    rebuilt = reg.build_entries(POL, checked_by="registry-build")
+    rebuilt = reg.build_entries(POL, checked_by="registry-build", reviewed_by="fixture:dev")
     stored = policy_entries()
     key = lambda e: (e["ref"], e["contract"], e["destination"])  # noqa: E731
     assert sorted(map(key, stored)) == sorted(map(key, rebuilt))
@@ -311,9 +315,11 @@ def test_registry_cli_check_passes_for_repository_files(capsys):
 # ===== 3. 手がかり語は依頼文だけ・入口で NFKC とゼロ幅除去 =====
 
 def test_cue_words_in_approved_body_do_not_block(tmp_path):
-    # 承認時に確かめた語（ここでは M&A・金額）は送信時には見ない。同じ語が依頼文にあれば止める
-    t = body_text("dev-spec-deal", "列 deal には A社買収の想定額30億円 のような案件名が入る")
-    e = reg.register(t, B, "codex", acknowledged=tuple(reg.registration_hits(t.body)), checked_by="test")
+    # 承認時に確かめた語（ここでは規程上の金額）は送信時には見ない。同じ語が依頼文にあれば止める。
+    # M&A・社名は承認で外せない（本人決定 11/3 の後の登録の決まり）ので、本文には金額だけを残す
+    t = body_text("dev-spec-limit", "列 amount の上限は規程上の30億円")
+    e = reg.register(t, B, "codex", acknowledged=[{"text": "規程上の30億円", "reason": "規程の上限額"}],
+                     checked_by="test", reviewed_by="reviewer-x")
     tables = default_tables()
     tables["combinations"][t.key] = tables["combinations"][SPEC.key]
     g = gate_with(tmp_path, policy_entries() + [e], tables)
@@ -568,11 +574,17 @@ def test_registration_check_covers_request_cues(body, hit):
     assert hit in reg.registration_hits(body)
 
 
-@pytest.mark.parametrize("text", ["月名を October のような英語表記に変換して", "pd.read_csv で読んで合計して",
-                                  "一様に丸めて合計して", "df.groupby で category ごとに合計して"])
+@pytest.mark.parametrize("text", ["pd.read_csv で読んで合計して", "一様に丸めて合計して",
+                                  "df.groupby で category ごとに合計して"])
 def test_no_new_false_stop_on_ordinary_requests(text):
     v = GATE.check_candidate(cand_b(text))
     assert v.decision == "allow", v.reason
+
+
+def test_english_month_name_is_held_not_blocked():
+    # TOB は October に当たらない（遮断しない）。月名は前もって承認していない自由な値なので保留（本人決定 11/3 の 1）
+    v = GATE.check_candidate(cand_b("月名を October のような英語表記に変換して"))
+    assert v.decision == "hold" and "m_and_a" not in v.reason and "word:October" in v.reason, v.reason
 
 
 @pytest.mark.parametrize("cid,cue", [
@@ -607,8 +619,11 @@ def _bad_registry(tmp_path, **change):
 
 
 @pytest.mark.parametrize("change", [
-    dict(hits=["employee_id"], acknowledged=[]),  # 当たりが承認されていない
-    dict(acknowledged=["amount"]),  # 当たっていない項目の承認
+    dict(hits=[{"cue": "amount", "text": "5,000円"}], acknowledged=[]),  # 当たりが承認されていない
+    dict(hits=[{"cue": "employee_id", "text": "E1024"}],  # 承認では外せない種類
+         acknowledged=[{"text": "E1024", "reason": "試験用"}]),
+    dict(acknowledged=["amount"]),  # 古い形（項目名）の承認
+    dict(reviewed_by=""),  # 全文の確認者がいない
     dict(result="maybe"),
     dict(sha256="xyz"),
     dict(hits="employee_id"),

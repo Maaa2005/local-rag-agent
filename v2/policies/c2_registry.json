@@ -7,10 +7,16 @@
       "contract": "A-faq-format@1",
       "purpose": "社員向けFAQ",
       "destination": "claude",
-      "check_version": "c2-registration@2#d908be802e3e",
+      "check_version": "c2-registration@3#ed457c2faaf3",
       "hits": [],
       "acknowledged": [],
+      "request_values": {
+        "identifiers": [],
+        "values": []
+      },
       "checked_by": "registry-build",
+      "reviewed_by": "fixture:dev",
+      "review": "pass",
       "result": "pass"
     },
     {
@@ -19,10 +25,22 @@
       "contract": "B-csv-codegen@1",
       "purpose": "汎用CSV処理のコード案",
       "destination": "codex",
-      "check_version": "c2-registration@2#d908be802e3e",
+      "check_version": "c2-registration@3#ed457c2faaf3",
       "hits": [],
       "acknowledged": [],
+      "request_values": {
+        "identifiers": [
+          "date",
+          "category",
+          "amount"
+        ],
+        "values": [
+          "10万円"
+        ]
+      },
       "checked_by": "registry-build",
+      "reviewed_by": "fixture:dev",
+      "review": "pass",
       "result": "pass"
     }
   ]

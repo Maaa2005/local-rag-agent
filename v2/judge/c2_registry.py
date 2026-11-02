@@ -5,16 +5,32 @@
 ハッシュは同じ本文であることの証明で、安全な本文であることの証明ではない。そこで登録時に内容を
 検査し、その結果を用途・宛先・版（ID@版と契約の版）に結びつけて残す。
 
-登録時の検査（registration_hits）は、送信時に依頼文へ当てる手がかり語・文字種（judge.request_cues）と、
-今の RuleC2Gate の規則（金額は閾値の形でも当たる）の和。契約 A は送信内容がほぼ承認済み本文だけなので、
-ここが唯一の内容検査になる。当たった項目は、承認者が一つずつ承認（acknowledged）しない限り登録しない。
-当たっていない項目の承認も受け付けない。検査の規則を変えると REGISTRATION_CHECK_VERSION が変わり、
-古い版で登録した本文は送信時に保留になる（登録し直すまで送らない）。
+登録時の検査は、送信時に依頼文へ当てる手がかり語・文字種（judge.request_cues）と、今の RuleC2Gate の
+規則（金額は閾値の形でも当たる）の和を、正規化した本文の上の位置つきで出す（registration_findings）。
+契約 A は送信内容がほぼ承認済み本文だけなので、ここが唯一の内容検査になる。
 
-登録簿は policies/c2_registry.json。署名は無いので、読み込み時に行の形と「当たり＝承認」を確かめる。
+承認は本文の箇所に結ぶ（本人決定 11/3）。承認は {"text": 本文中の文字列, "reason": 理由} で、外せる種類
+（WAIVABLE: 規程上の額・日付など、実データでない値）の当たりだけを、その text の出現の範囲にまるごと入る
+場合に限って外す。同じ種類の別の箇所の当たりは通らない。それ以外の種類（個人情報・社名・社内のテーブル名・
+M&A・注入など）、空白を除いた写しだけでの当たり、文字種の当たりは、承認では外せず登録を拒否する。
+text が正規化した本文に出てこない承認は記録の誤りとして拒否する。当たらない承認は拒否しない。
+
+登録には、人が全文を確かめる段を別に置く。行の reviewed_by は本文の確認者で、承認済み本文の approver・
+当たりの承認をした人（checked_by）と別人でなければならない。fixture: で始まる確認者は開発用の架空本文だけ。
+封印用の測定と本番では、本文の作者・実装担当・承認者と別の人の名前が要る。
+
+依頼文に書いてよい値（ApprovedText.request_identifiers・request_values）も登録時の値を行に写す。
+検査の規則を変えると REGISTRATION_CHECK_VERSION が変わり、古い版で登録した本文は送信時に保留になる
+（登録し直すまで送らない）。
+
+登録簿は policies/c2_registry.json。署名は無いので、読み込み時に行の形と当たり・承認の対応を確かめる。
 作り直しと照合:
-  python -m judge.c2_registry --write [--acknowledge ID@版=項目,項目 --checked-by 承認者]
+  python -m judge.c2_registry --write --reviewed-by 確認者 [--acknowledge 'ID@版=本文の文字列::理由' ...
+                                                          --checked-by 承認をした人]
   python -m judge.c2_registry --check   # ファイルが今の本文・今の検査と一致するか
+--acknowledge は箇所ごとに繰り返す。同じ使い道（ref・contract・destination）で sha256・acknowledged・
+request_values が同じ行があれば、checked_by・reviewed_by はその行から引き継ぐ。引き継げない行があるのに
+--reviewed-by が無ければ拒否する（終了コード 1）。
 """
 from __future__ import annotations
 
@@ -29,22 +45,28 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from judge.base import question_version
 from judge.normalize import normalize_text
-from judge.request_cues import CUES_VERSION, cue_hits, unexpected_letters
+from judge.request_cues import CUES_VERSION, cue_hits, cue_spans, unexpected_letters
 from judge.rules import _C2_PATTERNS
 from orchestrator.policy import DEFAULT_POLICY_DIR, ApprovedText, Contract, Policy, load_policy, sha256_text
 
 DEFAULT_REGISTRY_PATH = DEFAULT_POLICY_DIR / "c2_registry.json"
 FORMAT = "c2-registry@1"
 
+# 承認で外せる当たりの種類。規程上の額・日付など、実データでない値だけ
+WAIVABLE = frozenset({"amount", "real_date"})
+
 REGISTRATION_CHECK_SPEC = {
     "request_cues": CUES_VERSION,  # 正規化の版を含む
     "rule_patterns": [(n, p.pattern, p.flags) for n, p in _C2_PATTERNS],
     "unexpected_script": "judge.request_cues.unexpected_letters",
+    "waivable": sorted(WAIVABLE),  # これ以外の種類・空白を除いた写しだけの当たり・文字種の当たりは外せない
+    "acknowledgement_unit": "span",  # 承認の text の出現の範囲に、当たりの範囲がまるごと入る
+    "human_review": "reviewed_by is non-empty and differs from approver and checked_by; review is pass",
 }
-REGISTRATION_CHECK_VERSION = question_version("c2-registration@2", REGISTRATION_CHECK_SPEC)
+REGISTRATION_CHECK_VERSION = question_version("c2-registration@3", REGISTRATION_CHECK_SPEC)
 
 _ENTRY_KEYS = ("ref", "sha256", "contract", "purpose", "destination", "check_version", "hits", "acknowledged",
-               "checked_by", "result")
+               "request_values", "checked_by", "reviewed_by", "review", "result")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -53,6 +75,7 @@ class RegistrationRefused(ValueError):
 
 
 def registration_hits(body: str) -> list[str]:
+    """当たった項目の名前だけ（空白を除いた写しだけでの当たりと文字種の当たりも含む）。位置は registration_findings。"""
     n = normalize_text(body)
     hits = [name for name, pat in _C2_PATTERNS if pat.search(n)] + cue_hits(body)
     if unexpected_letters(body):
@@ -60,13 +83,38 @@ def registration_hits(body: str) -> list[str]:
     return list(dict.fromkeys(hits))
 
 
-def register(approved: ApprovedText, contract: Contract, destination: str, *, acknowledged: Sequence[str] = (),
-             checked_by: str) -> dict[str, Any]:
-    """1 つの使い道（契約・用途・宛先）について登録時の検査をし、登録簿の 1 行を返す。
+def registration_findings(body: str) -> tuple[list[tuple[str, int, int, str]], list[str], list[str]]:
+    """登録時の検査の当たりを位置つきで返す: (当たり, 空白を除いた写しだけで当たった語, 文字種の当たり)。
 
-    承認の範囲外（契約・用途・宛先が承認済み本文または契約と合わない）、本文が承認時の sha256 と
-    違う、当たった項目が承認されていない、のどれかなら RegistrationRefused。
+    当たりは (名前, 始まり, 終わり, 文字列) で、正規化した写しの上の位置。手がかり語（cue_spans）と、
+    RuleC2Gate の規則（_C2_PATTERNS）の和を、始まり・終わり・名前の順に並べる。
     """
+    n = normalize_text(body)
+    spans, compact_only = cue_spans(body)
+    spans = spans + [(name, m.start(), m.end(), m.group(0)) for name, pat in _C2_PATTERNS for m in pat.finditer(n)]
+    return sorted(spans, key=lambda s: (s[1], s[2], s[0])), compact_only, unexpected_letters(body)
+
+
+def _ack_problem(a: Any) -> str | None:
+    if not isinstance(a, dict) or set(a) != {"text", "reason"}:
+        return "acknowledgement must be {text, reason}"
+    if not all(isinstance(a[k], str) and a[k].strip() for k in ("text", "reason")):
+        return "acknowledgement text and reason must be non-empty strings"
+    return None
+
+
+def _occurrences(n: str, text: str) -> list[tuple[int, int]]:
+    """n の中の text のすべての出現の範囲 [s, e)（重なる出現も数える）。"""
+    out, i = [], n.find(text)
+    while i != -1:
+        out.append((i, i + len(text)))
+        i = n.find(text, i + 1)
+    return out
+
+
+def _checked_row(approved: ApprovedText, contract: Contract, destination: str,
+                 acknowledged: Sequence[Mapping[str, str]]) -> dict[str, Any]:
+    """人（checked_by・reviewed_by）以外のすべての検査をして、登録簿の行の元を返す。"""
     if sha256_text(approved.body) != approved.sha256:
         raise RegistrationRefused(f"{approved.key}: body does not match its approved sha256")
     if contract.key not in approved.contracts:
@@ -77,29 +125,76 @@ def register(approved: ApprovedText, contract: Contract, destination: str, *, ac
         raise RegistrationRefused(f"{approved.key}: purpose {approved.purpose} differs from {contract.purpose}")
     if destination not in approved.destinations or destination not in contract.destinations:
         raise RegistrationRefused(f"{approved.key}: destination {destination} is outside the approval or contract")
-    hits = registration_hits(approved.body)
-    ack = sorted(set(acknowledged))
-    extra = [a for a in ack if a not in hits]
-    if extra:
-        raise RegistrationRefused(f"{approved.key}: acknowledged items were not hit: {extra}")
-    missing = [h for h in hits if h not in ack]
-    if missing:
-        raise RegistrationRefused(f"{approved.key}: registration check hit {missing} without acknowledgement")
+    for a in acknowledged:
+        why = _ack_problem(a)
+        if why is not None:
+            raise RegistrationRefused(f"{approved.key}: {why}: {a!r}")
+    ack = sorted({(a["text"], a["reason"]) for a in acknowledged})
+    n = normalize_text(approved.body)
+    absent = [t for t, _ in ack if t not in n]
+    if absent:
+        raise RegistrationRefused(f"{approved.key}: acknowledged text is not in the normalized body: {absent}")
+
+    spans, compact_only, scripts = registration_findings(approved.body)
+    fixed = sorted({s[0] for s in spans if s[0] not in WAIVABLE} | set(compact_only)
+                   | ({"unexpected_script"} if scripts else set()))
+    if fixed:
+        raise RegistrationRefused(f"{approved.key}: registration check hit {fixed}, which acknowledgement cannot waive")
+    ranges = [r for t, _ in ack for r in _occurrences(n, t)]
+    open_hits = [f"{name}:{text}" for name, s, e, text in spans if not any(rs <= s and e <= re_ for rs, re_ in ranges)]
+    if open_hits:
+        raise RegistrationRefused(
+            f"{approved.key}: registration check hit {list(dict.fromkeys(open_hits))} outside the acknowledged text")
+    hits = list(dict.fromkeys((name, text) for name, _, _, text in spans))
     return {"ref": approved.key, "sha256": approved.sha256, "contract": contract.key, "purpose": contract.purpose,
-            "destination": destination, "check_version": REGISTRATION_CHECK_VERSION, "hits": hits,
-            "acknowledged": ack, "checked_by": checked_by, "result": "pass"}
+            "destination": destination, "check_version": REGISTRATION_CHECK_VERSION,
+            "hits": [{"cue": c, "text": t} for c, t in hits],
+            "acknowledged": [{"text": t, "reason": r} for t, r in ack],
+            "request_values": {"identifiers": list(approved.request_identifiers),
+                               "values": [t for t, _ in approved.request_values]},
+            "review": "pass", "result": "pass"}
 
 
-def build_entries(policy: Policy, *, checked_by: str, acknowledged: Mapping[str, Sequence[str]] | None = None,
+def _people_problem(approved: ApprovedText, checked_by: str, reviewed_by: str) -> str | None:
+    if not isinstance(reviewed_by, str) or not reviewed_by.strip():
+        return "reviewed_by must be a non-empty string"
+    if reviewed_by.strip() == approved.approver.strip():
+        return f"reviewed_by {reviewed_by!r} is the approver of the text"
+    if reviewed_by.strip() == checked_by.strip():
+        return f"reviewed_by {reviewed_by!r} is the same as checked_by"
+    return None
+
+
+def register(approved: ApprovedText, contract: Contract, destination: str, *,
+             acknowledged: Sequence[Mapping[str, str]] = (), checked_by: str, reviewed_by: str) -> dict[str, Any]:
+    """1 つの使い道（契約・用途・宛先）について登録時の検査をし、登録簿の 1 行を返す。
+
+    acknowledged は [{"text": 本文中の文字列, "reason": 理由}]。承認の範囲外（契約・用途・宛先が承認済み
+    本文または契約と合わない）、本文が承認時の sha256 と違う、外せない当たり、承認の範囲に入らない当たり、
+    承認の text が正規化した本文に無い、確認者（reviewed_by）が空または承認者・checked_by と同じ、
+    のどれかなら RegistrationRefused。
+    """
+    row = _checked_row(approved, contract, destination, acknowledged)
+    why = _people_problem(approved, checked_by, reviewed_by)
+    if why is not None:
+        raise RegistrationRefused(f"{approved.key}: {why}")
+    return dict(row, checked_by=checked_by, reviewed_by=reviewed_by)
+
+
+def build_entries(policy: Policy, *, checked_by: str, reviewed_by: str | None = None,
+                  acknowledged: Mapping[str, Sequence[Mapping[str, str]]] | None = None,
                   previous: Iterable[Mapping[str, Any]] = ()) -> list[dict[str, Any]]:
     """policies/ の承認済み本文のすべての使い道（承認と契約の両方が許す契約×宛先）を登録する。
 
-    previous（今の登録簿）に、同じ使い道・本文・当たり・承認の行があれば、その checked_by を引き継ぐ。
+    previous（今の登録簿）に、同じ使い道・本文・承認・依頼文に書いてよい値の行があれば、その checked_by と
+    reviewed_by を引き継ぐ。引き継げない行は reviewed_by（引数）が要り、無ければ RegistrationRefused。
     """
     def same(e: Mapping[str, Any]) -> tuple[Any, ...]:
-        return (e["ref"], e["contract"], e["destination"], e["sha256"], tuple(e["hits"]), tuple(e["acknowledged"]))
+        return (e["ref"], e["contract"], e["destination"], e["sha256"],
+                tuple((a["text"], a["reason"]) for a in e["acknowledged"]),
+                (tuple(e["request_values"]["identifiers"]), tuple(e["request_values"]["values"])))
 
-    prev = {same(e): e["checked_by"] for e in previous}
+    prev = {same(e): (e["checked_by"], e["reviewed_by"]) for e in previous}
     out = []
     for a in sorted(policy.approved.values(), key=lambda x: x.key):
         for ck in a.contracts:
@@ -108,14 +203,31 @@ def build_entries(policy: Policy, *, checked_by: str, acknowledged: Mapping[str,
                 continue
             for d in c.destinations:
                 if d in a.destinations:
-                    e = register(a, c, d, acknowledged=(acknowledged or {}).get(a.key, ()), checked_by=checked_by)
-                    e["checked_by"] = prev.get(same(e), checked_by)
+                    e = _checked_row(a, c, d, (acknowledged or {}).get(a.key, ()))
+                    inherited = prev.get(same(e))
+                    if inherited is None and reviewed_by is None:
+                        raise RegistrationRefused(
+                            f"{a.key} ({ck}/{d}): reviewed_by is required for a row that cannot carry one over")
+                    e["checked_by"], e["reviewed_by"] = inherited or (checked_by, reviewed_by)
+                    why = _people_problem(a, e["checked_by"], e["reviewed_by"])
+                    if why is not None:
+                        raise RegistrationRefused(f"{a.key} ({ck}/{d}): {why}")
                     out.append(e)
     return out
 
 
+def _canon(e: Mapping[str, Any]) -> dict[str, Any]:
+    """行の鍵の並びを決まった形にする（入れ子の鍵の並びで登録簿の版が変わらないように）。"""
+    row = {k: e[k] for k in _ENTRY_KEYS}
+    row["hits"] = [{"cue": h["cue"], "text": h["text"]} for h in e["hits"]]
+    row["acknowledged"] = [{"text": a["text"], "reason": a["reason"]} for a in e["acknowledged"]]
+    row["request_values"] = {"identifiers": list(e["request_values"]["identifiers"]),
+                             "values": list(e["request_values"]["values"])}
+    return row
+
+
 def _dump(entries: Iterable[Mapping[str, Any]]) -> str:
-    rows = [{k: e[k] for k in _ENTRY_KEYS} for e in entries]
+    rows = [_canon(e) for e in entries]
     rows.sort(key=lambda e: (e["ref"], e["contract"], e["destination"]))
     return json.dumps({"format": FORMAT, "entries": rows}, ensure_ascii=False, indent=2) + "\n"
 
@@ -139,21 +251,40 @@ class Registry:
         return [dict(e) for e in self.entries]
 
 
+def _nonblank(x: Any) -> bool:
+    return isinstance(x, str) and bool(x.strip())
+
+
 def _row_problem(e: Any) -> str | None:
     if not isinstance(e, dict) or set(e) != set(_ENTRY_KEYS):
         return f"keys {sorted(e) if isinstance(e, dict) else type(e).__name__} != {sorted(_ENTRY_KEYS)}"
-    for k in ("ref", "contract", "purpose", "destination", "check_version", "checked_by", "result"):
-        if not isinstance(e[k], str) or not e[k]:
+    for k in ("ref", "contract", "purpose", "destination", "check_version", "checked_by", "reviewed_by", "review",
+              "result"):
+        if not isinstance(e[k], str) or not e[k].strip():
             return f"{k} must be a non-empty string"
     if not _SHA256.fullmatch(e["sha256"] if isinstance(e["sha256"], str) else ""):
         return "sha256 must be 64 lowercase hex digits"
-    for k in ("hits", "acknowledged"):
-        if not isinstance(e[k], list) or not all(isinstance(x, str) for x in e[k]):
-            return f"{k} must be a list of strings"
-    if set(e["hits"]) != set(e["acknowledged"]):
-        return f"hits {e['hits']} and acknowledged {e['acknowledged']} differ"
     if e["result"] != "pass":
         return f"result {e['result']!r} is not pass"
+    if e["review"] != "pass":
+        return f"review {e['review']!r} is not pass"
+    if e["reviewed_by"].strip() == e["checked_by"].strip():
+        return "reviewed_by must differ from checked_by"
+    if not isinstance(e["acknowledged"], list) or any(_ack_problem(a) for a in e["acknowledged"]):
+        return "acknowledged must be a list of {text, reason} (non-empty strings)"
+    if not isinstance(e["hits"], list) or not all(
+            isinstance(h, dict) and set(h) == {"cue", "text"} and _nonblank(h["cue"]) and _nonblank(h["text"])
+            for h in e["hits"]):
+        return "hits must be a list of {cue, text} (non-empty strings)"
+    for h in e["hits"]:
+        if h["cue"] not in WAIVABLE:
+            return f"hit {h['cue']!r} cannot be waived by acknowledgement"
+        if not any(h["text"] in a["text"] for a in e["acknowledged"]):
+            return f"hit {h['text']!r} is not inside any acknowledged text"
+    rv = e["request_values"]
+    if not isinstance(rv, dict) or set(rv) != {"identifiers", "values"} or not all(
+            isinstance(rv[k], list) and all(_nonblank(x) for x in rv[k]) for k in ("identifiers", "values")):
+        return "request_values must be {identifiers, values}: lists of non-empty strings"
     return None
 
 
@@ -174,13 +305,14 @@ def load_registry(path: Path | str = DEFAULT_REGISTRY_PATH) -> Registry:
     return Registry(tuple(entries), hashlib.sha256(_dump(entries).encode("utf-8")).hexdigest())
 
 
-def _parse_ack(items: Sequence[str]) -> dict[str, list[str]]:
-    out: dict[str, list[str]] = {}
+def _parse_ack(items: Sequence[str]) -> dict[str, list[dict[str, str]]]:
+    out: dict[str, list[dict[str, str]]] = {}
     for s in items:
-        ref, sep, names = s.partition("=")
-        if not sep or not ref:
-            raise SystemExit(f"--acknowledge needs ID@版=項目,項目: {s!r}")
-        out[ref] = [n for n in names.split(",") if n]
+        ref, sep, rest = s.partition("=")
+        text, sep2, reason = rest.partition("::")
+        if not sep or not sep2 or not ref or not text.strip() or not reason.strip():
+            raise SystemExit(f"--acknowledge needs ID@版=本文の文字列::理由: {s!r}")
+        out.setdefault(ref, []).append({"text": text, "reason": reason})
     return out
 
 
@@ -192,21 +324,31 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--policy-dir", type=Path, default=DEFAULT_POLICY_DIR)
     ap.add_argument("--registry", type=Path, default=None)
     ap.add_argument("--acknowledge", action="append", default=[],
-                    help="承認者が承知の上で残す当たり。ID@版=項目,項目（--write のとき）")
-    ap.add_argument("--checked-by", default="registry-build", help="新しく登録・承認した行に残す確認者")
+                    help="承認者が承知の上で残す当たりの箇所。ID@版=本文の文字列::理由（箇所ごとに繰り返す・--write のとき）")
+    ap.add_argument("--checked-by", default="registry-build", help="新しく登録・承認した行に残す承認をした人")
+    ap.add_argument("--reviewed-by", default=None,
+                    help="新しく登録した行に残す、本文の全文を確かめた人（承認者・--checked-by と別人。--write のとき）")
     a = ap.parse_args(argv)
+    if not a.write and (a.acknowledge or a.reviewed_by is not None):
+        raise SystemExit("--acknowledge and --reviewed-by are only for --write")
+    ack_new = _parse_ack(a.acknowledge)
     path = a.registry or a.policy_dir / "c2_registry.json"
     pol = load_policy(a.policy_dir)
-    old = load_registry(path) if path.exists() else None
+    old = None
+    if path.exists():
+        try:
+            old = load_registry(path)
+        except (ValueError, OSError) as e:  # 古い形・壊れた登録簿。照合はできず、作り直しは引き継ぎなしで進む
+            print(f"unreadable registry {path}: {e}", file=sys.stderr)
+            if a.check:
+                return 1
     # 承認（acknowledged）は今の登録簿から引き継ぐ。本文が変わった物は引き継がない。--acknowledge が優先
     ack = {e["ref"]: e["acknowledged"] for e in (old.entries if old else ())
            if e["ref"] in pol.approved and pol.approved[e["ref"]].sha256 == e["sha256"]}
-    if a.acknowledge:
-        if not a.write:
-            raise SystemExit("--acknowledge is only for --write")
-        ack.update(_parse_ack(a.acknowledge))
+    ack.update(ack_new)
     try:
-        entries = build_entries(pol, checked_by=a.checked_by, acknowledged=ack, previous=old.entries if old else ())
+        entries = build_entries(pol, checked_by=a.checked_by, reviewed_by=a.reviewed_by, acknowledged=ack,
+                                previous=old.entries if old else ())
     except RegistrationRefused as e:
         print(f"refused: {e}", file=sys.stderr)
         return 1

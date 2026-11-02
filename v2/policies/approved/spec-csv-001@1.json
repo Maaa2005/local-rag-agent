@@ -15,5 +15,18 @@
     "B-csv-codegen@1"
   ],
   "source": null,
-  "source_level": 1
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "date",
+      "category",
+      "amount"
+    ],
+    "values": [
+      {
+        "text": "10万円",
+        "reason": "amount の閾値として依頼文に書いてよい基準額（実データではない）。開発用の架空の承認"
+      }
+    ]
+  }
 }

@@ -5,7 +5,8 @@
 1. 書式文字（Cf: ゼロ幅スペース・ゼロ幅接合子・語結合子・BOM・双方向の制御・ソフトハイフン・タグ文字など）、
    制御文字（Cc。改行は残し、タブは空白にする）、異体字セレクタ、見えない字（ハングル埋め字・点字の空白など）を除く
 2. NFKC（濁点などの結合はここで合成される）
-3. 合成されずに残った結合文字（Mn・Me）と、1 で除く文字をもう一度除く
+3. 合成されずに残った結合文字（Mn・Mc・Me）と、1 で除く文字をもう一度除く（Mc はハングルの傍点 U+302E など。
+   「買〮収」のように語を割る。Codex レビュー 11/2）
 
 compact_text は、さらに空白をすべて除いた写し（「買 収」「M & A」のように語を空白で割る言い換え用）。
 正規化するのは検査に使う写しだけで、送信する本文は変えない（送る内容は組み立て時に確定している）。
@@ -19,14 +20,14 @@ from judge.base import question_version
 # 見た目が空白か何も無いのに、空白（Zs）にも書式文字にも入らない字
 _INVISIBLE_EXTRA = frozenset([0x115F, 0x1160, 0x3164, 0xFFA0, 0x2800, 0x17B4, 0x17B5])
 _DROP_BEFORE = ("Cf", "Cc")
-_DROP_AFTER = ("Cf", "Cc", "Mn", "Me")
+_DROP_AFTER = ("Cf", "Cc", "Mn", "Mc", "Me")
 
 NORMALIZE_SPEC = {
-    "steps": ["tab->space", "drop Cf/Cc/VS/extra (keep LF)", "NFKC", "drop Cf/Cc/Mn/Me/VS/extra (keep LF)"],
+    "steps": ["tab->space", "drop Cf/Cc/VS/extra (keep LF)", "NFKC", "drop Cf/Cc/Mn/Mc/Me/VS/extra (keep LF)"],
     "extra": sorted(_INVISIBLE_EXTRA), "variation_selectors": ["FE00-FE0F", "E0100-E01EF"],
     "compact": "normalized minus str.isspace",
 }
-NORMALIZE_VERSION = question_version("normalize@2", NORMALIZE_SPEC)
+NORMALIZE_VERSION = question_version("normalize@3", NORMALIZE_SPEC)
 
 
 def _drop(ch: str, cats: tuple[str, ...]) -> bool:
