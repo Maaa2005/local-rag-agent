@@ -244,8 +244,10 @@ def test_outdated_registration_check_is_held(tmp_path):
 
 
 def test_registration_result_must_be_pass(tmp_path):
+    # 登録できなかった行は登録簿に置けない（読み込みで止まり、ゲートを作れない＝何も送らない）
     entries = [dict(e, result="refused") for e in policy_entries()]
-    assert gate_with(tmp_path, entries).check_candidate(cand_b()).decision == "hold"
+    with pytest.raises(ValueError):
+        gate_with(tmp_path, entries)
 
 
 def test_register_refuses_unacknowledged_hits():
@@ -675,10 +677,21 @@ def test_gate_module_does_not_load_model_clients():
     assert out.stdout.strip() == ""
 
 
-def test_question_version_tracks_normalization():
+def test_question_version_tracks_normalization(monkeypatch):
+    # 正規化・手がかり語・文字種の版（CUES_VERSION）が、ゲートと登録時の検査の両方の版に入る
+    from judge import request_cues
+    assert GATE._qv_spec["cues"] == request_cues.CUES_VERSION
+    assert reg.REGISTRATION_CHECK_SPEC["request_cues"] == request_cues.CUES_VERSION
+    import importlib
+
     from judge import normalize
-    assert normalize.NORMALIZE_VERSION in repr(GATE._qv_spec)
-    assert normalize.NORMALIZE_VERSION in reg.REGISTRATION_CHECK_SPEC_REPR
+    monkeypatch.setattr(normalize, "NORMALIZE_SPEC", dict(normalize.NORMALIZE_SPEC, extra=[0x3164]))
+    monkeypatch.setattr(normalize, "NORMALIZE_VERSION", normalize.question_version("normalize@2", normalize.NORMALIZE_SPEC))
+    try:
+        assert importlib.reload(request_cues).CUES_VERSION != GATE._qv_spec["cues"]
+    finally:
+        monkeypatch.undo()
+        importlib.reload(request_cues)
 
 
 def test_delayed_gate_keeps_candidate_check():

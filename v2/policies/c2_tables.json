@@ -1,6 +1,6 @@
 {
   "format": "c2-tables@1",
-  "note": "出所で分ける C2（judge.provenance_gate・Issue #17）の表。request_kinds は契約ごとの依頼の種類（依頼文の無い契約は fixed、ある契約は依頼文を正規化してから当てる正規表現 rules）。combinations は 承認済み本文 ID@版 × 依頼の種類 の可否（allow / block）。表に無い組み合わせと、どの種類にも当たらない依頼は保留。",
+  "note": "出所で分ける C2（judge.provenance_gate・Issue #17）の表。request_kinds は契約ごとの依頼の種類: 依頼文の無い契約は fixed、ある契約は依頼文を正規化して文（。!? と改行）に分け、文ごとに rules（大文字小文字を区別しない正規表現）を当てる。neutral はあいさつなど種類を持たない文（文全体に一致したときだけ）。どの種類にも neutral にも当たらない文があれば保留。combinations は 承認済み本文 ID@版 × 依頼の種類 の可否（allow / block）。表に無い組み合わせは保留。",
   "request_kinds": {
     "A-faq-format@1": {
       "fixed": "faq_format"
@@ -13,8 +13,9 @@
         "output": "出力|表示|ログ|書き出|保存",
         "test": "テスト|ダミー|サンプルデータ|生成",
         "validate": "不正|欠損|検証|チェック|型ヒント|例外",
-        "network_io": "requests|urllib|https?://|URL|メール|送信|送る|アップロード|ダウンロード|(外部|Web|ウェブ|REST|HTTP)\\s*API|API\\s*(に|へ|で|を(呼|叩))|webhook|ソケット|socket"
-      }
+        "network_io": "(?<![A-Za-z0-9_])(requests|urllib|httpx|aiohttp|boto3|s3|sftp|ftp|scp|ssh|curl|wget|socket|subprocess|webhook|slack|teams|post|url|smtp)(?![A-Za-z0-9_])|https?://|メール|e-?mail|送信|送る|投稿|アップロード|ダウンロード|(外部|web|ウェブ|rest|http)\\s*api|api\\s*(に|へ|で|を(呼|叩))|ソケット|クラウド|ネットワーク|外部(に|へ|の(サーバ|サービス))|os\\.system"
+      },
+      "neutral": "(よろしく(お願い(します|いたします|致します))?|お願いします|以上(です)?|(関数|コード)(を|で|に)?(書いて|して|お願い)(ください|します)?)"
     }
   },
   "combinations": {
