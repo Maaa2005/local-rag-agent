@@ -68,3 +68,17 @@ def test_near_bodies_drop_format_lines():
     assert len(sealed) == 50 + 12 + 96 + 24 and all(sealed)
     assert not any("答えの最後の2行" in s or "結論:" in s for s in sealed)
     assert near.summary([0.1, 0.95, 0.5])["over"] == 1
+
+
+def test_reasoncheck_counts_wrong_and_missing(tmp_path):
+    from evaluation.distill import reasoncheck
+    p = tmp_path / "s.jsonl"
+    p.write_text("".join(json.dumps({"sid": f"S{i:03d}", "category": "boundary", "input": "q", "answer": "a"}) + "\n"
+                         for i in range(1, 6)), encoding="utf-8")
+    text = "S001|正\nS002|誤|向きが逆\nS003 | 誤 | 換算\nS004|正\nS005|誤|x\n"
+    res = reasoncheck.count(p, text)
+    assert res["judged"] == 5 and set(res["wrong"]) == {"S002", "S003", "S005"} and not res["stop"]
+    assert reasoncheck.count(p, text + "S001|誤|y\n")["stop"]    # 後の行が勝つ → 誤り 4
+    assert reasoncheck.count(p, "S001|正\n")["stop"]              # 答えの無い件があれば止める
+    assert reasoncheck.write_blind(p, tmp_path / "blind") == 5
+    assert (tmp_path / "blind" / "prompt.md").exists()
