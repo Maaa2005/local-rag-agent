@@ -1,0 +1,103 @@
+{
+  "answer_is_first_option": 100,
+  "answerable": 192,
+  "blind_check": {
+    "final_agree": 240,
+    "final_hold_agree": "48/48",
+    "round1": {
+      "agree": 239,
+      "disagree": 1,
+      "rule_fixed": 1,
+      "solved": 240,
+      "text_fixed": 10
+    },
+    "round2": {
+      "agree": 45,
+      "scope": "直した3文書の全問",
+      "solved": 45
+    },
+    "solver": "Claude（新しい文脈・正解を伏せた問と元の文書だけを渡した）"
+  },
+  "blind_sha256": "94a92e032493568ccf729514af618e751f7ae69c0d3b0a8d26789f06e4ecb8b0",
+  "body_location": "自宅の Windows PC の ~/research/local-rag-sealed/numeric240/（リポの外・git 管理なし）",
+  "by_group": {
+    "boundary": 48,
+    "derived": 16,
+    "distractor": 16,
+    "exception": 16,
+    "exception_near": 16,
+    "hold_missing": 16,
+    "hold_range": 16,
+    "hold_unknown": 16,
+    "multi": 16,
+    "paraphrase": 32,
+    "premise": 16,
+    "unknown_determined": 16
+  },
+  "by_kind": {
+    "date": 75,
+    "num": 152,
+    "time": 13
+  },
+  "by_polarity": {
+    "hold": 48,
+    "no": 100,
+    "yes": 92
+  },
+  "by_position": {
+    "above": 16,
+    "at": 16,
+    "below": 16
+  },
+  "by_rule": {
+    "R01": 15,
+    "R02": 15,
+    "R03": 15,
+    "R04": 15,
+    "R05": 15,
+    "R06": 15,
+    "R07": 15,
+    "R08": 15,
+    "R09": 15,
+    "R10": 15,
+    "R11": 15,
+    "R12": 15,
+    "R13": 15,
+    "R14": 15,
+    "R15": 15,
+    "R16": 15
+  },
+  "corpus_sha256": {
+    "R01": "bde87e71be812fb423a1f6ba311bd8b0b8c8c63bcc409fb038616cdd42f60fb1",
+    "R02": "8232b590358486997876b2487ce20571f592b73d998e218eaa3676c1f3b1fa3a",
+    "R03": "bfe8a7efc3add0e0faf5b7f3a5540cb0ce53b1267f133f81c0b209ac005b5a1e",
+    "R04": "bbc6a486c377497806dc14d61e3e367a9e8523acdfe556b44ac793130d05421d",
+    "R05": "befe5cb9d501967eb17b61d94c37dba86c73746f4bdcf74041ee33b9bc269205",
+    "R06": "440d76bd93b097f041f50a581ed8186fd01181bec6ef420a7a8b801ebeac7a0e",
+    "R07": "47cb9f8cdef2e4f8593d677f13d60e4dc4427c5de997e1e30f4836be825f6303",
+    "R08": "9ce0a8720e65fdad6ab2084959c55c00cc3354393a6abee23540e734edc7ce48",
+    "R09": "3ff3e558252af27d9410eeac2da3eb19f44d36af750070e9a6c31d6c72f6aa30",
+    "R10": "ee7da171752d490490d62e33704c1be5d7bf0b7ee023f26946223787dce641b1",
+    "R11": "15de227c13db597fe0f7f8b1a8c9473ed60fe73f9ad4fd12b4dc85d58bbf3d0a",
+    "R12": "6a7606418c1088bcb436195c1ece4cb896756e178764a47551504a8bb0bbf155",
+    "R13": "2644259b51716f32dfcb6075f7ec92f44c06e23cd8d32694b94a7ceca2e23b3e",
+    "R14": "c9f4eb4da39a4a1e26f9f110501c6defe7e73ee6b3a812e306c3e574b2bd85f8",
+    "R15": "c7fb671be15834b19d41396a8971d3fe12c0e18f5a3b1bcd8533834fbda0e5cd",
+    "R16": "e2a051fc7628437b0d67157e378ba14eed4c639a610be262ed90620af0cf3e1f"
+  },
+  "created": "2026-11-02",
+  "generator_sha256": {
+    "build.py": "62a20347b2d66cde96ef05b2e931ff4e626390da605ebbb3329dcd5aec214dda",
+    "check.py": "d16411cb68519d8a0c9cb8fe752090ce15367550923d05e493cb6e75f4954c2b",
+    "items.py": "4e825e97a3b07653d62fe00c2e176115d506e1d8eae17efea1a71bf1a8d33b71",
+    "rules.py": "24e60b6b60cb56bf6b5ba8c6bf2b9f27cc72eb9dad7a127d7d0f7b8f364c3945"
+  },
+  "issue": "Maaa2005/local-rag-agent#16",
+  "n": 240,
+  "opened": false,
+  "paraphrase_pairs": 32,
+  "questions_sha256": "7f95843011f7bada9899df67472141b13ff58b72364e5f97472787c82e0653b4",
+  "seed": 20261102,
+  "set": "numeric-sealed-240",
+  "should_hold": 48
+}
