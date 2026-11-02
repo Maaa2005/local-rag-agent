@@ -1,0 +1,32 @@
+{
+  "questions_sha256": "5f1bf9a17f413de6ada834961fd27a8363b5461cb9d7366cf8601b3f62a5371f",
+  "n": 96,
+  "by_category": {
+    "boundary": 48,
+    "paraphrase": 24,
+    "exception": 24
+  },
+  "stage1_ids": [
+    "T005",
+    "T025",
+    "T037",
+    "T041",
+    "T052",
+    "T054",
+    "T062",
+    "T069",
+    "T074",
+    "T079",
+    "T085",
+    "T093"
+  ],
+  "corpus_sha256": {
+    "住宅手当規程.md": "a356ad621bec0e3fac6939b5ff2f92f46637a676c6a7acb4c71ce24b77eca062",
+    "副業規程.md": "eb49bb1f451754c88b983c35b2bc3d6776da4e8bf319d1c12d18cbed73061b21",
+    "取引先審査規程.md": "bfacde76951b7d3329c57e4ea05a8928096c456b34797fb64a2d9dda00219420",
+    "懇親会費補助規程.md": "64a9fd3d2af17e18c90fd6e103710fe8cb3c94abbf8299b87368c6500d9573be",
+    "永年勤続表彰規程.md": "88aac08430a622be76b2935f555ecc277c8b5393c4e2f144b0e95ceb045dcc0a",
+    "社内貸付規程.md": "771da593bd6ae084e9560280490c958a931003609ddade2731a56c6aa5152cb2"
+  },
+  "system_prompt_sha256": "a3dabd05493c03616f098e11266cc47ce6e0d51dceb9a861b708b286205e6bd9"
+}
