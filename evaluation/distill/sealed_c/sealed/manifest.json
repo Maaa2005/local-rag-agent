@@ -1,0 +1,16 @@
+{
+  "questions_sha256": "0fa15b2336dcd6c0b1db4237dc586e6fdd1bb4951aec31e4fdd95a963230b3ff",
+  "n": 24,
+  "by_category": {
+    "boundary": 12,
+    "paraphrase": 4,
+    "exception": 4,
+    "undecidable": 4
+  },
+  "corpus_sha256": {
+    "会議室予約規程.md": "8d97f9cd7f53cbcd7383e4378b48ea613524a510cfff4461e5592fc4e6723b2b",
+    "社内図書貸出規程.md": "2fa567f17a6c2ac4094f835cf016087bc5d4d16b9a93f9503a6070b3799dbb07",
+    "自転車通勤手当規程.md": "4c23746fc798ea7a952625101f269296116bba6c66eb0f48aabc5ca967bad100",
+    "退職金規程.md": "5a82280914d3afaed759d7f00e086832d0b4cb8464bb0aee3f6d6eb92879fafe"
+  }
+}
