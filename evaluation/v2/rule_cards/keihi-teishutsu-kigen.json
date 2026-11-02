@@ -1,0 +1,51 @@
+{
+  "format": "rule-card@1",
+  "id": "keihi-teishutsu-kigen",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/経費精算規程.md",
+    "section": "申請期限",
+    "quote": "経費の精算は、費用が発生した月の翌月10日までに、経費精算システムより申請書を提出しなければならない。翌月10日を過ぎた申請は原則として受理しない。"
+  },
+  "target": "経費精算の申請期限",
+  "match": {
+    "conclusions": [
+      "受理される",
+      "受理されない"
+    ],
+    "keywords": [
+      "精算"
+    ]
+  },
+  "slots": {
+    "発生日": {
+      "type": "date",
+      "describe": "費用が発生した日"
+    },
+    "提出日": {
+      "type": "date",
+      "describe": "精算の申請書を提出した日"
+    }
+  },
+  "conditions": [
+    {
+      "name": "発生した月の翌月10日までに提出した",
+      "left": "提出日",
+      "op": "<=",
+      "right": {
+        "month_day": [
+          "発生日",
+          1,
+          10
+        ]
+      }
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "受理される",
+    "else": "受理されない"
+  }
+}

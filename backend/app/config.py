@@ -76,6 +76,23 @@ class Settings(BaseSettings):
     # 既定は OFF (従来と同じ出力)。環境変数 NUMERIC_CHECK_ENABLED=true で ON。
     numeric_check_enabled: bool = False
 
+    # 数の比べの安い腕（Issue #16）。どれも既定は OFF で、測るときだけ環境変数で ON にする。
+    # 数の正規化: 質問と参考情報の数・日付の表記をそろえてから C とモデルに渡す（NUMERIC_NORMALIZE_ENABLED）
+    numeric_normalize_enabled: bool = False
+    # 境界の対比例: 【計算の結果】に境目の 1 つ下・ちょうど・1 つ上の当てはまり方を足す（NUMERIC_CONTRAST_ENABLED）
+    numeric_contrast_enabled: bool = False
+    # コード形式の提示: 【計算の結果】に条件を実行しない式で足す（NUMERIC_CODEFORM_ENABLED）
+    numeric_codeform_enabled: bool = False
+
+    # 規程カード方式（Issue #16）: カードに合う質問は、小型モデルが値と引用を拾い、結論はコードが決めて定型文で答える。
+    # カードに合わない質問は今までどおり。rule_cards_dir に rule-card@1 の JSON を置く。
+    # 実行時は人が確認した（confirmed）カードだけを使う。下書き（draft）は比較実験のときだけ allow_draft で使う
+    rule_cards_enabled: bool = False
+    rule_cards_dir: str = ""
+    rule_cards_allow_draft: bool = False
+    # 値を拾うモデル（空なら llm_model）。vLLM / llama-server の json_schema を使う
+    rule_cards_extract_model: str = ""
+
     # ファイルコピー途中の部分インデックスを防ぐための猶予秒数。
     # mtime からこの秒数未満しか経過していないファイルは処理を先送りする。
     index_settle_seconds: int = 10

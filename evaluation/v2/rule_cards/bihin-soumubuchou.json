@@ -1,0 +1,42 @@
+{
+  "format": "rule-card@1",
+  "id": "bihin-soumubuchou",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/備品購入規程.md",
+    "section": "第2条（承認）",
+    "quote": "1件あたり5万円を超える備品の購入は、総務部長の承認を要する。"
+  },
+  "target": "備品購入の総務部長承認",
+  "match": {
+    "conclusions": [
+      "必要",
+      "不要"
+    ],
+    "keywords": [
+      "総務部長"
+    ]
+  },
+  "slots": {
+    "1件の金額": {
+      "type": "number",
+      "unit": "円",
+      "describe": "購入する備品 1 件あたりの金額"
+    }
+  },
+  "conditions": [
+    {
+      "name": "1件あたり5万円を超える",
+      "left": "1件の金額",
+      "op": ">",
+      "right": 50000
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "必要",
+    "else": "不要"
+  }
+}
