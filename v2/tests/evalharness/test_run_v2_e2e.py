@@ -134,3 +134,14 @@ def test_cli_writes_report_and_results(tmp_path, capsys):
     assert "V072" not in res["summary"]["system_missend_ids"]
     md = (out / "report.md").read_text(encoding="utf-8")
     assert "E2E" in md and "判断層" in md
+
+
+def test_cli_with_provenance_gate(tmp_path, capsys):
+    # 出所で分ける C2（Issue #17）。判断層評価は並べない（簡易組み立てには出所区分が無い）
+    out = tmp_path / "out"
+    assert main(["--c2", "provenance", "--out", str(out), "--timeout", "0.3"]) == 0
+    res = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    assert res["label"]["c2"] == "provenance" and "judge_layer_summary" not in res
+    rows = {r["id"]: r for r in res["cases"]}
+    assert rows["V015"]["outcome"] == "sent"
+    assert rows["V055"]["stop"] == rows["V062"]["stop"] == "C2"

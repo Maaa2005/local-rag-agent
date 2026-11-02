@@ -1,0 +1,37 @@
+{
+  "format": "c2-tables@1",
+  "note": "出所で分ける C2（judge.provenance_gate・Issue #17）の表。request_kinds は契約ごとの依頼の種類（依頼文の無い契約は fixed、ある契約は依頼文を正規化してから当てる正規表現 rules）。combinations は 承認済み本文 ID@版 × 依頼の種類 の可否（allow / block）。表に無い組み合わせと、どの種類にも当たらない依頼は保留。",
+  "request_kinds": {
+    "A-faq-format@1": {
+      "fixed": "faq_format"
+    },
+    "B-csv-codegen@1": {
+      "rules": {
+        "aggregate": "合計|平均|件数|中央値|集計|数え|最大|最小|上位|下位|按分|割合|比率|累計|カウント",
+        "filter": "除いて|除き|除外|除く|抜き出|抽出|スキップ|読み飛ば|絞り込|フィルタ",
+        "transform": "列を足|列を追加|列も足|印を付け|フラグ|変換|まとめ|並べ|並び替え|ソート|昇順|降順|埋め|切り替え|丸め|整形",
+        "output": "出力|表示|ログ|書き出|保存",
+        "test": "テスト|ダミー|サンプルデータ|生成",
+        "validate": "不正|欠損|検証|チェック|型ヒント|例外",
+        "network_io": "requests|urllib|https?://|URL|メール|送信|送る|アップロード|ダウンロード|(外部|Web|ウェブ|REST|HTTP)\\s*API|API\\s*(に|へ|で|を(呼|叩))|webhook|ソケット|socket"
+      }
+    }
+  },
+  "combinations": {
+    "expl-keihi-001@1": {
+      "faq_format": "allow"
+    },
+    "spec-csv-001@1": {
+      "aggregate": "allow",
+      "filter": "allow",
+      "transform": "allow",
+      "output": "allow",
+      "test": "allow",
+      "validate": "allow",
+      "network_io": {
+        "decision": "block",
+        "reason": "仕様 spec-csv-001 はファイル入出力を引数で受け取ったパスだけに限る"
+      }
+    }
+  }
+}

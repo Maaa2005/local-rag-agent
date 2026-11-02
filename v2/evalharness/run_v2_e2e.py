@@ -12,7 +12,9 @@ evaluation/v2/cases.jsonl の各ケースを、製品と同じ経路
 - 送信アダプタは gateway.adapters.FakeAdapter（偽物）。外部へは一切送らない。呼ばれた回数・宛先・payload を記録
 - 利用者確認は既定で自動承認（候補の digest をそのまま返す）。condition で確認の欠落・確認後の変更を指定した
   ケースだけ、その条件どおりに振る舞う（CONFIRM_POLICY）
-- C1 / C2 は run_v2_eval.make_impls と同じ差し替え口（rules / http）
+- C1 / C2 は run_v2_eval.make_impls と同じ差し替え口（rules / http）。C2 だけ provenance（出所で分ける C2・
+  judge.provenance_gate・Issue #17）も選べる。provenance は製品の組み立て（出所区分つき）でしか判定できないので、
+  簡易組み立ての判断層評価は並べない
 
 判断層評価（run_v2_eval）との違い: 判断層は C1 と C2 だけを当て、送信資格・契約上限・確認・digest・Gateway を
 再現しない。ここではそれらを全部通し、「誤送信」を送信アダプタの呼び出しで数える。
@@ -21,6 +23,7 @@ evaluation/v2/cases.jsonl の各ケースを、製品と同じ経路
 使い方:
   python -m evalharness.run_v2_e2e --out out/e2e
   python -m evalharness.run_v2_e2e --c1 http --c2 http --base-url http://judge.internal:8080 --out out/e2e-laya
+  python -m evalharness.run_v2_e2e --c2 provenance --out out/e2e-provenance
 """
 from __future__ import annotations
 
@@ -422,7 +425,7 @@ def _cell(s: str | None) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--c1", choices=["rules", "http"], default="rules")
-    ap.add_argument("--c2", choices=["rules", "http"], default="rules")
+    ap.add_argument("--c2", choices=["rules", "http", "provenance"], default="rules")
     ap.add_argument("--base-url", help="判断モデルサーバ（社内）の URL。http のとき必須")
     ap.add_argument("--c1-model", default="laya-multilingual")
     ap.add_argument("--c2-model", default="laya-multilingual")
@@ -438,13 +441,17 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.fromisoformat(a.now)
     if now.tzinfo is None:
         now = now.replace(tzinfo=JST)
-    router, gate = make_impls(a.c1, a.c2, a.base_url, a.c1_model, a.c2_model)
+    router, gate = make_impls(a.c1, "rules" if a.c2 == "provenance" else a.c2, a.base_url, a.c1_model, a.c2_model)
+    if a.c2 == "provenance":
+        from judge.provenance_gate import ProvenanceC2Gate
+        gate = ProvenanceC2Gate()
     cases = load_cases(a.cases)
     res = evaluate_e2e(cases, router, gate, now=now, timeout_s=a.timeout, max_input_chars=a.max_input_chars)
     label = {"c1": a.c1 if a.c1 == "rules" else f"{a.c1}:{a.c1_model}",
-             "c2": a.c2 if a.c2 == "rules" else f"{a.c2}:{a.c2_model}"}
+             "c2": a.c2 if a.c2 in ("rules", "provenance") else f"{a.c2}:{a.c2_model}"}
     res["label"], res["now"], res["confirm_policy"] = label, now.isoformat(), CONFIRM_POLICY
-    judge = None if a.no_judge else evaluate(cases, router, gate, timeout_s=a.timeout, max_input_chars=a.max_input_chars)
+    # provenance は出所区分の無い簡易組み立てでは全部保留になり、比べる意味が無いので判断層評価を並べない
+    judge = None if a.no_judge or a.c2 == "provenance" else evaluate(cases, router, gate, timeout_s=a.timeout, max_input_chars=a.max_input_chars)
     if judge is not None:
         res["judge_layer_summary"] = judge["summary"]
     (a.out / "results.json").write_text(json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8")

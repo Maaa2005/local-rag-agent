@@ -1,0 +1,29 @@
+{
+  "format": "c2-registry@1",
+  "entries": [
+    {
+      "ref": "expl-keihi-001@1",
+      "sha256": "51734a6ff2abaa3386690981a2b70b3249f6b20ee1476cda2a63f81c1a2b8e5c",
+      "contract": "A-faq-format@1",
+      "purpose": "社員向けFAQ",
+      "destination": "claude",
+      "check_version": "c2-registration@1#08b97914a5bd",
+      "hits": [],
+      "acknowledged": [],
+      "checked_by": "registry-build",
+      "result": "pass"
+    },
+    {
+      "ref": "spec-csv-001@1",
+      "sha256": "a3f0de6209d5205bfc03fb0462167c75dffaa00aaabf9d27c708b206ca6d46c0",
+      "contract": "B-csv-codegen@1",
+      "purpose": "汎用CSV処理のコード案",
+      "destination": "codex",
+      "check_version": "c2-registration@1#08b97914a5bd",
+      "hits": [],
+      "acknowledged": [],
+      "checked_by": "registry-build",
+      "result": "pass"
+    }
+  ]
+}

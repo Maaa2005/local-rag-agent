@@ -64,7 +64,7 @@ def _render(contract: Contract, approved: ApprovedText, opts: Mapping[str, str],
             t("文体: "), Part(source="option", text=opts["文体"]),
             t("\n長さ: "), Part(source="option", text=opts["長さ"]),
             t("\n形式: 質問と回答の組を3〜5個\n\n説明文:\n"),
-            Part(source="approved", text=approved.body),
+            Part(source="approved", text=approved.body, ref=approved.key),
         )
         return (RenderedMessage(role="system", parts=(Part(source="system", text=A_SYSTEM),)),
                 RenderedMessage(role="user", parts=user))
@@ -73,7 +73,7 @@ def _render(contract: Contract, approved: ApprovedText, opts: Mapping[str, str],
             raise ContractViolation(f"契約 {contract.key} のテンプレートは依頼文が要る")
         user = (
             t("言語: "), Part(source="option", text=opts["言語"]),
-            t("\n仕様:\n"), Part(source="approved", text=approved.body),
+            t("\n仕様:\n"), Part(source="approved", text=approved.body, ref=approved.key),
             t("\n依頼:\n"), Part(source="free_text", text=free_text),
         )
         return (RenderedMessage(role="system", parts=(Part(source="system", text=B_SYSTEM),)),
