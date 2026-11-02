@@ -1,0 +1,194 @@
+{
+ "label": "local-NVIDIA-GeForce-RTX-3050-6GB-Laptop-GPU-rerank-off",
+ "rerank": "off",
+ "warmup_s": null,
+ "ok": true,
+ "checks": [
+  {
+   "check": "1 二問続けて回答",
+   "ok": true,
+   "detail": "answered/none ローカルで回答 | answered/none ローカルで回答"
+  },
+  {
+   "check": "2 権限外の文書が出ない",
+   "ok": true,
+   "detail": "7 問 / 漏れ なし / 不明ID なし / held 0 問"
+  },
+  {
+   "check": "2b 上位ユーザーには上位文書が出る（対照）",
+   "ok": true,
+   "detail": "u_exec: 最上位 Lv3（answered/none ローカルで回答）; u_manager: 最上位 Lv2（answered/none ローカルで回答）"
+  },
+  {
+   "check": "4 vLLM 固まる",
+   "ok": true,
+   "detail": "held/generate ローカル LLM の生成に失敗: TimeoutError / 15.2 秒（上限 15 秒）"
+  },
+  {
+   "check": "4 vLLM 固まる の後に戻る",
+   "ok": true,
+   "detail": "answered/none ローカルで回答 / 4.2 秒"
+  },
+  {
+   "check": "4 Qdrant 固まる",
+   "ok": true,
+   "detail": "held/retrieve 検索に失敗: ResponseHandlingException / 5.2 秒（上限 15 秒）"
+  },
+  {
+   "check": "4 Qdrant 固まる の後に戻る",
+   "ok": true,
+   "detail": "answered/none ローカルで回答 / 3.2 秒"
+  },
+  {
+   "check": "4 vLLM 停止",
+   "ok": true,
+   "detail": "held/generate ローカル LLM の生成に失敗: APIConnectionError / 1.7 秒（上限 15 秒）"
+  },
+  {
+   "check": "4 Qdrant 停止",
+   "ok": true,
+   "detail": "held/retrieve 検索に失敗: ResponseHandlingException / 0.3 秒（上限 15 秒）"
+  },
+  {
+   "check": "3 監査に本文が残らない",
+   "ok": true,
+   "detail": "run 17 件 / 調べた本文 48 個 / 行に 0 個・ファイルに 0 個 / 根拠の文書ID あり"
+  }
+ ],
+ "timings": [
+  {
+   "tag": "two",
+   "user": "u_general",
+   "retrieve_s": 0.37,
+   "generate_s": 90.26,
+   "total_s": 90.7,
+   "outcome": "answered"
+  },
+  {
+   "tag": "two",
+   "user": "u_general",
+   "retrieve_s": 3.65,
+   "generate_s": 6.84,
+   "total_s": 10.5,
+   "outcome": "answered"
+  },
+  {
+   "tag": "perm",
+   "user": "u_general",
+   "retrieve_s": 1.09,
+   "generate_s": 8.02,
+   "total_s": 9.12,
+   "outcome": "answered"
+  },
+  {
+   "tag": "perm",
+   "user": "u_general",
+   "retrieve_s": 0.65,
+   "generate_s": 10.19,
+   "total_s": 10.85,
+   "outcome": "answered"
+  },
+  {
+   "tag": "perm",
+   "user": "u_general",
+   "retrieve_s": 0.17,
+   "generate_s": 4.23,
+   "total_s": 4.42,
+   "outcome": "answered"
+  },
+  {
+   "tag": "perm",
+   "user": "u_general",
+   "retrieve_s": 0.56,
+   "generate_s": 4.51,
+   "total_s": 5.1,
+   "outcome": "answered"
+  },
+  {
+   "tag": "perm",
+   "user": "u_manager",
+   "retrieve_s": 0.24,
+   "generate_s": 4.1,
+   "total_s": 4.37,
+   "outcome": "answered"
+  },
+  {
+   "tag": "perm",
+   "user": "u_manager",
+   "retrieve_s": 0.56,
+   "generate_s": 1.97,
+   "total_s": 2.54,
+   "outcome": "answered"
+  },
+  {
+   "tag": "perm",
+   "user": "u_manager",
+   "retrieve_s": 0.15,
+   "generate_s": 1.82,
+   "total_s": 1.97,
+   "outcome": "answered"
+  },
+  {
+   "tag": "control",
+   "user": "u_exec",
+   "retrieve_s": 0.13,
+   "generate_s": 8.52,
+   "total_s": 8.68,
+   "outcome": "answered"
+  },
+  {
+   "tag": "control",
+   "user": "u_manager",
+   "retrieve_s": 0.17,
+   "generate_s": 2.66,
+   "total_s": 2.84,
+   "outcome": "answered"
+  },
+  {
+   "tag": "vLLM 固まる",
+   "user": "u_general",
+   "retrieve_s": 0.23,
+   "generate_s": 15.0,
+   "total_s": 15.24,
+   "outcome": "held"
+  },
+  {
+   "tag": "recover-vLLM 固まる",
+   "user": "u_general",
+   "retrieve_s": 0.15,
+   "generate_s": 4.08,
+   "total_s": 4.24,
+   "outcome": "answered"
+  },
+  {
+   "tag": "Qdrant 固まる",
+   "user": "u_general",
+   "retrieve_s": 5.13,
+   "total_s": 5.16,
+   "outcome": "held"
+  },
+  {
+   "tag": "recover-Qdrant 固まる",
+   "user": "u_general",
+   "retrieve_s": 0.24,
+   "generate_s": 2.97,
+   "total_s": 3.24,
+   "outcome": "answered"
+  },
+  {
+   "tag": "vLLM 停止",
+   "user": "u_general",
+   "retrieve_s": 0.17,
+   "generate_s": 1.47,
+   "total_s": 1.67,
+   "outcome": "held"
+  },
+  {
+   "tag": "Qdrant 停止",
+   "user": "u_general",
+   "retrieve_s": 0.28,
+   "total_s": 0.29,
+   "outcome": "held"
+  }
+ ]
+}
