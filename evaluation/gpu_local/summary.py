@@ -89,6 +89,24 @@ def run_numbers(results: list[QuestionResult]) -> dict:
     }
 
 
+def retrieval_numbers(results: list[QuestionResult]) -> dict:
+    """検索だけの指標 (Issue #14 E1)。M1・M2 は Q の 50 問、検索の時間は全問 (最初の問の読み込みも含む)。"""
+    q = [r for r in results if r.expected_conclusion is None]
+    agg = _aggregate(q)
+    answered = [r for r in q if not answer_failed(r)]
+    times = [r.retrieval_latency if not answer_failed(r) else float("inf") for r in results]
+    return {
+        "n_q": len(q),
+        "n_all": len(results),
+        "answer_failed": len(q) - len(answered),
+        "M1_recall_at_5": agg["recall_at_5"] if answered else 0.0,
+        "M2_mrr": agg["mrr"] if answered else 0.0,
+        "retrieval_p50": round(metrics.percentile(times, 50), 3) if times else float("inf"),
+        "retrieval_p95": round(metrics.percentile(times, 95), 3) if times else float("inf"),
+        "retrieval_max": round(max(times), 3) if times else float("inf"),
+    }
+
+
 def line_checks(nums: dict, peak_mib: int | None, budget_mib: int, v_checks: dict,
                 expected_q: int = EXPECTED_Q, expected_n: int = EXPECTED_N) -> dict:
     """測る前に決めた線ごとの合否。V は trial_checks の結果 (完走・最長・OOM・あふれ・予算) をそのまま使う。

@@ -24,6 +24,7 @@ import urllib.request
 from pathlib import Path
 
 from evaluation.colab import step05 as s5
+from evaluation.gpu_local import proc_mem
 from evaluation.gpu_local import summary as sm
 
 MODEL = "google/gemma-4-E4B-it"
@@ -141,6 +142,10 @@ class Bench:
         self.qdrant_storage = args.qdrant_storage or str(self.out / "qdrant_storage")
         self.windows: dict[str, tuple[float, float]] = {}
         self.gpu = GpuLog()
+        # Issue #14: 部品ごとの常駐メモリ (llama-server・評価・索引)
+        self.procs = proc_mem.ProcLog({"llama": "llama-server", "eval": "evaluation.run_eval",
+                                       "index": "corpus_index.py"})
+        self.server_extra = args.server_extra.split() if args.server_extra else []
         name, cap, total = [x.strip() for x in subprocess.run(
             ["nvidia-smi", "--query-gpu=name,compute_cap,memory.total", "--format=csv,noheader,nounits"],
             capture_output=True, text=True).stdout.splitlines()[0].split(",")]
@@ -156,7 +161,8 @@ class Bench:
 
     # ─── 部品 ───
     def start_server(self, ctx: int, log_path: Path) -> tuple[subprocess.Popen, bool, dict, object]:
-        proc = launch(s5.llama_server_argv(self.server_bin, self.gguf, PORT, ctx), log_path, self.llama_env)
+        proc = launch(s5.llama_server_argv(self.server_bin, self.gguf, PORT, ctx, extra=self.server_extra),
+                      log_path, self.llama_env)
         up = wait_up(f"http://127.0.0.1:{PORT}/health", proc, 600)
         gpu = s5.llama_gpu_check(log_path.read_text(errors="replace"))
         warm = None
@@ -183,10 +189,12 @@ class Bench:
         return rc
 
     def index(self) -> dict:
+        t0 = time.time()
         p = subprocess.run([self.py, "evaluation/colab/corpus_index.py", "--repo", str(self.repo),
                             "--work", str(self.out / "index_work"), "--qdrant-url", QDRANT_URL,
                             "--collection", f"local_{int(time.time())}"],
                            cwd=self.repo, capture_output=True, text=True)
+        self.windows["index"] = (t0, time.time())
         if p.returncode != 0:
             raise SystemExit(f"索引に失敗: {p.stderr[-2000:]}")
         return json.loads((self.out / "index_work" / "index.json").read_text())
@@ -217,8 +225,13 @@ class Bench:
         stats = s5.prompt_token_stats(self.out / "measure" / "raw.jsonl")
         ctx = s5.needed_max_model_len(stats["max_prompt_tokens"])
         log(f"入力の最大 {stats['max_prompt_tokens']} ({stats['max_id']}) → 文脈 {ctx}")
+        # 出力 1 トークンの回なので答えの指標は使えないが、検索の指標 (M1・M2・検索の時間) はそのまま読める
+        retrieval = sm.retrieval_numbers(sm.load_results(self.out / "measure" / "raw.jsonl"))
+        log(f"検索: {retrieval}")
         return {**stats, "ctx": MEASURE_CTX, "rc": rc, "needed_ctx": ctx, "gpu_check": gpu,
-                "warmup_seconds": warm, "precheck": pre}
+                "warmup_seconds": warm, "precheck": pre, "retrieval": retrieval,
+                "proc_mem": self.procs.stats(*self.windows["measure"]),
+                "index_proc_mem": self.procs.stats(*self.windows["index"]) if "index" in self.windows else None}
 
     def run_once(self, label: str, index: dict, ctx: int, all_ids: list[str], longest_id: str) -> dict:
         budget = self.args.budget_mib
@@ -256,7 +269,9 @@ class Bench:
         rec.update(started=True, gpu_ok=True, rc=rc, out_dir=str(out_dir), peak_mib=mem["peak_mib"],
                    v_checks=checks, slot_n_ctx=log_scan["slot_n_ctx"], debug_active=log_scan["debug_active"],
                    oom_lines=len(log_scan["oom"]), overflow_lines=len(log_scan["preempt"]), numbers=nums,
-                   lines=sm.line_checks(nums, mem["peak_mib"], budget, checks))
+                   lines=sm.line_checks(nums, mem["peak_mib"], budget, checks),
+                   proc_mem=self.procs.stats(*self.windows[f"{label}:run"]),
+                   lazy_lines=[ln[:200] for ln in text.splitlines() if "lazy" in ln.lower()][:5])
         log(f"[{label}] 最大 {mem['peak_mib']} MiB / 予算 {budget} → {rec['lines']} / N {nums['N']}")
         return rec
 
@@ -289,8 +304,9 @@ class Bench:
                          "baseline_mib": self.baseline, "budget_mib": self.args.budget_mib,
                          "runtime": f"llama.cpp {LLAMA_TAG}", "server_version": self.server_ver, "model": MODEL,
                          "gguf": {"repo": GGUF_REPO, "file": GGUF_FILE, "revision": GGUF_REV}, "quant": QUANT,
-                         "embedding": "intfloat/multilingual-e5-large (CPU)", "rerank": "off",
-                         "numeric_check": NUMERIC_CHECK, "runs": []}
+                         "embedding": f"{os.environ.get('EMBED_MODEL', 'intfloat/multilingual-e5-large')} (CPU)",
+                         "rerank": "off", "numeric_check": NUMERIC_CHECK, "server_extra": self.server_extra,
+                         "measure_only": self.args.measure_only, "runs": []}
         qdrant = launch([self.qdrant_bin], self.out / "qdrant.log", q_env)
         try:
             # 起動しない時も finally で落とす (残ると次の回が古い Qdrant に繋がる)
@@ -301,7 +317,13 @@ class Bench:
             measure = self.measure(index)
             summary["measure"] = measure
             ctx = measure["needed_ctx"]
-            summary["server_args"] = s5.llama_server_argv("llama-server", GGUF_FILE, PORT, ctx)[1:]
+            summary["server_args"] = s5.llama_server_argv("llama-server", GGUF_FILE, PORT, ctx,
+                                                          extra=self.server_extra)[1:]
+            if self.args.measure_only:
+                # Issue #14 E1: 検索とメモリだけを見る回。回答の回と G0 は流さない
+                self._write(summary)
+                log(f"終わり (入力長の測定だけ): {self.out / 'summary.json'}")
+                return
             all_ids = s5.dataset_ids(self.repo)
             for i in range(1, self.args.runs + 1):
                 summary["runs"].append(self.run_once(f"{self.args.label}-{i}", index, ctx, all_ids,
@@ -336,6 +358,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--label", default="6GB")
     p.add_argument("--server-bin", help="llama-server の起動口 (既定は .work/llama-pre の配布版)")
     p.add_argument("--qdrant-storage", help="Qdrant の保存先 (既定は --out の下)")
+    p.add_argument("--measure-only", action="store_true",
+                   help="索引と入力長の測定 (出力 1 トークン) だけで止める。検索の指標とメモリを見る (Issue #14 E1)")
+    p.add_argument("--server-extra", default="", help="llama-server に足す引数 (空白区切り。例: '-lzm on')")
     p.add_argument("--skip-g0", action="store_true")
     return p.parse_args(argv)
 

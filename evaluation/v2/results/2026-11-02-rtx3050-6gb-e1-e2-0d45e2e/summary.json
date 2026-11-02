@@ -1,0 +1,198 @@
+{
+ "issue": 14,
+ "code_commit": "0d45e2e",
+ "gpu": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+ "runtime": "llama.cpp b11836",
+ "model": "google/gemma-4-E4B-it Q4_K_M (unsloth bfc15c38)",
+ "lines": "Issue #14 の 11/2 のコメント（測る前に固定）",
+ "E1": {
+  "B0": {
+   "embedding": "intfloat/multilingual-e5-large (CPU)",
+   "retrieval": {
+    "n_q": 50,
+    "n_all": 62,
+    "answer_failed": 0,
+    "M1_recall_at_5": 1.0,
+    "M2_mrr": 0.9866666666666667,
+    "retrieval_p50": 0.127,
+    "retrieval_p95": 0.278,
+    "retrieval_max": 6.731
+   },
+   "eval_proc_mib": {
+    "VmRSS": 1948.4,
+    "VmHWM": 1948.4,
+    "RssAnon": 694.1,
+    "RssFile": 1301.0,
+    "RssAnon_plus_File": 1948.4
+   },
+   "index_proc_mib": {
+    "VmRSS": 2207.9,
+    "VmHWM": 2207.9,
+    "RssAnon": 825.9,
+    "RssFile": 1382.0,
+    "RssAnon_plus_File": 2207.9
+   }
+  },
+  "B1r": {
+   "embedding": "cl-nagoya/ruri-v3-30m (CPU)",
+   "retrieval": {
+    "n_q": 50,
+    "n_all": 62,
+    "answer_failed": 0,
+    "M1_recall_at_5": 1.0,
+    "M2_mrr": 0.9866666666666667,
+    "retrieval_p50": 0.021,
+    "retrieval_p95": 0.039,
+    "retrieval_max": 4.615
+   },
+   "eval_proc_mib": {
+    "VmRSS": 706.2,
+    "VmHWM": 709.3,
+    "RssAnon": 521.3,
+    "RssFile": 185.4,
+    "RssAnon_plus_File": 706.2
+   },
+   "index_proc_mib": {
+    "VmRSS": 832.0,
+    "VmHWM": 832.0,
+    "RssAnon": 553.7,
+    "RssFile": 278.3,
+    "RssAnon_plus_File": 832.0
+   }
+  },
+  "B2r": {
+   "embedding": "cl-nagoya/ruri-v3-130m (CPU)",
+   "retrieval": {
+    "n_q": 50,
+    "n_all": 62,
+    "answer_failed": 0,
+    "M1_recall_at_5": 1.0,
+    "M2_mrr": 0.9866666666666667,
+    "retrieval_p50": 0.039,
+    "retrieval_p95": 0.069,
+    "retrieval_max": 4.544
+   },
+   "eval_proc_mib": {
+    "VmRSS": 969.5,
+    "VmHWM": 969.5,
+    "RssAnon": 521.3,
+    "RssFile": 448.5,
+    "RssAnon_plus_File": 969.5
+   },
+   "index_proc_mib": {
+    "VmRSS": 1098.3,
+    "VmHWM": 1098.3,
+    "RssAnon": 589.0,
+    "RssFile": 509.3,
+    "RssAnon_plus_File": 1098.3
+   }
+  }
+ },
+ "E2": {
+  "A0": {
+   "server_extra": [],
+   "peak_vram_mib": 3433,
+   "gpu_check": {
+    "offloaded": "43/43",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+     "CUDA0": 2883.51,
+     "CPU": 2208.0
+    },
+    "no_kernel_image": false,
+    "ok": true
+   },
+   "all_answered": true,
+   "oom_lines": 0,
+   "overflow_lines": 0,
+   "numbers": {
+    "ftl_p50": 1.1412994359998265,
+    "ftl_p95": 2.974,
+    "total_p50": 1.6928958409998813,
+    "total_p95": 6.305,
+    "over_15s": [
+     "Q001"
+    ],
+    "decode_tps_median": 42.7,
+    "M1_recall_at_5": 1.0,
+    "M2_mrr": 0.9867,
+    "M6_correctness": 0.9733333333333333,
+    "M7_permission": 1.0,
+    "M8_refusal": "16/16",
+    "N": {
+     "ok": 11,
+     "n": 12,
+     "wrong": [
+      "N09"
+     ]
+    }
+   },
+   "llama_proc": {
+    "max_mib": {
+     "VmRSS": 4117.3,
+     "VmHWM": 5065.8,
+     "RssAnon": 3733.7,
+     "RssFile": 2240.0,
+     "RssAnon_plus_File": 3993.3
+    },
+    "majflt_delta": 1243,
+    "n_samples": 156
+   },
+   "lazy_lines": []
+  },
+  "A1": {
+   "server_extra": [
+    "-lzm",
+    "on"
+   ],
+   "peak_vram_mib": 3496,
+   "gpu_check": {
+    "offloaded": "43/43",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+     "CUDA0": 2883.51,
+     "CPU": 2208.0
+    },
+    "no_kernel_image": false,
+    "ok": true
+   },
+   "all_answered": true,
+   "oom_lines": 0,
+   "overflow_lines": 0,
+   "numbers": {
+    "ftl_p50": 0.9750073410000368,
+    "ftl_p95": 1.531,
+    "total_p50": 1.4967157845003385,
+    "total_p95": 5.097,
+    "over_15s": [],
+    "decode_tps_median": 42.3,
+    "M1_recall_at_5": 1.0,
+    "M2_mrr": 0.9867,
+    "M6_correctness": 0.9533333333333333,
+    "M7_permission": 1.0,
+    "M8_refusal": "16/16",
+    "N": {
+     "ok": 11,
+     "n": 12,
+     "wrong": [
+      "N09"
+     ]
+    }
+   },
+   "llama_proc": {
+    "max_mib": {
+     "VmRSS": 4207.9,
+     "VmHWM": 4213.5,
+     "RssAnon": 3855.3,
+     "RssFile": 489.8,
+     "RssAnon_plus_File": 4083.9
+    },
+    "majflt_delta": 40,
+    "n_samples": 122
+   },
+   "lazy_lines": [
+    "0.01.281.301 I add: tensor per_layer_token_embd.weight (size = 1848 MiB) lazy read enabled"
+   ]
+  }
+ }
+}
