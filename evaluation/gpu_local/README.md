@@ -18,6 +18,8 @@ uv venv -p 3.11 .work/rag-env
 uv pip install --python .work/rag-env/bin/python torch --index-url https://download.pytorch.org/whl/cpu
 uv pip install --python .work/rag-env/bin/python "transformers<5" sentence-transformers==3.3.1 \
     qdrant-client==1.12.1 aiosqlite==0.20.0 pydantic-settings==2.6.1 openai==1.57.0 httpx==0.28.1 pyyaml
+# ruri-v3（埋め込みの比較・Issue #14 E1）は SentencePiece の分かち書きを使う
+uv pip install --python .work/rag-env/bin/python sentencepiece protobuf
 curl -sfL -o .work/gguf/gemma-4-E4B-it-Q4_K_M.gguf \
   https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/bfc15c382204943c3a8fff0c750b94ae2364d7a3/gemma-4-E4B-it-Q4_K_M.gguf
 ```
