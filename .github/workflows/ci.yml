@@ -30,3 +30,20 @@ jobs:
           grep -v -E '^(sentence-transformers|docling)' requirements.txt > /tmp/req-ci.txt
           pip install -r /tmp/req-ci.txt pytest==9.1.1
       - run: python -m pytest -q tests
+  # 評価の仕組み (evaluation/) の単体テスト。backend の app を import するので同じ依存を入れる。
+  # モデル・GPU・Qdrant は使わない (テストが偽物に差し替える)
+  evaluation-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: install (重いモデル以外)
+        run: |
+          grep -v -E '^(sentence-transformers|docling)' backend/requirements.txt > /tmp/req-ci.txt
+          pip install -r /tmp/req-ci.txt pyyaml pytest==9.1.1
+      - run: python -m pytest -q evaluation/tests
