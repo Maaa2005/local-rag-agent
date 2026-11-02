@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import date
 from fractions import Fraction
 
-from evaluation.teacher_check.rules import UNDECIDED, all3, any3, cmp, full_years, not3
+from evaluation.teacher_check.rules import UNDECIDED, all3, cmp, full_years, not3
 
 Tri = bool | None
 
