@@ -8,6 +8,9 @@ W=${LLAMA_WORK:-$(cd "$(dirname "$0")/../../.work" && pwd)}
 LIBS=$W/noble-libs/root/usr/lib/x86_64-linux-gnu
 BIN=$(find "$W/llama-pre" -maxdepth 2 -name llama-server -printf '%h\n' | head -1)
 CUDART=$(find "$W/llama-pre" -name 'libcudart.so*' -printf '%h\n' | head -1)
+for need in "$LIBS/ld-linux-x86-64.so.2" "$BIN/llama-server" "$CUDART"; do
+  [ -n "$need" ] && [ -e "$need" ] || { echo "準備が足りない: $W に配布版・cudart・noble-libs を置く (README.md)" >&2; exit 1; }
+done
 # ld.so から起動すると実行ファイルの場所が ld.so 側になり、計算部品 (libggml-cuda.so・libggml-cpu-*.so) を
 # 探しに行かない。部品は今いるフォルダからも探すので、配布版のフォルダに移ってから起動する (重みは絶対パスで渡す)
 cd "$BIN"

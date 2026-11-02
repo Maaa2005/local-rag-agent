@@ -131,7 +131,9 @@ class Bench:
         # 配布版は glibc 2.38 以上が要る。古い OS では新しい glibc の ld.so で包んだ起動口を --server-bin で渡す
         self.server_bin = args.server_bin or str(sorted(work.glob("llama-pre/**/llama-server"))[0])
         libdirs = sorted({str(p.parent) for p in work.glob("llama-pre/**/*.so*")})
-        self.llama_env = dict(os.environ, LD_LIBRARY_PATH=":".join(libdirs + [os.environ.get("LD_LIBRARY_PATH", "")]))
+        # LLAMA_WORK は llama_server_noble.sh が配布版と glibc を探す場所。--work と食い違わないように渡す
+        self.llama_env = dict(os.environ, LD_LIBRARY_PATH=":".join(libdirs + [os.environ.get("LD_LIBRARY_PATH", "")]),
+                              LLAMA_WORK=str(work))
         self.gguf = str(work / "gguf" / GGUF_FILE)
         self.qdrant_bin = str(work / "qdrant" / "bin" / "qdrant")
         # WSL2 の ext4 では索引の作成が 5 秒を超え、qdrant-client の既定の時間切れ (5 秒) で落ちた (11/2)。
@@ -283,16 +285,17 @@ class Bench:
     def main(self) -> None:
         q_env = dict(os.environ, QDRANT__STORAGE__STORAGE_PATH=self.qdrant_storage,
                      QDRANT__SERVICE__HTTP_PORT="6333")
-        qdrant = launch([self.qdrant_bin], self.out / "qdrant.log", q_env)
-        if not wait_up(f"{QDRANT_URL}/readyz", qdrant, 60):
-            raise SystemExit("Qdrant が起動しない")
         summary: dict = {"issue": 1, "gpu": self.gpu_name, "compute_cap": self.cap, "total_mib": self.total_mib,
                          "baseline_mib": self.baseline, "budget_mib": self.args.budget_mib,
                          "runtime": f"llama.cpp {LLAMA_TAG}", "server_version": self.server_ver, "model": MODEL,
                          "gguf": {"repo": GGUF_REPO, "file": GGUF_FILE, "revision": GGUF_REV}, "quant": QUANT,
                          "embedding": "intfloat/multilingual-e5-large (CPU)", "rerank": "off",
                          "numeric_check": NUMERIC_CHECK, "runs": []}
+        qdrant = launch([self.qdrant_bin], self.out / "qdrant.log", q_env)
         try:
+            # 起動しない時も finally で落とす (残ると次の回が古い Qdrant に繋がる)
+            if not wait_up(f"{QDRANT_URL}/readyz", qdrant, 60):
+                raise SystemExit("Qdrant が起動しない")
             index = self.index()
             summary["index"] = {k: index.get(k) for k in ("documents", "chunks", "seconds")}
             measure = self.measure(index)
@@ -312,7 +315,7 @@ class Bench:
         # 回ごとに確かめ、全部の回で予測の幅に入った時だけ「外れていない」
         conv = {r["label"]: sm.conversion_check(T4_TPS, T4_BW_GBS, self.args.bandwidth_gbs,
                                                 r["numbers"]["decode_tps_median"]) for r in started}
-        summary["conversion_check"] = {"runs": conv, "within_all": bool(conv) and all(
+        summary["conversion_check"] = {"runs": conv, "within_all": len(conv) == self.args.runs and all(
             c["within"] is True for c in conv.values())}
         summary["verdict_all_lines"] = bool(started) and len(started) == self.args.runs and all(
             r["lines"]["all"] for r in started) and summary.get("g0", {}).get("ok") is True
@@ -320,7 +323,7 @@ class Bench:
         log(f"終わり: {self.out / 'summary.json'}")
 
     def _write(self, summary: dict) -> None:
-        (self.out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
+        (self.out / "summary.json").write_text(json.dumps(sm.json_safe(summary), ensure_ascii=False, indent=2) + "\n")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

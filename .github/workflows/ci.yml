@@ -1,5 +1,5 @@
-# backend の単体テストを回す。重いモデル (sentence-transformers / docling) は
-# tests/conftest.py がスタブするので、CI では入れずに数分で終わらせる。
+# backend と evaluation の単体テストを回す。重いモデル (sentence-transformers / docling) は
+# テスト側がスタブするので、CI では入れずに数分で終わらせる。
 name: ci
 on:
   push:

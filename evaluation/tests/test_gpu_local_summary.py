@@ -61,10 +61,44 @@ def test_decode_tps_skips_missing_tokens_and_zero_gen():
                                              completion_tokens=50)) == 25.0
 
 
+def test_all_failed_or_missing_run_does_not_crash(tmp_path):
+    rows = [_row("Q001", error="run_failed: ConnectError: x"),
+            _row("Q002", category="permission_test", error="run_failed: ConnectError: x"),
+            _row("N01", expected_conclusion="必要", error="run_failed: ConnectError: x")]
+    nums = summary.run_numbers(summary.load_results(_write(tmp_path, rows)))
+    assert nums["M6_correctness"] == 0.0 and nums["M7_permission"] == 0.0
+    assert nums["M8_refusal"] == "0/1"
+    assert nums["ftl_p50"] == float("inf")
+    assert nums["N"] == {"ok": 0, "n": 1, "wrong": ["N01"]}
+    empty = summary.run_numbers(summary.load_results(tmp_path / "missing.jsonl"))
+    assert empty["n_q"] == 0 and empty["N"] is None and empty["ftl_p50"] == float("inf")
+    assert summary.line_checks(empty, 3000, 5632, {"ok": False})["all"] is False
+
+
+def test_json_safe_turns_infinity_into_string():
+    out = summary.json_safe({"a": [1.0, float("inf")], "b": {"c": float("inf")}, "d": "x"})
+    assert out == {"a": [1.0, "inf"], "b": {"c": "inf"}, "d": "x"}
+    json.dumps(out, allow_nan=False)
+
+
 def _nums(**kw):
-    base = {"ftl_p50": 1.0, "total_p50": 2.0, "M6_correctness": 0.9, "M7_permission": 1.0, "M8_refusal": "16/16",
-            "N": {"ok": 12, "n": 12, "wrong": []}}
+    base = {"n_q": 50, "ftl_p50": 1.0, "total_p50": 2.0, "M6_correctness": 0.9, "M7_permission": 1.0,
+            "M8_refusal": "16/16", "N": {"ok": 12, "n": 12, "wrong": []}}
     return {**base, **kw}
+
+
+def test_short_run_does_not_pass_q_p_n():
+    ok_v = {"ok": True}
+    res = summary.line_checks(_nums(n_q=3, N={"ok": 1, "n": 1, "wrong": []}), 3000, 5632, ok_v)
+    assert res["P"] is False and res["Q"] is False and res["N"] is False
+
+
+def test_lines_compare_unrounded_values(tmp_path):
+    # 最初の文字の中央が 5.0004 秒なら、丸めると 5.0 でも線 5.0 秒は通らない
+    rows = [_row(f"Q{i:03d}", first_token_latency=5.0004, total_latency=6.0) for i in range(50)]
+    nums = summary.run_numbers(summary.load_results(_write(tmp_path, rows)))
+    assert nums["ftl_p50"] > 5.0
+    assert summary.line_checks(nums, 3000, 5632, {"ok": True})["P"] is False
 
 
 def test_line_checks_pass_and_each_failure():
