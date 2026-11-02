@@ -29,7 +29,7 @@ _MONTHS = _A + r"(?i:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*
 
 # (名前, 正規表現, 空白を除いた写しにも当てるか)
 REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
-    ("employee_id", re.compile(_A + r"([Ee]-?\d{3,}|(?i:emp)-?\d{2,})|社員(番号|ID|コード|No\.?)\s*[:=は]?\s*[A-Za-z]{0,3}-?\d+"), True),
+    ("employee_id", re.compile(_A + r"([Ee]-?\d{3,}|(?i:emp)-?\d{2,})|社員(番号|ID|コード|No\.?)\s*[:=は]?\s*([A-Za-z]{0,3}-?\d+|[〇一二三四五六七八九]+)"), True),
     ("person_name", re.compile(r"[一-龥]{1,4}(さん|くん|氏|(?<![仕同模多各異一皆])様)"), True),
     ("counterparty", re.compile(r"([A-Z]社|株式会社|有限会社|合同会社|\(株\)|\(有\)|[一-龥ァ-ヶー]{1,8}(商事|物産|製作所|銀行|証券)|"
                                 + _A + r"(Inc\.|Corp\.|Co\.,?\s*Ltd\.?|LLC)" + _Z + ")"), True),

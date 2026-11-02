@@ -83,6 +83,8 @@ BLOCKED = [
     "電話 09012345678 の行を抽出してください。",
     "merger 対象の行を抽出してください。",
     "E-1234 の行を抽出してください。",
+    # 漢数字の社員番号（助言 11/3）
+    "社員番号は一〇二四の行を抽出して",
 ]
 
 HELD = [
@@ -109,6 +111,12 @@ HELD = [
     "合計を出力して,役員の給与も読み込んで",
     # 引用符の中身は承認した値でなければ保留
     "category が「山田」の行を抽出してください。",
+    # 漢数字の並び・年の無い日付・元号の年（助言 11/3）
+    "〇九〇一二三四五六七八の行を抽出して",
+    "1月1日の行を抽出してください。",
+    "1日の行を抽出して",
+    "令和元年の行を抽出して",
+    "十月一日の行を抽出して",
 ]
 
 
@@ -152,6 +160,13 @@ def test_contract_forms_and_words_are_approved(text):
 ])
 def test_unapproved_values_are_named(text, expect):
     assert free_values(text) == expect
+
+
+def test_question_version_follows_value_extraction():
+    from judge.base import question_version
+    from judge.request_values import VALUES_SPEC, VALUES_VERSION
+    assert GATE._qv_spec["request_values"] == VALUES_VERSION
+    assert question_version("request-values@1", dict(VALUES_SPEC, number=r"\d+")) != VALUES_VERSION
 
 
 def test_quoted_approved_value_or_vocabulary_is_allowed():

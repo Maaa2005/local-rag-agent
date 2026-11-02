@@ -43,7 +43,7 @@ from judge.base import C2Verdict, question_version
 from judge.c2_registry import DEFAULT_REGISTRY_PATH, REGISTRATION_CHECK_VERSION, Registry, load_registry
 from judge.normalize import compact_text, normalize_text
 from judge.request_cues import CUES_VERSION, REQUEST_CUES, cue_hits, unexpected_letters
-from judge.request_values import ValueRules, compile_value_rules, unapproved_values
+from judge.request_values import VALUES_VERSION, ValueRules, compile_value_rules, unapproved_values
 from orchestrator.policy import DEFAULT_POLICY_DIR, Contract, Policy, load_policy
 
 MODEL = "provenance-rules"
@@ -161,7 +161,7 @@ class ProvenanceC2Gate:
             "registration_check": REGISTRATION_CHECK_VERSION,
             "registry_sha256": self.registry.sha256,
             "tables": self.tables.canonical,
-            "request_values": "judge.request_values@1",
+            "request_values": VALUES_VERSION,  # 自由な値の切り出し
             "approved_request_values": {k: [list(a.request_identifiers), [t for t, _ in a.request_values]]
                                         for k, a in sorted(self.policy.approved.items())},
         }

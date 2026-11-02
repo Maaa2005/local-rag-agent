@@ -6,7 +6,9 @@
 
 自由な値（正規化した写しの上で切り出す）:
 - 数字の並び（10・3.11・5,000）
-- 漢数字の値（金額・日付・人数などの単位が続く物: 五百円・三名・十月）
+- 漢数字の値（2 字以上続く物・〇 を含む物: 一〇二四・〇九〇…、1 字でも金額・日付・人数などの単位が続く物:
+  五百円・三名・十月）
+- 元号の年（令和元年・平成5年）
 - 英字の語（[A-Za-z_][A-Za-z0-9_]*。_ で区切った各部分を照合する: total_amount は total と amount）
 - 引用符の中身（「」『』""“”''‘’）。中身が承認した値そのもの、または承認した語・値だけなら可。
   中の語や数字は引用符ごとに判定し、別に数えない
@@ -27,12 +29,22 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
+from judge.base import question_version
 from judge.normalize import normalize_text
 
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _NUMBER = re.compile(r"(?<![A-Za-z0-9_])\d+(?:[.,]\d+)*")
-_KANJI_NUMBER = re.compile(r"[〇一二三四五六七八九十百千万億兆]+(?=\s*(円|ドル|ユーロ|年|月|日|名|人|歳|割|%))")
+_KANJI_DIGITS = "〇一二三四五六七八九十百千万億兆"
+_KANJI_NUMBER = re.compile(rf"[{_KANJI_DIGITS}]*〇[{_KANJI_DIGITS}]*|[{_KANJI_DIGITS}]{{2,}}|"
+                           rf"[{_KANJI_DIGITS}](?=\s*(円|ドル|ユーロ|年|月|日|名|人|歳|割|%))")
+_ERA_YEAR = re.compile(r"(令和|平成|昭和|大正|明治)\s*(元|\d+|[〇一二三四五六七八九十]+)\s*年")
 _QUOTED = re.compile(r"「([^」]*)」|『([^』]*)』|\"([^\"]*)\"|“([^”]*)”|'([^']*)'|‘([^’]*)’")
+
+# 切り出しの版（ゲートの question_version に入れる。切り出しを変えると版が変わる）
+VALUES_SPEC = {"word": _WORD.pattern, "number": _NUMBER.pattern, "kanji_number": _KANJI_NUMBER.pattern,
+               "era_year": _ERA_YEAR.pattern, "quoted": _QUOTED.pattern, "word_parts": "split on _",
+               "quoted_rest": r"[^\s.,:;/・-]", "approved_value": "whole occurrence covers the token"}
+VALUES_VERSION = question_version("request-values@1", VALUES_SPEC)
 
 
 @dataclass(frozen=True)
@@ -86,7 +98,7 @@ def _check(n: str, rules: ValueRules, known: frozenset[str], values: Sequence[st
     covered = [m.span() for _, pat in rules.forms for m in pat.finditer(n)]
     covered += [sp for v in values for sp in _occurrences(n, v)]
     bad: list[tuple[int, str]] = []
-    for kind, pat in (("number", _NUMBER), ("kanji_number", _KANJI_NUMBER), ("word", _WORD)):
+    for kind, pat in (("number", _NUMBER), ("kanji_number", _KANJI_NUMBER), ("era_year", _ERA_YEAR), ("word", _WORD)):
         for m in pat.finditer(n):
             if _inside(m.span(), skip) or _inside(m.span(), covered):
                 continue
