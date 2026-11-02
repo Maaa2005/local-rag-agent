@@ -14,7 +14,7 @@ from pathlib import Path
 from evaluation.teacher_check.questions import build
 from evaluation.teacher_check.score import _ARTICLE, _to_int
 
-_LINE = re.compile(r"^\s*(T\d{3})\s*\|\s*([^|]*)\|\s*(.+?)\s*$")
+_LINE = re.compile(r"^\s*([TC]\d{2,3})\s*\|\s*([^|]*)\|\s*(.+?)\s*$")   # T001（封 B）・C01（封 C）
 
 
 def parse(text: str) -> dict[str, dict]:
