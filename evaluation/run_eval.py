@@ -145,7 +145,8 @@ async def evaluate_question(
             except Exception as exc:
                 res.error = f"judge_failed: {exc}"
     except Exception as exc:
-        res.error = f"run_failed: {exc}"
+        # 型名も残す (httpx の時間切れなどは本文が空で、何で落ちたか分からなかった・2026-11-02 の Q029)
+        res.error = f"run_failed: {type(exc).__name__}: {exc}"
     return res
 
 

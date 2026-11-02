@@ -1,0 +1,2 @@
+# WSL などで直接動かすシェルは、Windows で取り出しても LF のままにする (CRLF だと bash が起動できない)
+*.sh text eol=lf

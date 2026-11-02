@@ -1,0 +1,302 @@
+{
+ "issue": 1,
+ "gpu": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+ "compute_cap": "8.6",
+ "total_mib": 6144,
+ "baseline_mib": 122,
+ "budget_mib": 5632,
+ "runtime": "llama.cpp b11836",
+ "server_version": [
+  "version: 0.7.0-dev (build 11836, commit f5027fb21)",
+  "built with GNU 13.3.0 for Linux x86_64"
+ ],
+ "model": "google/gemma-4-E4B-it",
+ "gguf": {
+  "repo": "unsloth/gemma-4-E4B-it-GGUF",
+  "file": "gemma-4-E4B-it-Q4_K_M.gguf",
+  "revision": "bfc15c382204943c3a8fff0c750b94ae2364d7a3"
+ },
+ "quant": "Q4_K_M",
+ "embedding": "intfloat/multilingual-e5-large (CPU)",
+ "rerank": "off",
+ "numeric_check": "true",
+ "runs": [
+  {
+   "label": "6GB-1",
+   "ctx": 3072,
+   "budget_mib": 5632,
+   "gpu_check": {
+    "offloaded": "43/43",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+     "CUDA0": 2883.51,
+     "CPU": 2208.0
+    },
+    "no_kernel_image": false,
+    "ok": true
+   },
+   "warmup_seconds": 1.0,
+   "started": true,
+   "gpu_ok": true,
+   "rc": 0,
+   "out_dir": "<repo>/.work/out-20261102-1220/run_6GB-1",
+   "peak_mib": 3609,
+   "v_checks": {
+    "all_answered": true,
+    "longest_ok": true,
+    "no_oom": true,
+    "no_preemption": true,
+    "within_budget": true,
+    "missing": [],
+    "ok": true,
+    "note": "Issue #1 6GB 実機"
+   },
+   "slot_n_ctx": [
+    3072
+   ],
+   "debug_active": 1759,
+   "oom_lines": 0,
+   "overflow_lines": 0,
+   "numbers": {
+    "n_q": 50,
+    "answer_failed": 0,
+    "M1_recall_at_5": 1.0,
+    "M2_mrr": 0.9867,
+    "M6_correctness": 0.9633,
+    "M7_permission": 1.0,
+    "M8_refusal": "16/16",
+    "M8_not_refused": [],
+    "ftl_p50": 1.953,
+    "ftl_p95": 11.483,
+    "total_p50": 3.037,
+    "total_p95": 12.118,
+    "total_max": 23.504,
+    "over_15s": [
+     "Q001",
+     "Q019"
+    ],
+    "decode_tps_median": 41.1,
+    "decode_tps_n": 50,
+    "N": {
+     "ok": 11,
+     "n": 12,
+     "wrong": [
+      "N09"
+     ]
+    }
+   },
+   "lines": {
+    "V": true,
+    "P": true,
+    "Q": true,
+    "N": false,
+    "all": false
+   }
+  },
+  {
+   "label": "6GB-2",
+   "ctx": 3072,
+   "budget_mib": 5632,
+   "gpu_check": {
+    "offloaded": "43/43",
+    "all_layers_on_gpu": true,
+    "model_buffers_mib": {
+     "CUDA0": 2883.51,
+     "CPU": 2208.0
+    },
+    "no_kernel_image": false,
+    "ok": true
+   },
+   "warmup_seconds": 0.8,
+   "started": true,
+   "gpu_ok": true,
+   "rc": 1,
+   "out_dir": "<repo>/.work/out-20261102-1220/run_6GB-2",
+   "peak_mib": 3592,
+   "v_checks": {
+    "all_answered": false,
+    "longest_ok": true,
+    "no_oom": true,
+    "no_preemption": true,
+    "within_budget": true,
+    "missing": [
+     "Q011"
+    ],
+    "ok": false,
+    "note": "Issue #1 6GB 実機"
+   },
+   "slot_n_ctx": [
+    3072
+   ],
+   "debug_active": 1779,
+   "oom_lines": 0,
+   "overflow_lines": 0,
+   "numbers": {
+    "n_q": 50,
+    "answer_failed": 1,
+    "M1_recall_at_5": 0.98,
+    "M2_mrr": 0.9667,
+    "M6_correctness": 0.9433,
+    "M7_permission": 1.0,
+    "M8_refusal": "15/16",
+    "M8_not_refused": [
+     "Q011"
+    ],
+    "ftl_p50": 5.76,
+    "ftl_p95": 27.471,
+    "total_p50": 6.219,
+    "total_p95": 30.353,
+    "total_max": Infinity,
+    "over_15s": [
+     "Q001",
+     "Q002",
+     "Q003",
+     "Q011",
+     "Q023",
+     "Q035",
+     "Q041",
+     "Q042",
+     "Q043",
+     "Q048"
+    ],
+    "decode_tps_median": 38.9,
+    "decode_tps_n": 49,
+    "N": {
+     "ok": 11,
+     "n": 12,
+     "wrong": [
+      "N09"
+     ]
+    }
+   },
+   "lines": {
+    "V": false,
+    "P": false,
+    "Q": false,
+    "N": false,
+    "all": false
+   }
+  }
+ ],
+ "index": {
+  "documents": 13,
+  "chunks": 40,
+  "seconds": 36.4
+ },
+ "measure": {
+  "max_prompt_tokens": 1907,
+  "max_id": "N07",
+  "n": 62,
+  "ctx": 8192,
+  "rc": 0,
+  "needed_ctx": 3072,
+  "gpu_check": {
+   "offloaded": "43/43",
+   "all_layers_on_gpu": true,
+   "model_buffers_mib": {
+    "CUDA0": 2883.51,
+    "CPU": 2208.0
+   },
+   "no_kernel_image": false,
+   "ok": true
+  },
+  "warmup_seconds": 1.8,
+  "precheck": {
+   "prompt_tokens": 22,
+   "content_chars": 11,
+   "reasoning_chars": 0,
+   "japanese": true,
+   "thinking_marks": false,
+   "ok": true
+  }
+ },
+ "server_args": [
+  "-m",
+  "gemma-4-E4B-it-Q4_K_M.gguf",
+  "-ngl",
+  "999",
+  "-c",
+  "3072",
+  "--jinja",
+  "--reasoning",
+  "off",
+  "-np",
+  "1",
+  "--alias",
+  "local-llm",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "8001",
+  "-v"
+ ],
+ "g0": {
+  "rerank": "off",
+  "fault_timeout": 15,
+  "ctx": 3072,
+  "gpu_check": {
+   "offloaded": "43/43",
+   "all_layers_on_gpu": true,
+   "model_buffers_mib": {
+    "CUDA0": 2883.51,
+    "CPU": 2208.0
+   },
+   "no_kernel_image": false,
+   "ok": true
+  },
+  "rc": 0,
+  "ok": true
+ },
+ "conversion_check": {
+  "runs": {
+   "6GB-1": {
+    "t4_tps": 51.1,
+    "bandwidth_gbs": {
+     "t4": 320.0,
+     "target": 168.0
+    },
+    "predicted_tps": 26.8,
+    "measured_tps": 41.1,
+    "ratio": 1.532,
+    "band": [
+     0.75,
+     1.25
+    ],
+    "within": false
+   },
+   "6GB-2": {
+    "t4_tps": 51.1,
+    "bandwidth_gbs": {
+     "t4": 320.0,
+     "target": 168.0
+    },
+    "predicted_tps": 26.8,
+    "measured_tps": 38.9,
+    "ratio": 1.45,
+    "band": [
+     0.75,
+     1.25
+    ],
+    "within": false
+   }
+  },
+  "within_all": false
+ },
+ "verdict_all_lines": false,
+ "code_commit": "d610858",
+ "code_check": "測定に使った WSL 側の evaluation/gpu_local/*・run_eval.py・colab/step05.py・corpus_index.py・rag_connection_check.py の blob が d610858 と一致することを git hash-object で確かめた",
+ "ran_at_jst": "2026-11-02 12:20-12:55（索引・入力長の測定・6GB-1・6GB-2・G0 の順）",
+ "attempts_lost": [
+  "11:55 索引の作成で qdrant-client が 5 秒で時間切れ (Qdrant 側は 5.8 秒で完了・WSL の ext4)。数える回の前の準備で止まった。保存先を /dev/shm に変えた",
+  "11:57 入力長の測定 (出力 1 トークン・数えない回) で Q029 が run_failed (型名なし)。決まりどおり止めた。型名を残すよう run_eval を直し、最初からやり直した"
+ ],
+ "environment": {
+  "host": "Windows 11 + WSL2 Ubuntu 22.04 (Docker は使わない。WSL に Docker 29.1.3 は入っているが止まっていた)・RTX 3050 6GB Laptop (WDDM・ドライバ 581.86・CUDA 13.0)",
+  "bandwidth": "96bit × 14Gbps = 168 GB/s (NVML のバス幅 96・最大メモリクロック 7001 MHz)",
+  "host_ram": "16 GB。6GB-2 の直後に Windows の空き 49 MB を確認 (WSL の VM・ブラウザなどで埋まっていた)",
+  "wsl_ram": "7.7 GB (WSL の既定)",
+  "idle_free_vram": "llama-server --list-devices で 6143 MiB 中 5154 MiB 空き (Windows の画面などが使う分)",
+  "llama_cpp": "配布版 b11836 ubuntu CUDA 12.8 をそのまま。Ubuntu 24.04 の公式 glibc 2.39 で起動 (evaluation/gpu_local/llama_server_noble.sh)",
+  "qdrant": "v1.12.6・保存先 /dev/shm"
+ }
+}
