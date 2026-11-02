@@ -1,6 +1,6 @@
 # 6GB 実機での Step 2（Issue #1・2026-11-02）
 
-学校 PC（RTX 3050 6GB Laptop・WSL2・Docker なし）で、T4 で一番近かった構成（Gemma 4 E4B Q4_K_M・考え OFF・C ON）を測った。
+学校 PC（RTX 3050 6GB Laptop・WSL2・Docker は使わない）で、T4 で一番近かった構成（Gemma 4 E4B Q4_K_M・考え OFF・C ON）を測った。
 線は Issue #1 の 11/2 のコメントで測る前に決めた（`docs/v2-light-model-plan.md` §1 の線のまま、V の予算だけ 6,144 − 512 = 5,632 MiB、P は換算しない）。
 測り方は `evaluation/gpu_local/`（コミット d610858）。回答の本文はリポジトリに入れていない。
 

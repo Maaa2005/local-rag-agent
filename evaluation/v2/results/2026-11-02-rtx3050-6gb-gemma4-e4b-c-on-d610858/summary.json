@@ -291,7 +291,7 @@
   "11:57 入力長の測定 (出力 1 トークン・数えない回) で Q029 が run_failed (型名なし)。決まりどおり止めた。型名を残すよう run_eval を直し、最初からやり直した"
  ],
  "environment": {
-  "host": "Windows 11 + WSL2 Ubuntu 22.04 (Docker なし)・RTX 3050 6GB Laptop (WDDM・ドライバ 581.86・CUDA 13.0)",
+  "host": "Windows 11 + WSL2 Ubuntu 22.04 (Docker は使わない。WSL に Docker 29.1.3 は入っているが止まっていた)・RTX 3050 6GB Laptop (WDDM・ドライバ 581.86・CUDA 13.0)",
   "bandwidth": "96bit × 14Gbps = 168 GB/s (NVML のバス幅 96・最大メモリクロック 7001 MHz)",
   "host_ram": "16 GB。6GB-2 の直後に Windows の空き 49 MB を確認 (WSL の VM・ブラウザなどで埋まっていた)",
   "wsl_ram": "7.7 GB (WSL の既定)",

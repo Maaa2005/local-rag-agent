@@ -1,4 +1,4 @@
-"""Step 2 の測り方を手元の Linux GPU (WSL2 など・Docker なし) で流す。Issue #1 の 6GB 実機用。
+"""Step 2 の測り方を手元の Linux GPU (WSL2 など・Docker を使わない) で流す。Issue #1 の 6GB 実機用。
 
 evaluation/colab/step2_measure_llamacpp.ipynb @ 88cd974 (Gemma 4 E4B Q4_K_M・考え OFF・C ON) と同じ手順:
 索引 → 入力トークン数の測定 (ctx 8192・出力 1) → 必要な文脈で別々に起動して 62 問 × runs 回 → G0 → summary.json。
