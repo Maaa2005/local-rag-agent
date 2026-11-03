@@ -27,10 +27,23 @@ _A = r"(?<![A-Za-z0-9_])"
 _Z = r"(?![A-Za-z0-9_])"
 _MONTHS = _A + r"(?i:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*"
 
+# よくある姓（Issue #17・11/3）。敬称の無い人名（「佐藤の経費」「山田太郎の行」）用。開発用の集合から
+# 選んだのではなく、全国でよくある姓の上位から 2 字以上の物を取り、都道府県名と同じ物（山口・石川・千葉・
+# 宮崎・福島など）は地域の値と紛れるので除いた。このリポの日本語の文書 2,654 行で当たったのは本物の人名の
+# 2 行だけ（11/3 測定）。一覧に無い姓・名だけ・ひらがなの人名は拾えない（残る危険・#17）
+_SURNAMES = """
+    佐藤 鈴木 高橋 田中 伊藤 渡辺 渡邊 渡邉 山本 中村 小林 加藤 吉田 山田 佐々木 松本 井上 木村 斎藤 斉藤 齋藤 清水 山崎 池田 橋本 阿部 山下 中島 石井 小川 前田 岡田 長谷川
+    藤田 後藤 近藤 村上 遠藤 青木 坂本 福田 太田 西村 藤井 金子 岡本 藤原 中野 三浦 原田 中川 松田 竹内 小野 田村 中山 和田 石田 森田 上田 内田 柴田 酒井 横山 高木 安藤
+    宮本 大野 小島 谷口 今井 工藤 高田 増田 丸山 杉山 村田 大塚 新井 小山 平野 藤本 河野 上野 野口 武田 松井 岩崎 菅原 木下 久保 佐野 野村 松尾 市川 菊地 杉本 古川 大西
+    島田 水野 桜井 高野 渡部 吉川 西田 飯田 菊池 西川 小松 北村 安田 五十嵐 川口 平田 中田 久保田 服部 岩田 土屋 川崎 本田 樋口 秋山 田口 永井 中西 吉村 石原 大橋 松岡 馬場
+    浅野 荒木 大久保 野田 小池 松下 浅井 菅野 熊谷 大石 川村 望月 星野 内藤
+""".split()
+
 # (名前, 正規表現, 空白を除いた写しにも当てるか)
 REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
     ("employee_id", re.compile(_A + r"([Ee]-?\d{3,}|(?i:emp)-?\d{2,})|社員(番号|ID|コード|No\.?)\s*[:=は]?\s*([A-Za-z]{0,3}-?\d+|[〇一二三四五六七八九]+)"), True),
     ("person_name", re.compile(r"[一-龥]{1,4}(さん|くん|氏|(?<![仕同模多各異一皆])様)"), True),
+    ("person_surname", re.compile("(" + "|".join(sorted(_SURNAMES, key=len, reverse=True)) + ")"), True),
     ("counterparty", re.compile(r"([A-Z]社|株式会社|有限会社|合同会社|\(株\)|\(有\)|[一-龥ァ-ヶー]{1,8}(商事|物産|製作所|銀行|証券)|"
                                 + _A + r"(Inc\.|Corp\.|Co\.,?\s*Ltd\.?|LLC)" + _Z + ")"), True),
     ("email", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), True),
@@ -70,7 +83,7 @@ REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
 _SCRIPT_PREFIXES = ("LATIN ", "HIRAGANA ", "KATAKANA ", "CJK UNIFIED IDEOGRAPH", "CJK COMPATIBILITY IDEOGRAPH")
 _SCRIPT_EXTRA = frozenset("々〆ーゝゞヽヾ")
 
-CUES_VERSION = question_version("request-cues@3", {
+CUES_VERSION = question_version("request-cues@4", {
     "normalize": NORMALIZE_VERSION,
     "cues": [(n, p.pattern, p.flags, c) for n, p, c in REQUEST_CUES],
     "scripts": {"letters": list(_SCRIPT_PREFIXES), "extra": sorted(_SCRIPT_EXTRA)},

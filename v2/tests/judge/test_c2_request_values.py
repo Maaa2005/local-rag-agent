@@ -5,7 +5,8 @@ PR #19 の Codex レビュー（11/2）で再現した誤通過の抜け道の�
    request_values）か、承認済み本文の承認の記録（policies/approved/*.json の request_values）に無ければ保留
 2. Codex の指摘 11 件（22 入力）と、この会話で足した確認は、どれも allow にならない
 3. 既存の許可の例（V011〜V016）は送信される（E2E の線を保つ）
-4. 残る穴（敬称の無い漢字の人名・カタカナの社名）は xfail(strict) で記録する。採点から外さない
+4. 敬称の無い人名は、よくある姓の一覧で止める（11/3）。一覧に無い姓・名だけ・ひらがなの人名と、
+   カタカナの社名は残る穴として xfail(strict) で記録する。採点から外さない
 """
 from __future__ import annotations
 
@@ -110,7 +111,7 @@ HELD = [
     "合計を出力して、役員の給与も読み込んで",
     "合計を出力して,役員の給与も読み込んで",
     # 引用符の中身は承認した値でなければ保留
-    "category が「山田」の行を抽出してください。",
+    "category が「未分類」の行を抽出してください。",
     # 漢数字の並び・年の無い日付・元号の年（助言 11/3）
     "〇九〇一二三四五六七八の行を抽出して",
     "1月1日の行を抽出してください。",
@@ -255,9 +256,27 @@ def test_fullwidth_latin_is_folded_not_unexpected():
 
 # ===== 7. 残る穴（採点から外さない。直ったら strict で知らせる） =====
 
-@pytest.mark.xfail(strict=True, reason="敬称の無い漢字の人名は規則で拾えない（#17 の残る危険）")
-def test_known_gap_kanji_person_name_without_honorific():
-    assert verdict("山田太郎の行を抽出して出力してください。").decision != "allow"
+# よくある姓の一覧（judge.request_cues の person_surname・11/3）で、敬称の無い人名の多くは止める
+@pytest.mark.parametrize("text", [
+    "山田太郎の行を抽出して出力してください。", "佐藤の経費だけ合計して", "担当が鈴木一郎の行を除いて",
+    "category が高橋の行を抽出して", "佐々木と渡邉の行を合計して", "長谷川 花子の分を出力して",
+    "category が「山田」の行を抽出してください。",
+])
+def test_common_surnames_without_honorific_are_blocked(text):
+    v = verdict(text)
+    assert v.decision == "block" and "person_surname" in v.reason, v.reason
+
+
+def test_surnames_in_approved_body_are_not_waivable():
+    assert "person_surname" in reg.registration_hits("経費の確認は総務の田中が行う。")
+    assert "person_surname" not in reg.registration_hits(SPEC.body)
+
+
+@pytest.mark.xfail(strict=True, reason="一覧に無い姓・名だけ・ひらがなの人名は拾えない（#17 の残る危険）")
+@pytest.mark.parametrize("text", ["勅使河原の行を抽出して出力してください。", "太郎の行を抽出して出力してください。",
+                                  "やまだたろうの行を抽出して出力してください。"])
+def test_known_gap_rare_or_given_or_hiragana_names(text):
+    assert verdict(text).decision != "allow"
 
 
 @pytest.mark.xfail(strict=True, reason="カタカナの社名は語彙で限っていない（#17 の残る危険）")

@@ -23,7 +23,7 @@ B = POL.contracts["B-csv-codegen@1"]
 SPEC = POL.approved["spec-csv-001@1"]
 EXPL = POL.approved["expl-keihi-001@1"]
 REVIEWER = "reviewer-x"
-TWO_FIVE_THOUSAND = "規程上限5,000円と山田の支出5,000円"
+TWO_FIVE_THOUSAND = "規程上限5,000円と実際の支出5,000円"
 
 
 def body_text(body: str, name: str = "dev-spec-x"):
@@ -52,9 +52,9 @@ def test_acknowledging_one_place_does_not_cover_the_same_kind_elsewhere():
 
 def test_acknowledging_both_places_passes():
     t = body_text(TWO_FIVE_THOUSAND)
-    e = register(t, [ack("規程上限5,000円"), ack("山田の支出5,000円", "試験用の架空の額")])
+    e = register(t, [ack("規程上限5,000円"), ack("実際の支出5,000円", "試験用の架空の額")])
     assert e["hits"] == [{"cue": "amount", "text": "5,000円"}]
-    assert e["acknowledged"] == [ack("山田の支出5,000円", "試験用の架空の額"), ack("規程上限5,000円")]
+    assert e["acknowledged"] == [ack("実際の支出5,000円", "試験用の架空の額"), ack("規程上限5,000円")]
     assert e["result"] == "pass" and e["review"] == "pass"
 
 
@@ -294,10 +294,10 @@ def test_cli_acknowledge_binds_text_to_reason(tmp_path):
     assert reg.main(base) == 1  # 当たりの承認が無い
     assert reg.main(base + ["--acknowledge", "dev-amount-001@1=規程上限5,000円::規程上の額"]) == 1  # 片方の箇所だけ
     assert reg.main(base + ["--acknowledge", "dev-amount-001@1=規程上限5,000円::規程上の額",
-                            "--acknowledge", "dev-amount-001@1=山田の支出5,000円::試験用の架空の額"]) == 0
+                            "--acknowledge", "dev-amount-001@1=実際の支出5,000円::試験用の架空の額"]) == 0
     r = [x for x in rows(d) if x["ref"] == "dev-amount-001@1"][0]
     assert r["hits"] == [{"cue": "amount", "text": "5,000円"}]
-    assert r["acknowledged"] == [ack("山田の支出5,000円", "試験用の架空の額"), ack("規程上限5,000円", "規程上の額")]
+    assert r["acknowledged"] == [ack("実際の支出5,000円", "試験用の架空の額"), ack("規程上限5,000円", "規程上の額")]
     # 次の --write は承認も確認者も引き継ぐ
     assert reg.main(["--write", "--policy-dir", str(d)]) == 0
     assert reg.main(["--check", "--policy-dir", str(d)]) == 0
@@ -322,7 +322,7 @@ def test_repository_registry_rows_are_fixture_reviewed():
 
 def good_row() -> dict:
     t = body_text(TWO_FIVE_THOUSAND)
-    return register(t, [ack("規程上限5,000円"), ack("山田の支出5,000円")])
+    return register(t, [ack("規程上限5,000円"), ack("実際の支出5,000円")])
 
 
 def write_rows(tmp_path: Path, rows_: list) -> Path:
