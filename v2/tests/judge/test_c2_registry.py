@@ -58,9 +58,39 @@ def test_acknowledging_both_places_passes():
     assert e["result"] == "pass" and e["review"] == "pass"
 
 
-def test_text_covers_every_occurrence_in_the_body():
+def test_acknowledged_text_must_point_to_one_place():
+    # 2 回出る文字列の承認は、どの箇所か決まらないので拒否する（Codex レビュー 11/3 の 7）
     t = body_text(TWO_FIVE_THOUSAND)
-    assert register(t, [ack("5,000円")])["hits"] == [{"cue": "amount", "text": "5,000円"}]
+    with pytest.raises(reg.RegistrationRefused, match="2 times"):
+        register(t, [ack("5,000円")])
+
+
+def test_amount_hidden_by_spaces_is_not_covered_by_another_amount():
+    # 正規化した写しで金額が 1 つ当たっても、空白を除いた写しだけで当たる別の金額は外せない（Codex 11/3 の 5）
+    t = body_text("規程上限5,000円。実際の支払額1000 ド ル")
+    with pytest.raises(reg.RegistrationRefused, match="amount"):
+        register(t, [ack("規程上限5,000円")])
+
+
+def test_explicit_reviewer_replaces_the_inherited_one():
+    # 本番・封印用の登録で、開発用の確認者（fixture:dev）を実際の確認者に替えられる（Codex 11/3 の 8）
+    old = reg.load_registry(reg.DEFAULT_REGISTRY_PATH).entries
+    es = reg.build_entries(POL, checked_by="registry-build", reviewed_by="actual-reviewer", previous=old, re_review=True)
+    assert {e["reviewed_by"] for e in es} == {"actual-reviewer"}
+    # 確かめ直しを言わなければ、引き継げる行は前の確認者のまま（見ていない本文を確かめた扱いにしない）
+    es = reg.build_entries(POL, checked_by="registry-build", reviewed_by="actual-reviewer", previous=old)
+    assert {e["reviewed_by"] for e in es} == {"fixture:dev"}
+    with pytest.raises(reg.RegistrationRefused, match="re_review"):
+        reg.build_entries(POL, checked_by="registry-build", previous=old, re_review=True)
+
+
+def test_cli_re_review_replaces_reviewers(tmp_path):
+    d = policy_copy(tmp_path)
+    assert reg.main(["--write", "--policy-dir", str(d), "--reviewed-by", "first-reviewer"]) == 0
+    assert reg.main(["--write", "--policy-dir", str(d), "--reviewed-by", "second-reviewer", "--re-review"]) == 0
+    assert {r["reviewed_by"] for r in rows(d)} == {"second-reviewer"}
+    with pytest.raises(SystemExit):
+        reg.main(["--write", "--policy-dir", str(d), "--re-review"])
 
 
 def test_hit_must_fit_inside_the_range_not_just_touch_it():
@@ -72,7 +102,7 @@ def test_hit_must_fit_inside_the_range_not_just_touch_it():
 
 def test_hits_are_deduplicated_and_ordered_by_position():
     t = body_text("下限1万円、上限5,000円、再掲5,000円、期日2026-10-31")
-    e = register(t, [ack("1万円"), ack("5,000円"), ack("2026-10-31")])
+    e = register(t, [ack("1万円"), ack("上限5,000円"), ack("再掲5,000円"), ack("2026-10-31")])
     assert e["hits"] == [{"cue": "amount", "text": "1万円"}, {"cue": "amount", "text": "5,000円"},
                          {"cue": "real_date", "text": "2026-10-31"}]
 

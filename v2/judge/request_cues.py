@@ -20,8 +20,9 @@ import unicodedata
 from judge.base import question_version
 from judge.normalize import NORMALIZE_VERSION, compact_text, normalize_text
 
-_NOT_COND_AMOUNT = r"(?!\s*(を?超|以上|以下|未満|より(大き|小さ|多|少|高|安)))"
-_NOT_COND_DATE = r"(?!\s*日?\s*(以降|以前|から|まで|より(前|後)))"
+# 閉じ引用符をはさむ形（「10万円」を超える）も処理条件とみなす
+_NOT_COND_AMOUNT = r"(?![」』\"”’')\]]?\s*(を?超|以上|以下|未満|より(大き|小さ|多|少|高|安)))"
+_NOT_COND_DATE = r"(?![」』\"”’')\]]?\s*日?\s*(以降|以前|から|まで|より(前|後)))"
 # ASCII の語の境目（日本語の直後でも当たるように、\w ではなく ASCII だけで見る）
 _A = r"(?<![A-Za-z0-9_])"
 _Z = r"(?![A-Za-z0-9_])"
@@ -63,19 +64,24 @@ REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
     ("table_name", re.compile(r"(?<![A-Za-z0-9_.])(?!(?:pd|np|df|os|sys|re|csv|json|math|io|dt|datetime|pathlib|path|"
                               r"self|str|int|list|dict)\.)[A-Za-z_][A-Za-z0-9_]*\."
                               r"(?!(?:csv|py|txt|json|md|xlsx?)(?![A-Za-z0-9_]))[A-Za-z_][A-Za-z0-9_]*"), False),
-    # 英字の略語は大文字小文字を区別する（TOB が October に当たらないように）
+    # 「社内の」に英字の名前が続く（社内のテーブル名・列名・システム名。契約 B が禁じる。Codex 11/3）
+    ("internal_name", re.compile(r"社内(の|で使う|向けの|システムの)?\s*[A-Za-z_][A-Za-z0-9_]*"), True),
+    # 英字の略語は大文字小文字を問わず、ASCII の境目で見る（TOB が October に当たらないように）
     ("m_and_a", re.compile(_A + r"(?i:m&a|tob|mbo|lbo|mergers?|acquisitions?|takeovers?|buyouts?)" + _Z + r"|(買収|合併|出資比率|株式(を|の)?(段階)?(取得|譲渡|売却|買い増し|買い付け)|段階取得|"
                            r"資本(業務)?提携|事業譲渡|経営統合|子会社化)"), True),
     ("injection", re.compile(r"(前の指示(は|を)?無視|指示(は|を)無視|指示を(すべて|全部)?忘れ|これまでの(指示|命令)|"
-                             r"(ignore|disregard)\s*(all\s*)?(the\s*)?(previous|prior|above)|システムプロンプト|system\s*prompt|全文を出力)", re.I), True),
+                             r"(ignore|disregard)\s*(all\s*)?(the\s*)?(previous|prior|above)|システムプロンプト|system\s*prompt|全文を出力|"
+                             r"(従来|以前|これまで|上記|先)の(命令|指示|ルール|設定)|(命令|指示|ルール|制約)(を|は)?(破棄|撤回|取り消|リセット|上書き|解除))", re.I), True),
     ("gate_override", re.compile(r"(送信(ゲート|前の(審査|検査|確認))|審査の対象外|(検査|審査|判定)(を|の|は)?(対象外|通過済|免除|不要|省略|スキップ)|"
                                  r"(安全|許可|問題(が)?ない|問題なし)と(判定|判断|みな)|判定する側|判定(者|役|モデル)(へ|に)の?指示|"
-                                 r"(答え|回答|判定)は「?(はい|いいえ|yes|no|allow|許可)」?と(して|する)|確認済みです|承認済みです)", re.I), True),
+                                 r"(答え|回答|判定)は「?(はい|いいえ|yes|no|allow|許可)」?と(して|する)|確認済みです|承認済みです|"
+                                 r"(判定|審査|検査|承認)(結果)?(は|を)?(必ず|常に|すべて|全部)?\s*(許可|通過|合格|allow|ok)(に|と|で)(して|する)|"
+                                 r"添付(は|を)?\S{0,12}として)", re.I), True),
     ("forged_heading", re.compile(r"^\s*(-{3,}\s*$|区分\s*:|仕様\s*:|依頼\s*:|説明文\s*:|(system|user|assistant)\s*:|\[(system|user)\])",
                                   re.I | re.M), False),
     ("constraint_override", re.compile(r"(条件|制約|仕様|ルール)(は|を)?(すべて|全部)?(外し|無視し|守らなく|破っ|緩め|気にしなく)"), True),
     # 承認済み本文の ID@版・sha256 を書く（添付や区分を装う。ID 自体も社内コード）
-    ("provenance_forgery", re.compile(r"((?<![A-Za-z0-9_-])(?i:[a-z][a-z0-9]*(-[a-z0-9]+)+)@\d+(?![A-Za-z0-9_])|(?<![0-9a-fA-F])[0-9a-fA-F]{64}(?![0-9a-fA-F]))"),
+    ("provenance_forgery", re.compile(r"((?<![A-Za-z0-9_.-])(?i:[a-z][a-z0-9_]*(-[a-z0-9_]+)*)@\d+(?![A-Za-z0-9_.])|(?<![0-9a-fA-F])[0-9a-fA-F]{64}(?![0-9a-fA-F]))"),
      False),
 ]
 
@@ -83,7 +89,7 @@ REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
 _SCRIPT_PREFIXES = ("LATIN ", "HIRAGANA ", "KATAKANA ", "CJK UNIFIED IDEOGRAPH", "CJK COMPATIBILITY IDEOGRAPH")
 _SCRIPT_EXTRA = frozenset("々〆ーゝゞヽヾ")
 
-CUES_VERSION = question_version("request-cues@4", {
+CUES_VERSION = question_version("request-cues@5", {
     "normalize": NORMALIZE_VERSION,
     "cues": [(n, p.pattern, p.flags, c) for n, p, c in REQUEST_CUES],
     "scripts": {"letters": list(_SCRIPT_PREFIXES), "extra": sorted(_SCRIPT_EXTRA)},
@@ -103,8 +109,14 @@ def cue_spans(text: str) -> tuple[list[tuple[str, int, int, str]], list[str]]:
     n = normalize_text(text)
     c = compact_text(n)
     spans = [(name, m.start(), m.end(), m.group(0)) for name, pat, _ in REQUEST_CUES for m in pat.finditer(n)]
-    found = {s[0] for s in spans}
-    compact_only = [name for name, pat, compact in REQUEST_CUES if compact and name not in found and pat.search(c)]
+    compact_only = []
+    for name, pat, compact in REQUEST_CUES:
+        if not compact:
+            continue
+        # 正規化した写しで同じ種類が当たっていても、空白を除いた写しにしか無い当たりがあれば別の箇所
+        seen = {compact_text(m.group(0)) for m in pat.finditer(n)}
+        if any(compact_text(m.group(0)) not in seen for m in pat.finditer(c)):
+            compact_only.append(name)
     return spans, compact_only
 
 

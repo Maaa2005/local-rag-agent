@@ -10,7 +10,7 @@
 契約 A は送信内容がほぼ承認済み本文だけなので、ここが唯一の内容検査になる。
 
 承認は本文の箇所に結ぶ（本人決定 11/3）。承認は {"text": 本文中の文字列, "reason": 理由} で、外せる種類
-（WAIVABLE: 規程上の額・日付など、実データでない値）の当たりだけを、その text の出現の範囲にまるごと入る
+（WAIVABLE: 規程上の額・日付など、実データでない値）の当たりだけを、その text（本文に 1 回だけ出る物）の範囲にまるごと入る
 場合に限って外す。同じ種類の別の箇所の当たりは通らない。それ以外の種類（個人情報・社名・社内のテーブル名・
 M&A・注入など）、空白を除いた写しだけでの当たり、文字種の当たりは、承認では外せず登録を拒否する。
 text が正規化した本文に出てこない承認は記録の誤りとして拒否する。当たらない承認は拒否しない。
@@ -61,6 +61,7 @@ REGISTRATION_CHECK_SPEC = {
     "unexpected_script": "judge.request_cues.unexpected_letters",
     "waivable": sorted(WAIVABLE),  # これ以外の種類・空白を除いた写しだけの当たり・文字種の当たりは外せない
     "acknowledgement_unit": "span",  # 承認の text の出現の範囲に、当たりの範囲がまるごと入る
+    "acknowledgement_unique": True,  # 承認の text は本文に 1 回だけ出る（1 か所に結ぶ）
     "human_review": "reviewed_by is non-empty and differs from approver and checked_by; review is pass",
 }
 REGISTRATION_CHECK_VERSION = question_version("c2-registration@3", REGISTRATION_CHECK_SPEC)
@@ -134,6 +135,11 @@ def _checked_row(approved: ApprovedText, contract: Contract, destination: str,
     absent = [t for t, _ in ack if t not in n]
     if absent:
         raise RegistrationRefused(f"{approved.key}: acknowledged text is not in the normalized body: {absent}")
+    # 承認は本文の 1 か所に結ぶ。2 回以上出る文字列は、前後の語を足して 1 か所に決める（Codex 11/3）
+    many = [f"{t} ({len(_occurrences(n, t))} times)" for t, _ in ack if len(_occurrences(n, t)) > 1]
+    if many:
+        raise RegistrationRefused(f"{approved.key}: acknowledged text must point to one place; it occurs {many}. "
+                                  "Include the words around it")
 
     spans, compact_only, scripts = registration_findings(approved.body)
     fixed = sorted({s[0] for s in spans if s[0] not in WAIVABLE} | set(compact_only)
@@ -183,7 +189,7 @@ def register(approved: ApprovedText, contract: Contract, destination: str, *,
 
 def build_entries(policy: Policy, *, checked_by: str, reviewed_by: str | None = None,
                   acknowledged: Mapping[str, Sequence[Mapping[str, str]]] | None = None,
-                  previous: Iterable[Mapping[str, Any]] = ()) -> list[dict[str, Any]]:
+                  previous: Iterable[Mapping[str, Any]] = (), re_review: bool = False) -> list[dict[str, Any]]:
     """policies/ の承認済み本文のすべての使い道（承認と契約の両方が許す契約×宛先）を登録する。
 
     previous（今の登録簿）に、同じ使い道・本文・承認・依頼文に書いてよい値の行があれば、その checked_by と
@@ -208,7 +214,12 @@ def build_entries(policy: Policy, *, checked_by: str, reviewed_by: str | None = 
                     if inherited is None and reviewed_by is None:
                         raise RegistrationRefused(
                             f"{a.key} ({ck}/{d}): reviewed_by is required for a row that cannot carry one over")
-                    e["checked_by"], e["reviewed_by"] = inherited or (checked_by, reviewed_by)
+                    if re_review and reviewed_by is None:
+                        raise RegistrationRefused("re_review needs reviewed_by")
+                    # re_review（全部の本文を確かめ直した）なら、引き継げる行も reviewed_by に替える。
+                    # 開発用の fixture:dev を、封印用・本番で実際の確認者に替えるため（Codex 11/3）
+                    e["checked_by"] = inherited[0] if inherited else checked_by
+                    e["reviewed_by"] = reviewed_by if (re_review or inherited is None) else inherited[1]
                     why = _people_problem(a, e["checked_by"], e["reviewed_by"])
                     if why is not None:
                         raise RegistrationRefused(f"{a.key} ({ck}/{d}): {why}")
@@ -328,9 +339,13 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--checked-by", default="registry-build", help="新しく登録・承認した行に残す承認をした人")
     ap.add_argument("--reviewed-by", default=None,
                     help="新しく登録した行に残す、本文の全文を確かめた人（承認者・--checked-by と別人。--write のとき）")
+    ap.add_argument("--re-review", action="store_true",
+                    help="--reviewed-by の人が全部の本文を確かめ直した。引き継げる行の確認者も替える（--write のとき）")
     a = ap.parse_args(argv)
-    if not a.write and (a.acknowledge or a.reviewed_by is not None):
-        raise SystemExit("--acknowledge and --reviewed-by are only for --write")
+    if not a.write and (a.acknowledge or a.reviewed_by is not None or a.re_review):
+        raise SystemExit("--acknowledge, --reviewed-by and --re-review are only for --write")
+    if a.re_review and a.reviewed_by is None:
+        raise SystemExit("--re-review needs --reviewed-by")
     ack_new = _parse_ack(a.acknowledge)
     path = a.registry or a.policy_dir / "c2_registry.json"
     pol = load_policy(a.policy_dir)
@@ -348,7 +363,7 @@ def main(argv: list[str] | None = None) -> int:
     ack.update(ack_new)
     try:
         entries = build_entries(pol, checked_by=a.checked_by, reviewed_by=a.reviewed_by, acknowledged=ack,
-                                previous=old.entries if old else ())
+                                previous=old.entries if old else (), re_review=a.re_review)
     except RegistrationRefused as e:
         print(f"refused: {e}", file=sys.stderr)
         return 1

@@ -42,7 +42,7 @@ _QUOTED = re.compile(r"「([^」]*)」|『([^』]*)』|\"([^\"]*)\"|“([^”]*)
 
 # 切り出しの版（ゲートの question_version に入れる。切り出しを変えると版が変わる）
 VALUES_SPEC = {"word": _WORD.pattern, "number": _NUMBER.pattern, "kanji_number": _KANJI_NUMBER.pattern,
-               "era_year": _ERA_YEAR.pattern, "quoted": _QUOTED.pattern, "word_parts": "split on _",
+               "era_year": _ERA_YEAR.pattern, "quoted": _QUOTED.pattern, "word_parts": "whole word, else split on _",
                "quoted_rest": r"[^\s.,:;/・-]", "approved_value": "whole occurrence covers the token"}
 VALUES_VERSION = question_version("request-values@1", VALUES_SPEC)
 
@@ -88,6 +88,9 @@ def _inside(span: tuple[int, int], covered: Sequence[tuple[int, int]]) -> bool:
 
 
 def _word_ok(word: str, known: frozenset[str]) -> bool:
+    """語全体が一覧にあれば可（to_datetime・drop_duplicates）。無ければ _ で区切った各部分を見る。"""
+    if word.lower() in known:
+        return True
     parts = [p for p in word.lower().split("_") if p]
     return bool(parts) and all(p in known for p in parts)
 

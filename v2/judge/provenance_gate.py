@@ -52,6 +52,11 @@ DEFAULT_TABLES_PATH = DEFAULT_POLICY_DIR / "c2_tables.json"
 TABLES_FORMAT = "c2-tables@1"
 # 区切り: 句点・感嘆符・疑問符・セミコロン・改行・読点と、英字に挟まれていない ,（month,category は区切らない）
 _SENTENCE_END = re.compile(r"(?:[。!?;\n、]|,(?![ ]*[A-Za-z0-9_])|(?<![A-Za-z0-9_]),)+")
+# 種類の無い区切りでも、助詞で終わる修飾（「category ごとに、」「amount が負の行は、」）は後ろの区切りに結ぶ。
+# 動詞のて形（「読み込んで、」）で終わる区切りは結ばない（付け足しの依頼になるため）。Codex 11/3
+_MODIFIER_END = re.compile(r"(ごとに|ごとの|別に|単位で|について|に対して|に関して|場合は?|なら(ば)?|では|には|からは|までは|"
+                           r"ときは|際は|は|に|から|まで|より|で|を|も|と)$")
+_TE_FORM = re.compile(r"(て|[んい]で)$")
 
 __all__ = ["MODEL", "REQUEST_CUES", "DEFAULT_TABLES_PATH", "ProvenanceC2Gate", "Tables", "load_tables",
            "normalize_request", "request_cue_hits"]
@@ -88,14 +93,23 @@ class Tables:
         kinds: list[str] = []
         unknown: list[int] = []
         sentences = [s.strip(" 、,") for s in _SENTENCE_END.split(normalize_request(request))]
-        for i, s in enumerate(x for x in sentences if x):
+        clauses = [x for x in sentences if x]
+        pending: int | None = None  # 後ろの区切りに結ぶのを待っている修飾の区切り
+        for i, s in enumerate(clauses):
             c = compact_text(s)  # 「r e q u e s t s」のように語を空白で割る言い換え用
             hit = [name for name, pat in k.rules if pat.search(s) or pat.search(c)]
             if hit:
                 kinds.extend(h for h in hit if h not in kinds)
-            elif k.neutral is None or not (k.neutral.fullmatch(s) or k.neutral.fullmatch(c)):
+                pending = None
+            elif k.neutral is not None and (k.neutral.fullmatch(s) or k.neutral.fullmatch(c)):
+                continue
+            elif i < len(clauses) - 1 and _MODIFIER_END.search(s) and not _TE_FORM.search(s):
+                pending = i if pending is None else pending
+            else:
                 unknown.append(i)
-        return kinds, unknown
+        if pending is not None:
+            unknown.append(pending)
+        return kinds, sorted(unknown)
 
 
 def _compile(where: str, pattern: Any) -> re.Pattern[str]:
@@ -158,12 +172,14 @@ class ProvenanceC2Gate:
             "cues": CUES_VERSION,  # 正規化・手がかり語・文字種
             "canonical": "template parts via orchestrator.candidate._render@1",
             "sentences": _SENTENCE_END.pattern,
+            "modifier": [_MODIFIER_END.pattern, _TE_FORM.pattern],
             "registration_check": REGISTRATION_CHECK_VERSION,
             "registry_sha256": self.registry.sha256,
             "tables": self.tables.canonical,
             "request_values": VALUES_VERSION,  # 自由な値の切り出し
-            "approved_request_values": {k: [list(a.request_identifiers), [t for t, _ in a.request_values]]
-                                        for k, a in sorted(self.policy.approved.items())},
+            # 承認者も版に入れる（全文確認者が承認者と別人かをこの承認者で見るため）
+            "approved_records": {k: [a.approver, list(a.request_identifiers), [t for t, _ in a.request_values]]
+                                 for k, a in sorted(self.policy.approved.items())},
         }
         self.question_version = question_version("provenance-c2@3", self._qv_spec)
 
@@ -215,6 +231,8 @@ class ProvenanceC2Gate:
                 if a is not None and rv != {"identifiers": list(a.request_identifiers),
                                             "values": [t for t, _ in a.request_values]}:
                     holds.append(f"{ref} request values differ from the registry (register again)")
+                if a is not None and e["reviewed_by"].strip() == a.approver.strip():
+                    holds.append(f"{ref} full-text reviewer is the approver (needs another person)")
                 body_ids += rv["identifiers"]
                 body_values += rv["values"]
 
