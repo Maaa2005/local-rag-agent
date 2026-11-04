@@ -130,3 +130,119 @@ def test_step2_local_defaults_match_issue_lines():
     assert args.runs == 2
     assert args.bandwidth_gbs == 168.0
     assert step2_local.T4_TPS == 51.1 and step2_local.T4_BW_GBS == 320.0
+
+
+# ─── Issue #14 E3 ───
+
+def _e3_rec(**over):
+    rec = {
+        "started": True, "gpu_ok": True, "oom_lines": 0, "overflow_lines": 0,
+        "lazy_lines": ["per_layer_token_embd.weight (size = 1848 MiB) lazy read enabled"],
+        "v_checks": {"all_answered": True},
+        "numbers": {"ftl_p50": 1.2, "total_p95": 6.0, "M6_correctness": 0.9533333333333333,
+                    "M8_refusal": "16/16", "N": {"ok": 11, "n": 12, "wrong": ["N09"]}},
+        "pressure": {"valid": True, "floor_releases": 0, "exited_early": False},
+    }
+    for k, v in over.items():
+        if isinstance(v, dict) and isinstance(rec.get(k), dict):
+            rec[k] = {**rec[k], **v}
+        else:
+            rec[k] = v
+    return rec
+
+
+def test_e3_passes_at_the_lines():
+    got = summary.e3_line_checks(_e3_rec(numbers={"ftl_p50": 5.0, "total_p95": 12.0}), expect_lazy=True)
+    assert got == {"valid": True, "verdict": "通る", "lines": {
+        "L1_complete": True, "L2_ftl_p50": True, "L3_total_p95": True, "L4_quality": True, "all": True}}
+
+
+@pytest.mark.parametrize("over, line", [
+    ({"numbers": {"ftl_p50": 5.01}}, "L2_ftl_p50"),
+    ({"numbers": {"total_p95": 12.001}}, "L3_total_p95"),
+    ({"numbers": {"total_p95": float("inf")}}, "L3_total_p95"),
+    ({"v_checks": {"all_answered": False}}, "L1_complete"),
+    ({"oom_lines": 1}, "L1_complete"),
+    ({"lazy_lines": []}, "L1_complete"),
+    ({"numbers": {"N": {"ok": 10, "n": 12}}}, "L4_quality"),
+    ({"numbers": {"M8_refusal": "15/16"}}, "L4_quality"),
+    ({"numbers": {"M6_correctness": 0.95}}, "L4_quality"),
+])
+def test_e3_each_line_fails(over, line):
+    got = summary.e3_line_checks(_e3_rec(**over), expect_lazy=True)
+    assert got["lines"][line] is False and got["verdict"] == "落ちる"
+
+
+def test_e3_a0_does_not_need_lazy_lines():
+    assert summary.e3_line_checks(_e3_rec(lazy_lines=[]), expect_lazy=False)["verdict"] == "通る"
+
+
+@pytest.mark.parametrize("pressure", [
+    {"valid": False}, {"floor_releases": 1}, {"exited_early": True}, None,
+])
+def test_e3_invalid_pressure_gives_no_verdict(pressure):
+    rec = _e3_rec()
+    rec["pressure"] = None if pressure is None else {**rec["pressure"], **pressure}
+    got = summary.e3_line_checks(rec, expect_lazy=True)
+    assert got["valid"] is False and got["verdict"] == "無効"
+
+
+def test_e3_reference_is_e2_a0():
+    import json
+    from pathlib import Path
+    s = json.loads((Path(__file__).resolve().parents[1] / "v2" / "results" /
+                    "2026-11-02-rtx3050-6gb-e1-e2-0d45e2e" / "summary.json").read_text(encoding="utf-8"))
+    a0 = s["E2"]["A0"]["numbers"]
+    assert summary.E3_REF_A0 == {"N_ok": a0["N"]["ok"], "N_n": a0["N"]["n"], "M8": a0["M8_refusal"],
+                                 "M6": a0["M6_correctness"]}
+
+
+def test_step2_local_pressure_is_off_by_default():
+    a = step2_local.parse_args(["--work", "w", "--out", "o"])
+    assert a.pressure_target_mib is None
+    a = step2_local.parse_args(["--work", "w", "--out", "o", "--pressure-target-mib", "1024"])
+    assert (a.pressure_target_mib, a.pressure_probe, a.pressure_valid_band_mib, a.pressure_floor_mib) == \
+        (1024, "windows", 256, 256)
+
+
+def test_step2_local_pressure_start_and_record(tmp_path):
+    """GPU なしで、絞る道具の起動・待ち・止め・区間のまとめだけを通す（Linux の空き・何も確保しない目標）。"""
+    import time
+
+    from evaluation.gpu_local import mem_pressure
+
+    b = step2_local.Bench.__new__(step2_local.Bench)
+    b.out = tmp_path
+    b.args = step2_local.parse_args(["--work", "w", "--out", str(tmp_path), "--pressure-probe", "linux",
+                                     "--pressure-target-mib", str(mem_pressure.linux_available_mib() + 100_000),
+                                     "--pressure-settle-s", "2"])
+    started = b.start_pressure("t")
+    assert started is not None
+    t0 = time.time()
+    time.sleep(1.5)
+    rec = b.pressure_record(started, (t0 - 5, time.time()))
+    assert started[0].returncode is not None  # 止まっている
+    assert rec["probe"] == "linux" and rec["n"] >= 1 and rec["held_max_mib"] == 0
+    assert rec["valid"] is False  # 目標に届かない回は無効
+    assert rec["exited_early"] is False and rec["before_free_mib"] > 0
+    assert b.start_pressure.__func__(type("B", (), {"args": step2_local.parse_args(
+        ["--work", "w", "--out", "o"])})(), "x") is None
+
+
+def test_step2_local_pressure_that_dies_is_marked_and_invalid(tmp_path):
+    """Windows の空きが読めない所（この試験の Linux）で windows を選ぶと道具は落ちる → 途中で落ちた・無効。"""
+    import shutil
+    import time
+
+    if shutil.which("powershell.exe"):
+        pytest.skip("WSL では powershell.exe が動くので落ちない")
+    b = step2_local.Bench.__new__(step2_local.Bench)
+    b.out = tmp_path
+    b.args = step2_local.parse_args(["--work", "w", "--out", str(tmp_path), "--pressure-target-mib", "1024",
+                                     "--pressure-settle-s", "20"])
+    t0 = time.time()
+    started = b.start_pressure("t")
+    assert time.time() - t0 < 15  # 落ちたら待ち続けない
+    rec = b.pressure_record(started, (t0, time.time()))
+    assert rec["exited_early"] is True and rec["valid"] is False
+    assert summary.e3_line_checks({"pressure": rec}, expect_lazy=False)["verdict"] == "無効"
