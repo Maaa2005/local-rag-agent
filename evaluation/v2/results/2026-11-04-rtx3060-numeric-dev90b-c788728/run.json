@@ -1,0 +1,48 @@
+{
+  "format": "numeric-sealed-run@1",
+  "dev": true,
+  "runs": 2,
+  "n": 90,
+  "set_sha256": "7ad0d248c1c60ca496e94783c09df2b58848bbabb052a82bedd8b01bcb8b0916",
+  "freeze_sha256": "28fbe8639add57f8649c0234fa5eb4673170e5381415aa7831f8ccc55f5a90aa",
+  "unable_rules": [
+    "第2条 入社後6か月の経過を入社日と届出日から出す",
+    "第4条 繁忙期を開始日の日付から判定する",
+    "手当額の1円未満の切り捨て",
+    "勤続月数を入社日と婚姻日から出す（第3条2項）",
+    "会計時刻による利用の選別（午前11時〜午後2時）",
+    "1日2回以上の利用を1回と数える読み替え",
+    "登録前の利用を回数・金額に数えない",
+    "休暇の日を出張・在宅勤務の日数に含めない",
+    "補助額（利用1回につき150円）",
+    "支給時期（翌月の給与支給日）",
+    "第2条 適用範囲（社員が講師を務める場合には適用しない）",
+    "第3条 A の1円未満の切り捨て",
+    "第6条 退職後2年以内（年数・月数で書かれた時）"
+  ],
+  "ctx": 4096,
+  "server_extra": [
+    "--cache-ram",
+    "1024"
+  ],
+  "conditions": {
+    "conclusion_options_given_first": true,
+    "retrieval": false,
+    "no_card_goes_to_model": false
+  },
+  "baseline_mib": 2525,
+  "rounds": {
+    "1": {
+      "available_before_mib": 3591,
+      "launch_seconds": 11.7,
+      "eval_seconds": 536.8,
+      "oom_lines": 0,
+      "overflow_lines": 0,
+      "peak_gpu_mib": 6876
+    }
+  },
+  "min_available_mib": 149,
+  "peak_rss_mib": {
+    "llama": 4080
+  }
+}

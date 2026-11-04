@@ -1,0 +1,92 @@
+{
+  "format": "numeric-sealed-freeze@1",
+  "allow_draft": true,
+  "cards_dir": "C:\\Users\\mtkzi\\.cache\\lr-gpu\\dev90b\\cards",
+  "cards": [
+    {
+      "id": "fukugyo-kakutei-shinkoku",
+      "status": "draft"
+    },
+    {
+      "id": "fukugyo-todokede-juri",
+      "status": "draft"
+    },
+    {
+      "id": "keicho-kekkon-iwaikin",
+      "status": "draft"
+    },
+    {
+      "id": "saikensa-hojo",
+      "status": "draft"
+    },
+    {
+      "id": "saikensa-shinsei-kigen",
+      "status": "draft"
+    },
+    {
+      "id": "shagai-koshi-sharei-kessai",
+      "status": "draft"
+    },
+    {
+      "id": "shokudo-hojo-deru",
+      "status": "draft"
+    },
+    {
+      "id": "shokudo-hojo-ka",
+      "status": "draft"
+    },
+    {
+      "id": "shokudo-hojo-moraeru",
+      "status": "draft"
+    },
+    {
+      "id": "shokudo-hojo-shikyu",
+      "status": "draft"
+    },
+    {
+      "id": "zaitaku-teate-shikyu",
+      "status": "draft"
+    }
+  ],
+  "files": {
+    "fukugyo-kakutei-shinkoku.json": "7f0815393abb1fbc7a4947e9ff2ebdef7b8e7d1ae1b306cbf469d8040abcddf9",
+    "fukugyo-todokede-juri.json": "48a32bdf5f180d532d29d50615a4d46286a19e8e8370fd1278e951ffeba3d5f0",
+    "keicho-kekkon-iwaikin.json": "a1221dadf9fee9b6f9858c0b4913fd6c0cc85fd524e6396fe69928db68ecb903",
+    "saikensa-hojo.json": "f24b17f58c2674fdcff57e79ad31c80749012fc3dec432dd5f3a60227209ae69",
+    "saikensa-shinsei-kigen.json": "68a260dca643854a698a92abdf88121652e25fee14a196aaf9a5f0fa047814d2",
+    "shagai-koshi-sharei-kessai.json": "1d732a47ee42bbaf999ae13b17cad93669dbfce511a4a43479bf38a3e211a5d0",
+    "shokudo-hojo-deru.json": "c426f7e73f967cf80e2225495bca1f78d3f99ef863d7eb8b6c1374c38362fb78",
+    "shokudo-hojo-ka.json": "076e72bd65c2b07ce2600d1065a93f2ffc441dfe83d95dced38c97ecfb9ae2d9",
+    "shokudo-hojo-moraeru.json": "ab9ff346b6e8310f29c6f85420b410fe955c05a7dcc869b1304e71dee0ba7edf",
+    "shokudo-hojo-shikyu.json": "3e4960e9d4a33d547f544614711c764cc32330aaac50e4941d5db9ef3711f070",
+    "unable.json": "0d8df5b0a16cf03b86f71e10407546ff10f64e9d52ce63dcd69938f1effb7893",
+    "zaitaku-teate-shikyu.json": "f1288f9d81b9d448ec224a1ed9927e9e0b2f799d221c0f16878347dc6896f498"
+  },
+  "unable": {
+    "present": true,
+    "rules": [
+      "第2条 入社後6か月の経過を入社日と届出日から出す",
+      "第4条 繁忙期を開始日の日付から判定する",
+      "手当額の1円未満の切り捨て",
+      "勤続月数を入社日と婚姻日から出す（第3条2項）",
+      "会計時刻による利用の選別（午前11時〜午後2時）",
+      "1日2回以上の利用を1回と数える読み替え",
+      "登録前の利用を回数・金額に数えない",
+      "休暇の日を出張・在宅勤務の日数に含めない",
+      "補助額（利用1回につき150円）",
+      "支給時期（翌月の給与支給日）",
+      "第2条 適用範囲（社員が講師を務める場合には適用しない）",
+      "第3条 A の1円未満の切り捨て",
+      "第6条 退職後2年以内（年数・月数で書かれた時）"
+    ],
+    "sha256": "0d8df5b0a16cf03b86f71e10407546ff10f64e9d52ce63dcd69938f1effb7893"
+  },
+  "prompt": {
+    "path": "evaluation/v2/rule_cards/draft_prompt.md",
+    "sha256": "959ee985a01020831ecbdf327126d1f7817d4bcd142b7ad44e60f7111800beb9"
+  },
+  "rule_cards_py": {
+    "path": "backend/app/services/rule_cards.py",
+    "sha256": "1050a4a8e3559aefea07724c3a911e8ee90b6c4cd60062c460f7bbbddd8dc27f"
+  }
+}
