@@ -474,6 +474,7 @@ class OpenAICompatExtractor:
         self.last_stats: dict[str, Any] = {}  # 直前の 1 回の数（測定用）
 
     async def extract(self, messages: list[dict[str, str]], schema: dict[str, Any]) -> Any:
+        self.last_stats = {}  # 通信で落ちた問に前の問の数が残らないように
         resp = await self._client.chat.completions.create(
             model=self._model, messages=messages, temperature=0, max_tokens=512,
             response_format={"type": "json_schema", "json_schema": {"name": "slots", "schema": schema, "strict": True}},
