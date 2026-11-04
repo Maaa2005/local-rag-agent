@@ -24,6 +24,7 @@ import urllib.request
 from pathlib import Path
 
 from evaluation.colab import step05 as s5
+from evaluation.gpu_local import mem_pressure
 from evaluation.gpu_local import proc_mem
 from evaluation.gpu_local import summary as sm
 
@@ -97,6 +98,19 @@ def kill(proc: subprocess.Popen | None) -> None:
     proc.wait()
 
 
+def stop_gently(proc: subprocess.Popen | None, wait_s: float = 15.0) -> None:
+    """SIGTERM で止め (持ったメモリと powershell.exe を片付けさせる)、止まらなければ kill。"""
+    if proc is None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait(timeout=wait_s)
+    except ProcessLookupError:
+        pass
+    except subprocess.TimeoutExpired:
+        kill(proc)
+
+
 def read_mib() -> int:
     out = subprocess.run(["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
                          capture_output=True, text=True).stdout
@@ -158,6 +172,46 @@ class Bench:
                             "gguf": f"{GGUF_REPO}/{GGUF_FILE}", "quant": QUANT, "rerank": "off",
                             "numeric_check": "on", "note": "Issue #1 6GB 実機 (step2_local.py)"}
         log(f"{name} cap {cap} 全体 {self.total_mib} MiB / 起動前 {self.baseline} MiB / {self.server_ver}")
+
+    # ─── 本体のメモリを絞る (Issue #14 E3) ───
+    def start_pressure(self, label: str) -> tuple[subprocess.Popen, Path] | None:
+        """--pressure-target-mib のときだけ、空きを目標に保つ別のプロセスを起動し、空きが幅に入るまで待つ。"""
+        a = self.args
+        if a.pressure_target_mib is None:
+            return None
+        plog = self.out / f"pressure_{label}.jsonl"
+        proc = launch([sys.executable, "-m", "evaluation.gpu_local.mem_pressure", "--target-mib",
+                       str(a.pressure_target_mib), "--probe", a.pressure_probe, "--band-mib", "128",
+                       "--floor-mib", str(a.pressure_floor_mib), "--log", str(plog)],
+                      self.out / f"pressure_{label}.log")
+        t, steady = time.time(), 0
+        while time.time() - t < a.pressure_settle_s and proc.poll() is None:
+            rows = mem_pressure.load_log(plog)
+            last = rows[-1] if rows else None
+            ok = last is not None and abs(last["free_mib"] - a.pressure_target_mib) <= a.pressure_valid_band_mib
+            steady = steady + 1 if ok else 0
+            if steady >= 5:
+                break
+            time.sleep(1)
+        rows = mem_pressure.load_log(plog)
+        log(f"[{label}] 空き {rows[0]['free_mib'] if rows else '?'} → {rows[-1]['free_mib'] if rows else '?'} MiB"
+            f" (目標 {a.pressure_target_mib}・{a.pressure_probe}) {'安定' if steady >= 5 else '安定しない'}")
+        return proc, plog
+
+    def pressure_record(self, started: tuple[subprocess.Popen, Path] | None, window: tuple[float, float]) -> dict | None:
+        if started is None:
+            return None
+        proc, plog = started
+        # 止める前に終わっていたら途中で落ちた（OOM で消された時も含む）
+        exited_early = proc.poll() is not None
+        stop_gently(proc)
+        rows = mem_pressure.load_log(plog)
+        rec = mem_pressure.window_summary(rows, *window, self.args.pressure_target_mib,
+                                          self.args.pressure_valid_band_mib)
+        rec["probe"] = self.args.pressure_probe
+        rec["before_free_mib"] = rows[0]["free_mib"] if rows else None
+        rec["exited_early"] = exited_early
+        return rec
 
     # ─── 部品 ───
     def start_server(self, ctx: int, log_path: Path) -> tuple[subprocess.Popen, bool, dict, object]:
@@ -249,9 +303,15 @@ class Bench:
             return rec
         log_start = len(llog.read_text(errors="replace"))
         out_dir = self.out / f"run_{label}"
-        rc = self.run_eval(s5.eval_cmd(self.py, out_dir, meta={**self.meta_common, "budget": label,
-                                                               "budget_mib": budget, "ctx": ctx}),
-                           s5.eval_env(index["env"], BASE_URL, NUMERIC_CHECK_ENABLED=NUMERIC_CHECK), f"{label}:run")
+        pressure = self.start_pressure(label)
+        try:
+            rc = self.run_eval(s5.eval_cmd(self.py, out_dir, meta={**self.meta_common, "budget": label,
+                                                                   "budget_mib": budget, "ctx": ctx}),
+                               s5.eval_env(index["env"], BASE_URL, NUMERIC_CHECK_ENABLED=NUMERIC_CHECK),
+                               f"{label}:run")
+        finally:
+            run_window = self.windows.get(f"{label}:run", (time.time(), time.time()))
+            rec["pressure"] = self.pressure_record(pressure, run_window)
         text = llog.read_text(errors="replace")
         kill(proc)
         whole, run_part = s5.scan_llama_log(text), s5.scan_llama_log(text[log_start:])
@@ -306,7 +366,11 @@ class Bench:
                          "gguf": {"repo": GGUF_REPO, "file": GGUF_FILE, "revision": GGUF_REV}, "quant": QUANT,
                          "embedding": f"{os.environ.get('EMBED_MODEL', 'intfloat/multilingual-e5-large')} (CPU)",
                          "rerank": "off", "numeric_check": NUMERIC_CHECK, "server_extra": self.server_extra,
-                         "measure_only": self.args.measure_only, "runs": []}
+                         "measure_only": self.args.measure_only, "runs": [],
+                         "pressure": None if self.args.pressure_target_mib is None else {
+                             "target_mib": self.args.pressure_target_mib, "probe": self.args.pressure_probe,
+                             "valid_band_mib": self.args.pressure_valid_band_mib,
+                             "floor_mib": self.args.pressure_floor_mib}}
         qdrant = launch([self.qdrant_bin], self.out / "qdrant.log", q_env)
         try:
             # 起動しない時も finally で落とす (残ると次の回が古い Qdrant に繋がる)
@@ -362,6 +426,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="索引と入力長の測定 (出力 1 トークン) だけで止める。検索の指標とメモリを見る (Issue #14 E1)")
     p.add_argument("--server-extra", default="", help="llama-server に足す引数 (空白区切り。例: '-lzm on')")
     p.add_argument("--skip-g0", action="store_true")
+    # Issue #14 E3: 回答の回の間だけ、本体の空きを目標に保つ (evaluation/gpu_local/mem_pressure.py)
+    p.add_argument("--pressure-target-mib", type=int, default=None,
+                   help="回答の回の間に保つ空き (MiB)。E3 の S1 は 1024。無ければ絞らない (今までと同じ)")
+    p.add_argument("--pressure-probe", choices=["windows", "linux"], default="windows",
+                   help="どの空きを目標に合わせるか (WSL では Windows の空き)")
+    p.add_argument("--pressure-valid-band-mib", type=int, default=256,
+                   help="有効な回: 回答中の空きの中央値が 目標 ± この幅 (E3 で測る前に固定)")
+    p.add_argument("--pressure-floor-mib", type=int, default=256, help="これを下回ったら持った分を全部放す")
+    p.add_argument("--pressure-settle-s", type=float, default=180.0, help="空きが幅に入るまで待つ上限 (秒)")
     return p.parse_args(argv)
 
 

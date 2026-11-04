@@ -142,3 +142,41 @@ def conversion_check(t4_tps: float, t4_bw_gbs: float, target_bw_gbs: float, meas
         "band": list(band),
         "within": None if ratio is None else band[0] <= ratio <= band[1],
     }
+
+
+# ─── Issue #14 E3: 本体のメモリを絞った状態での遅れと失敗（測る前に固定した線） ───
+# 比べる基準は E2 の A0（2026-11-02・0d45e2e・evaluation/v2/results/2026-11-02-rtx3050-6gb-e1-e2-0d45e2e）。
+# 時間の線は docs/research/2026-11-02/low-memory.md §4 の 2（S1 で P1 p50 ≤ 5 秒・P2 p95 ≤ 12 秒・失敗 0）。
+E3_REF_A0 = {"N_ok": 11, "N_n": 12, "M8": "16/16", "M6": 0.9733333333333333}
+E3_FTL_P50 = 5.0
+E3_TOTAL_P95 = 12.0
+E3_M6_DIFF = 0.02
+
+
+def e3_line_checks(rec: dict, expect_lazy: bool, ref: dict = E3_REF_A0) -> dict:
+    """E3 の 1 回分（run_once の結果）を線と比べる。
+
+    先に「有効な回か」を見る: 回答の間の空きの中央値が 目標 ± 幅 に入り、安全のための全部放しが 0 回、
+    絞る道具が途中で落ちていない。有効でない回は合否を出さず verdict="無効"（同じ設定で 1 回だけ流し直せる）。
+    """
+    p = rec.get("pressure") or {}
+    valid = p.get("valid") is True and p.get("floor_releases", 0) == 0 and not p.get("exited_early")
+    nums = rec.get("numbers") or {}
+    v = rec.get("v_checks") or {}
+    n = nums.get("N") or {"ok": 0, "n": 0}
+    lines = {
+        # 1. 起動・全層 GPU・62 問全部回答・メモリ不足 0・文脈あふれ 0（-lzm on の腕は lazy 読みの行も）
+        "L1_complete": bool(rec.get("started") and rec.get("gpu_ok") and v.get("all_answered") is True
+                            and rec.get("oom_lines", 1) == 0 and rec.get("overflow_lines", 1) == 0
+                            and (bool(rec.get("lazy_lines")) if expect_lazy else True)),
+        # 2. 最初の文字 p50 ≤ 5.0 秒
+        "L2_ftl_p50": nums.get("ftl_p50", float("inf")) <= E3_FTL_P50,
+        # 3. 完了 p95 ≤ 12.0 秒
+        "L3_total_p95": nums.get("total_p95", float("inf")) <= E3_TOTAL_P95,
+        # 4. N の一致数と M8 が E2 の A0 と同じ・M6 の差 ≤ 0.02（丸めで線ちょうどを落とさないよう 1e-9 の余裕）
+        "L4_quality": (n.get("ok") == ref["N_ok"] and n.get("n") == ref["N_n"] and nums.get("M8_refusal") == ref["M8"]
+                       and abs(nums.get("M6_correctness", -1.0) - ref["M6"]) <= E3_M6_DIFF + 1e-9),
+    }
+    lines["all"] = all(lines.values())
+    verdict = "無効" if not valid else ("通る" if lines["all"] else "落ちる")
+    return {"valid": valid, "lines": lines, "verdict": verdict}
