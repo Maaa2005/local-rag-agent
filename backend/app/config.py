@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "documents"
+    # Qdrant への要求の時間切れ（秒・整数）。0 なら qdrant-client の既定のまま
+    # （qdrant-client 1.12.1 は timeout を渡さないと httpx の既定 5 秒になる）。
+    # 学校 PC で本体のメモリが尽きた回に検索が 5 秒で時間切れになった（Issue #1・#14）。
+    # 既定は今までと同じ。測るときだけ環境変数 QDRANT_TIMEOUT_S で変える。
+    qdrant_timeout_s: int = 0
+    # 読むだけの要求（検索の query_points・scroll）を、時間切れのときだけ送り直す回数。0 なら送り直さない
+    # （今までと同じ）。書き込み（upsert・delete・set_payload）は送り直さない。環境変数 QDRANT_SEARCH_RETRIES
+    qdrant_search_retries: int = 0
     vector_size: int = 1024  # multilingual-e5-large
 
     # 推論プロバイダ: "vllm" | "openai" (将来 "transformers" 等を追加可能)
@@ -40,6 +48,21 @@ class Settings(BaseSettings):
     # CPU のリランクは候補 30 件で検索上限 30 秒を超えた (Issue #7 の B)。
     embed_device: str = "cpu"
     rerank_device: str = "cpu"
+
+    @field_validator("qdrant_timeout_s")
+    @classmethod
+    def _check_qdrant_timeout(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError(f"QDRANT_TIMEOUT_S は 0 以上（0 は qdrant-client の既定）: {v!r}")
+        return v
+
+    @field_validator("qdrant_search_retries")
+    @classmethod
+    def _check_qdrant_retries(cls, v: int) -> int:
+        # 送り直しを増やすと、時間切れのたびに待ちが timeout 分ずつ延びる。15 秒の枠を考えて 2 回までにする
+        if not 0 <= v <= 2:
+            raise ValueError(f"QDRANT_SEARCH_RETRIES は 0〜2: {v!r}")
+        return v
 
     @field_validator("embed_device", "rerank_device")
     @classmethod

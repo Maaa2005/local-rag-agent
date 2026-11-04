@@ -15,7 +15,7 @@ from qdrant_client.models import (
 from app.config import settings
 from app.database import db
 from app.services.embedder import embed_query
-from app.services.qdrant import get_client
+from app.services.qdrant import get_client, read_with_retry
 from app.services.reranker import rerank
 from app.services.sparse import build_sparse
 
@@ -116,13 +116,14 @@ async def retrieve(question: str, user_access_level: int) -> list[dict]:
             )
         )
 
-    response = await get_client().query_points(
+    # 時間切れのときだけ設定の回数まで送り直す（既定 0 回。Issue #14）
+    response = await read_with_retry(lambda: get_client().query_points(
         collection_name=settings.qdrant_collection,
         prefetch=prefetch_list,
         query=FusionQuery(fusion=Fusion.RRF),
         limit=fetch_limit,
         with_payload=True,
-    )
+    ))
 
     chunks = [
         {
@@ -153,7 +154,7 @@ async def get_chunk_content(document_id: str, chunk_index: int) -> str | None:
     権限チェック付きで解決する (項目3b)。無効化済み (is_active=False) や
     存在しないチャンクは None を返す。
     """
-    result = await get_client().scroll(
+    result = await read_with_retry(lambda: get_client().scroll(
         collection_name=settings.qdrant_collection,
         scroll_filter=Filter(
             must=[
@@ -164,7 +165,7 @@ async def get_chunk_content(document_id: str, chunk_index: int) -> str | None:
         ),
         limit=1,
         with_payload=True,
-    )
+    ))
     points, _ = result
     if not points:
         return None
