@@ -266,10 +266,31 @@ def _dates(text: str) -> list[date]:
     return out
 
 
+def _names(e: Any, slots: Mapping[str, Slot]) -> set[str]:
+    """式の中の枠の名前。"""
+    if isinstance(e, str):
+        return {e} if e in slots else set()
+    if isinstance(e, dict):
+        return {n for args in e.values() if isinstance(args, list) for a in args for n in _names(a, slots)}
+    return set()
+
+
+def _unused_slots(card: Card, values: Mapping[str, Any]) -> set[str]:
+    """判定に使わない枠。derive の元の枠で、derive の先の値が書かれている物（出勤日数があれば欠勤日数は使わない）。"""
+    used: set[str] = set()
+    for c in (*card.constraints, *card.conditions, *card.exceptions):
+        used |= _names(c["left"], card.slots) | _names(c["right"], card.slots)
+    for target, e in card.derive.items():
+        if values.get(target) is None:
+            used |= _names(e, card.slots)
+    return {n for n in card.slots if n not in used and n not in card.derive}
+
+
 def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, Any], list[str]]:
     """抽出の結果を確かめ、(値, 問題の一覧) を返す。問題が 1 つでもあれば保留にする。
 
     値は 数=Decimal・日付=date・bool=「あり」/「なし」・不明=None。
+    判定に使わない枠の問題だけは保留の理由にしない（検査に通らない値は使わず、不明として扱う）。
     """
     problems: list[str] = []
     values: dict[str, Any] = {}
@@ -318,6 +339,10 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
                 problems.append(f"{name}: value must be あり or なし")
                 continue
             values[name] = v
+    unused = _unused_slots(card, values)
+    problems = [p for p in problems if p.split(":", 1)[0] not in unused]
+    for name in unused:
+        values.setdefault(name, None)
     return values, problems
 
 

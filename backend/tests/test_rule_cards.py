@@ -168,6 +168,24 @@ def test_wrong_extraction_is_held(bad, why):
     assert text.splitlines()[-1] == "結論: 保留"
 
 
+def test_invalid_value_in_an_unused_slot_does_not_hold():
+    """N09: 出勤日数が書かれていれば欠勤日数は使わない。計算で埋めた欠勤日数は使わず、保留の理由にもしない。"""
+    q = next(x for x in QUESTIONS if x["id"] == "N09")["question"]
+    card = next(c for c in CARDS if c.id == "shugyo-yukyu-fuyo")
+    raw = gold_extraction(card, q)
+    raw["欠勤日数"] = {"value": 10, "quote": raw["出勤日数"]["quote"]}
+    values, problems = rule_cards.validate_extraction(card, q, raw)
+    assert problems == [] and values["欠勤日数"] is None
+    # 使う枠が検査に通らない時は保留のまま
+    raw["全労働日数"] = {"value": 999, "quote": raw["全労働日数"]["quote"]}
+    assert rule_cards.validate_extraction(card, q, raw)[1]
+    # 出勤日数が書かれていなければ欠勤日数を使うので保留のまま
+    raw2 = gold_extraction(card, q)
+    raw2["出勤日数"] = {"value": None, "quote": None}
+    raw2["欠勤日数"] = {"value": 10, "quote": raw2["全労働日数"]["quote"]}
+    assert rule_cards.validate_extraction(card, q, raw2)[1]
+
+
 def test_swapped_roles_violate_the_constraint():
     # 出勤日数と全労働日数を取り違えた（どちらも引用は質問にある）→ 出勤日数 ≤ 全労働日数 に反して保留
     bad = _with(出勤日数={"value": 100, "quote": "全労働日100日"}, 全労働日数={"value": 79, "quote": "出勤したのは79日"})
