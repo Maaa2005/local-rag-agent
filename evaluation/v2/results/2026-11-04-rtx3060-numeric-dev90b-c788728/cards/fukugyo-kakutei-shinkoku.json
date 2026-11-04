@@ -1,0 +1,43 @@
+{
+  "format": "rule-card@1",
+  "id": "fukugyo-kakutei-shinkoku",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "副業届出規程",
+    "section": "第6条",
+    "quote": "副業による収入が年間20万円を超える場合は、本人が確定申告を行う。"
+  },
+  "target": "副業収入の確定申告",
+  "match": {
+    "conclusions": [
+      "必要",
+      "不要"
+    ],
+    "keywords": [
+      "確定申告"
+    ]
+  },
+  "slots": {
+    "年間の副業収入": {
+      "type": "number",
+      "unit": "円",
+      "describe": "副業による収入（年間）"
+    }
+  },
+  "conditions": [
+    {
+      "name": "副業による収入が年間20万円を超える",
+      "left": "年間の副業収入",
+      "op": ">",
+      "right": 200000,
+      "quote": "副業による収入が年間20万円を超える場合は、本人が確定申告を行う。"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "必要",
+    "else": "不要"
+  }
+}

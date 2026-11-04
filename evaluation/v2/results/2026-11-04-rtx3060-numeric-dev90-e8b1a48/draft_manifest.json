@@ -1,0 +1,22 @@
+{
+  "format": "draft-manifest@1",
+  "prompt_sha256": "85e262beb60aad146dd8ee494be034ed7a48e49d4f1f79ce4c47abcf466efe8a",
+  "options_sha256": "8fb8123636d03256cc6b1cf80506235f9edef42670ae73e0a52928c22dc9275a",
+  "n_pairs": 8,
+  "rules_sha256": {
+    "リモート機器貸与規程": "05d8fd17deef9ac77570a57244b8b655c2dd8f4d7fd9830a932c28057c7a5c52",
+    "出張宿泊費規程": "5e3c8c94f81fe7fc44eeb5f49f716021fbb153dea3a8cf1acfeeb1a155a4137b",
+    "夜間勤務手当規程": "2c9b954caf66b7b19e7b9d25d16d2dadc2e81b6a53bd5b5e1673765503da1026",
+    "研修費補助規程": "d414377bdf14fc35fcc1a62684b1819f0e70e082ba223ac0194637743e30dc62",
+    "社用車利用規程": "e82d27ebb25abfd0828d19278f160fc70d9ac1f98d82f703f0deb206bd4aaa32",
+    "資格取得奨励規程": "98bb0be50104eec2737ee85ca45d94a602fa4ad28ec64102d2788fb6bc0a8567"
+  },
+  "rendered_prompts_sha256": {
+    "リモート機器貸与規程": "b26cb8d80562e60dd4cad64f6ffbf192734dd953daf1c394e51e01a05b38fadc",
+    "出張宿泊費規程": "18e0d6e48b93631d968139d64c32576ed6c77ec624c18354837d0fe962936aea",
+    "夜間勤務手当規程": "fff7ab617de0325e443bee9e0718e615439db4096d02f0e74e7475fafda54039",
+    "研修費補助規程": "908de36bc31fa35450c811ad17f6f083f53c0a5dd715e69f280877e40211c95e",
+    "社用車利用規程": "d78cb4dabcfb1879c7b067fbd6230bc04c421d7f87090fe921815449630a3eae",
+    "資格取得奨励規程": "fb17435f7c7dac97fcb4c9ca004e2d8ae9ea4ef4643022efa223786a3c3a1905"
+  }
+}

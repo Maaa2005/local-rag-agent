@@ -1,0 +1,157 @@
+{
+  "runs": 2,
+  "rounds": {
+    "1": {
+      "n": 90,
+      "complete": true,
+      "answerable": 72,
+      "should_hold": 18,
+      "wrong_assertions": 1,
+      "held": 17,
+      "decided": 20,
+      "decided_required": 65,
+      "pairs": 12,
+      "pairs_both_correct": 1,
+      "pairs_required": 11,
+      "stop_reasons": {
+        "no_card": 5,
+        "extract_failed": 0,
+        "validation_failed": 37,
+        "unknown_hold": 23,
+        "confirm_mismatch": 5
+      },
+      "per_rule": {
+        "再検査費補助規程": {
+          "answerable": 12,
+          "decided": 3,
+          "correct": 3,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "副業届出規程": {
+          "answerable": 12,
+          "decided": 1,
+          "correct": 1,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "在宅勤務手当規程": {
+          "answerable": 12,
+          "decided": 4,
+          "correct": 4,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "慶弔見舞金規程": {
+          "answerable": 12,
+          "decided": 2,
+          "correct": 2,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 2,
+          "required": 10,
+          "ok": false
+        },
+        "社員食堂利用補助規程": {
+          "answerable": 12,
+          "decided": 6,
+          "correct": 6,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "社外講師謝礼規程": {
+          "answerable": 12,
+          "decided": 4,
+          "correct": 3,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        }
+      },
+      "lines": {
+        "wrong_assertions_zero": false,
+        "all_held": false,
+        "decided_overall": false,
+        "decided_per_rule": false,
+        "pairs": false
+      },
+      "ok": false
+    },
+    "2": {
+      "n": 0,
+      "complete": false,
+      "answerable": 0,
+      "should_hold": 0,
+      "wrong_assertions": 0,
+      "held": 0,
+      "decided": 0,
+      "decided_required": 0,
+      "pairs": 0,
+      "pairs_both_correct": 0,
+      "pairs_required": 0,
+      "stop_reasons": {
+        "no_card": 0,
+        "extract_failed": 0,
+        "validation_failed": 0,
+        "unknown_hold": 0,
+        "confirm_mismatch": 0
+      },
+      "per_rule": {},
+      "lines": {
+        "wrong_assertions_zero": true,
+        "all_held": false,
+        "decided_overall": false,
+        "decided_per_rule": false,
+        "pairs": false
+      },
+      "ok": false
+    }
+  },
+  "ok": false,
+  "issue": 16,
+  "dev": true,
+  "stopped": null,
+  "unable_rules": [
+    "第2条 入社後6か月の経過を入社日と届出日から出す",
+    "第4条 繁忙期を開始日の日付から判定する",
+    "手当額の1円未満の切り捨て",
+    "勤続月数を入社日と婚姻日から出す（第3条2項）",
+    "会計時刻による利用の選別（午前11時〜午後2時）",
+    "1日2回以上の利用を1回と数える読み替え",
+    "登録前の利用を回数・金額に数えない",
+    "休暇の日を出張・在宅勤務の日数に含めない",
+    "補助額（利用1回につき150円）",
+    "支給時期（翌月の給与支給日）",
+    "第2条 適用範囲（社員が講師を務める場合には適用しない）",
+    "第3条 A の1円未満の切り捨て",
+    "第6条 退職後2年以内（年数・月数で書かれた時）"
+  ],
+  "conditions": {
+    "conclusion_options_given_first": true,
+    "retrieval": false,
+    "no_card_goes_to_model": false
+  },
+  "set_sha256": "7ad0d248c1c60ca496e94783c09df2b58848bbabb052a82bedd8b01bcb8b0916",
+  "freeze_sha256": "28fbe8639add57f8649c0234fa5eb4673170e5381415aa7831f8ccc55f5a90aa",
+  "lines_definition": {
+    "wrong_assertions_max": 0,
+    "hold": "全部 (答えなかった問は数えない)",
+    "decided_overall": "9/10 以上 (切り上げ)",
+    "decided_per_rule": "8/10 以上 (切り上げ)",
+    "pairs": "9/10 以上 (切り上げ)"
+  }
+}

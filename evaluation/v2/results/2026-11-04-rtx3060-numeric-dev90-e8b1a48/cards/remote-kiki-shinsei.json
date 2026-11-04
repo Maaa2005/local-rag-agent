@@ -1,0 +1,50 @@
+{
+  "format": "rule-card@1",
+  "id": "remote-kiki-shinsei",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "リモート機器貸与規程",
+    "section": "第5条",
+    "quote": "貸与を受けようとする者は、在宅勤務の開始予定日の10日前までに、貸与申請書を総務課に提出する。"
+  },
+  "target": "貸与申請書の提出期限",
+  "match": {
+    "conclusions": [
+      "受理される",
+      "受理されない"
+    ],
+    "keywords": [
+      "申請書"
+    ]
+  },
+  "slots": {
+    "在宅勤務開始予定日": {
+      "type": "date",
+      "describe": "在宅勤務を始める予定の日"
+    },
+    "申請書提出日": {
+      "type": "date",
+      "describe": "貸与申請書を総務課に提出した日（または提出する予定の日）"
+    }
+  },
+  "conditions": [
+    {
+      "name": "開始予定日の10日前までに提出した",
+      "left": "申請書提出日",
+      "op": "<=",
+      "right": {
+        "add_days": [
+          "在宅勤務開始予定日",
+          -10
+        ]
+      }
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "受理される",
+    "else": "受理されない"
+  }
+}

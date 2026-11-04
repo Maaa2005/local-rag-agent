@@ -1,0 +1,78 @@
+[
+  {
+    "rule": "remote-kiki-jogen",
+    "reason": "parse_card: remote-kiki-jogen: derive target 取得価格合計 is not a slot"
+  },
+  {
+    "rule": "remote-kiki-jogen-sangyoi",
+    "reason": "parse_card: remote-kiki-jogen-sangyoi: derive target 取得価格合計 is not a slot"
+  },
+  {
+    "rule": "第3条と第4条の上限の切り替え",
+    "reason": "第4条は結論ではなく上限額（8万円→12万円）を差し替えるただし書きで、exceptions は結論の語しか返せない。やむを得ず第3条・第4条を別カードにしたが、産業医の認定がある質問で合計が8万円以上12万円未満のとき第3条カードは「貸与できない」と誤判定する。第3条カードに「産業医認定があれば保留」を入れる仕組みが要る。"
+  },
+  {
+    "rule": "第6条 紛失・破損時の弁償",
+    "reason": "「取得価格に応じて弁償を求めることがある」は会社の裁量で、金額や有無を決める定めが文に無い。"
+  },
+  {
+    "rule": "shukuhaku-jogen-ippan",
+    "reason": "quote が規程の文に無い"
+  },
+  {
+    "rule": "yakan-kinmu-teate-shikyu",
+    "reason": "parse_card: yakan-kinmu-teate-shikyu: conclusion must be {then: 不支給, else: 支給}"
+  },
+  {
+    "rule": "yakan-kinmu-teate-jizen-shonin",
+    "reason": "parse_card: yakan-kinmu-teate-jizen-shonin: conclusion must be {then: 不支給, else: 支給}"
+  },
+  {
+    "rule": "第3条 手当の額（時間給の25%×22時以降の勤務時間）",
+    "reason": "計算結果は金額であり、結論の2語（不支給/支給 など）では表せない。支給の有無だけをカードにした"
+  },
+  {
+    "rule": "第3条 22時から翌朝5時までの時刻の境目",
+    "reason": "時刻の型が無いため、勤務の開始時刻・終了時刻から22時以降の時間を切り出す判定は式で書けない。質問に分で書かれた値を拾う形にした"
+  },
+  {
+    "rule": "第6条 支払い時期（翌月の給与と合わせて支払う）",
+    "reason": "いつ払うかの定めで、合う結論の組が無い"
+  },
+  {
+    "rule": "第4条 補助額の算出",
+    "reason": "受講料の80%と上限5万円の小さい方という金額を返す定めで、結論の2語の組に合わない"
+  },
+  {
+    "rule": "第4条 補助金の支払時期",
+    "reason": "修了証を提出した月の翌月末という月末の日付を出す式が無く、従業員の結論を決める定めでもない"
+  },
+  {
+    "rule": "第7条 返還",
+    "reason": "返還する／しないに合う結論の組が無い"
+  },
+  {
+    "rule": "第5条 利用の申込みの期限（前日の17時まで）",
+    "reason": "期限が日付と時刻の組合せで、時刻の型が無い。前日より前の日は時刻を問わず、前日だけ17時までという境目は、日付の比較と数の比較を all か any で並べるだけでは一つの判定にできない"
+  },
+  {
+    "rule": "第6条 運行中の休憩（2時間ごとに15分以上）",
+    "reason": "推奨であり、結論の語の組に合う判定にならない"
+  },
+  {
+    "rule": "shikaku-shorei-taisho",
+    "reason": "quote が規程の文に無い"
+  },
+  {
+    "rule": "shikaku-shorei-shinsei-uketsuke",
+    "reason": "quote が規程の文に無い"
+  },
+  {
+    "rule": "奨励金の額（第6条）",
+    "reason": "受験料の50%と上限3万円の小さい方という金額の計算が必要だが、式に min が無く、結論も2語の組に合わない"
+  },
+  {
+    "rule": "支給時期（第6条）",
+    "reason": "受理した月の翌月末という日付を出す定めで、月末を出す式が無く、結論の2語の組にも合わない"
+  }
+]

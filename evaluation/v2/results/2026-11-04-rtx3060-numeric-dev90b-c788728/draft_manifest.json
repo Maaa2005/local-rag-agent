@@ -1,0 +1,22 @@
+{
+  "format": "draft-manifest@1",
+  "prompt_sha256": "959ee985a01020831ecbdf327126d1f7817d4bcd142b7ad44e60f7111800beb9",
+  "options_sha256": "6908af22b42fcca8e54e48d018745c808b85a0d24ae16af4e2a7af5e3e68ddb9",
+  "n_pairs": 6,
+  "rules_sha256": {
+    "再検査費補助規程": "e24c4f74ff0cdad20588f165fdd535477601e52b5f59e773d2c96f25f01ee447",
+    "副業届出規程": "4ae85468989315e0874b65b005c5d4e7f1315466acfeb669e011570f2403a40a",
+    "在宅勤務手当規程": "d76a80b79218bfee8a077762daf82c505f1fbddb20032ec03e2c482a933774ae",
+    "慶弔見舞金規程": "f7ce85447c1daf06f0064b383cd07fadaf47a64c4a23d1ea37cbc4bf60c9b44f",
+    "社員食堂利用補助規程": "c13b76ee7f0c70de5638c619e3b3b0de2ca5aaad45fc922795796981503f6fff",
+    "社外講師謝礼規程": "01647fb74fe453a87a10f57dc06752fc6df28884fcabab0c286d07d0cd3ccaf1"
+  },
+  "rendered_prompts_sha256": {
+    "再検査費補助規程": "53ef1b623669e6aec559d607a5db8defa2744f98a109c0512b98e73abfadf58f",
+    "副業届出規程": "92915fc3cc57ee4b6cb59e558f98ad58a1b6d039e464c1953a3ea5512f1e8685",
+    "在宅勤務手当規程": "4690ce454ca99bf80068407d7ab384f83f63b74c26cf34f004d25c7e86be9552",
+    "慶弔見舞金規程": "2f104bd92e7bcc535243bb7bc1f4efdf8679a95bc7089dfe70ca1a4b1270f727",
+    "社員食堂利用補助規程": "afcac61bd9445f1e0c355f706e319986b6fa9fecdc7ae547c1e7f0adeafb773c",
+    "社外講師謝礼規程": "2bf379a41c3139a8b3a23a363ec971b5d9d57e8414f70bf00319767413e04215"
+  }
+}

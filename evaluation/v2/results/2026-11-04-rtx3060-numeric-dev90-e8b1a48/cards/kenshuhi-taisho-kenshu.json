@@ -1,0 +1,65 @@
+{
+  "format": "rule-card@1",
+  "id": "kenshuhi-taisho-kenshu",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "研修費補助規程",
+    "section": "第3条",
+    "quote": "補助の対象は、業務に関連する外部の研修（セミナー、講座、通信教育を含む）とする。趣味や教養を目的とするものは対象としない。"
+  },
+  "target": "補助の対象となる研修かどうか",
+  "match": {
+    "conclusions": [
+      "対象",
+      "対象外"
+    ],
+    "keywords": [
+      "業務"
+    ]
+  },
+  "slots": {
+    "業務関連": {
+      "type": "bool",
+      "describe": "業務に関連する研修かどうか"
+    },
+    "外部研修": {
+      "type": "bool",
+      "describe": "外部の研修（セミナー・講座・通信教育を含む）かどうか"
+    },
+    "趣味教養目的": {
+      "type": "bool",
+      "describe": "趣味や教養を目的とする研修かどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "業務に関連する",
+      "left": "業務関連",
+      "op": "==",
+      "right": "あり"
+    },
+    {
+      "name": "外部の研修である",
+      "left": "外部研修",
+      "op": "==",
+      "right": "あり"
+    }
+  ],
+  "combine": "all",
+  "exceptions": [
+    {
+      "name": "趣味や教養を目的とするものは対象としない",
+      "left": "趣味教養目的",
+      "op": "==",
+      "right": "あり",
+      "conclusion": "対象外",
+      "if_unknown": "ignore"
+    }
+  ],
+  "conclusion": {
+    "then": "対象",
+    "else": "対象外"
+  }
+}

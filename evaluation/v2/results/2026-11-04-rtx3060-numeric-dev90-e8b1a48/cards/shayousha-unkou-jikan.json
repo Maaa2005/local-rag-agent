@@ -1,0 +1,50 @@
+{
+  "format": "rule-card@1",
+  "id": "shayousha-unkou-jikan",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "社用車利用規程",
+    "section": "第3条",
+    "quote": "1回の運行は、6時間以内とする。運行時間は、車庫を出てから戻るまでの時間とし、客先での滞在や休憩の時間も含める。6時間を超える運行は認めない。"
+  },
+  "target": "1回の運行時間",
+  "match": {
+    "conclusions": [
+      "認められる",
+      "認められない"
+    ],
+    "keywords": [
+      "運行"
+    ]
+  },
+  "slots": {
+    "運行時間": {
+      "type": "number",
+      "unit": "時間",
+      "describe": "車庫を出てから戻るまでの時間（客先での滞在や休憩の時間も含む）"
+    }
+  },
+  "constraints": [
+    {
+      "name": "運行時間は 0 以上",
+      "left": "運行時間",
+      "op": ">=",
+      "right": 0
+    }
+  ],
+  "conditions": [
+    {
+      "name": "1回の運行が6時間以内",
+      "left": "運行時間",
+      "op": "<=",
+      "right": 6
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "認められる",
+    "else": "認められない"
+  }
+}

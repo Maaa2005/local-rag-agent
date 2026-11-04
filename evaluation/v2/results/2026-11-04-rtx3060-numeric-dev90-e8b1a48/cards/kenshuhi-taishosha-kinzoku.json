@@ -1,0 +1,64 @@
+{
+  "format": "rule-card@1",
+  "id": "kenshuhi-taishosha-kinzoku",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "研修費補助規程",
+    "section": "第2条",
+    "quote": "補助の対象となるのは、勤続2年以上の正社員とする。勤続年数は、入社日から補助の申請日までの期間で数える。契約社員、嘱託社員、アルバイトは対象としない。"
+  },
+  "target": "研修費補助の対象者（勤続年数と雇用区分）",
+  "match": {
+    "conclusions": [
+      "対象",
+      "対象外"
+    ],
+    "keywords": [
+      "勤続"
+    ]
+  },
+  "slots": {
+    "勤続年数": {
+      "type": "number",
+      "unit": "年",
+      "describe": "入社日から補助の申請日までの期間"
+    },
+    "正社員": {
+      "type": "bool",
+      "describe": "正社員かどうか（契約社員・嘱託社員・アルバイトは なし）"
+    },
+    "国家資格直結": {
+      "type": "bool",
+      "describe": "国家資格の取得に直結する研修かどうか"
+    }
+  },
+  "constraints": [
+    {
+      "name": "国家資格の取得に直結する研修は第6条の別カードで判定する",
+      "left": "国家資格直結",
+      "op": "==",
+      "right": "なし"
+    }
+  ],
+  "conditions": [
+    {
+      "name": "正社員である",
+      "left": "正社員",
+      "op": "==",
+      "right": "あり"
+    },
+    {
+      "name": "勤続2年以上",
+      "left": "勤続年数",
+      "op": ">=",
+      "right": 2
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "対象",
+    "else": "対象外"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "format": "rule-card@1",
+  "id": "shikaku-shorei-gokakusho",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "資格取得奨励規程",
+    "section": "第5条",
+    "quote": "申請には、合格証の写しを添付する。添付のない申請は受理しない。"
+  },
+  "target": "申請書類（合格証の写し）の添付",
+  "match": {
+    "conclusions": [
+      "受理される",
+      "受理されない"
+    ],
+    "keywords": [
+      "合格証"
+    ]
+  },
+  "slots": {
+    "合格証の写しの添付": {
+      "type": "bool",
+      "describe": "申請に合格証の写しを添付したかどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "合格証の写しを添付した",
+      "left": "合格証の写しの添付",
+      "op": "==",
+      "right": "あり"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "受理される",
+    "else": "受理されない"
+  }
+}

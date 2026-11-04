@@ -1,0 +1,61 @@
+{
+  "format": "rule-card@1",
+  "id": "shukuhaku-taisho-shucho",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "出張宿泊費規程",
+    "section": "第2条",
+    "quote": "宿泊費を精算できるのは、出張命令書が発行された出張のうち、勤務地から片道100km以上離れた場所へのものに限る。"
+  },
+  "target": "宿泊費を精算できる出張かどうか（出張命令書と片道距離）",
+  "match": {
+    "conclusions": [
+      "精算できる",
+      "精算できない"
+    ],
+    "keywords": [
+      "km",
+      "出張命令書"
+    ]
+  },
+  "slots": {
+    "出張命令書": {
+      "type": "bool",
+      "describe": "出張命令書が発行された出張かどうか"
+    },
+    "片道距離": {
+      "type": "number",
+      "unit": "km",
+      "describe": "勤務地から出張先までの片道の距離"
+    }
+  },
+  "constraints": [
+    {
+      "name": "片道距離は 0 以上",
+      "left": "片道距離",
+      "op": ">=",
+      "right": 0
+    }
+  ],
+  "conditions": [
+    {
+      "name": "出張命令書が発行された出張である",
+      "left": "出張命令書",
+      "op": "==",
+      "right": "あり"
+    },
+    {
+      "name": "勤務地から片道100km以上離れている",
+      "left": "片道距離",
+      "op": ">=",
+      "right": 100
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "精算できる",
+    "else": "精算できない"
+  }
+}

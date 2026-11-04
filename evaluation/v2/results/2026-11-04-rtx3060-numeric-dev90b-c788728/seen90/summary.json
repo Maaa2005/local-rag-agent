@@ -1,0 +1,218 @@
+{
+  "runs": 2,
+  "rounds": {
+    "1": {
+      "n": 90,
+      "complete": true,
+      "answerable": 72,
+      "should_hold": 18,
+      "wrong_assertions": 5,
+      "held": 16,
+      "decided": 24,
+      "decided_required": 65,
+      "pairs": 12,
+      "pairs_both_correct": 1,
+      "pairs_required": 11,
+      "stop_reasons": {
+        "no_card": 2,
+        "extract_failed": 0,
+        "validation_failed": 37,
+        "unknown_hold": 20,
+        "confirm_mismatch": 5
+      },
+      "per_rule": {
+        "リモート機器貸与規程": {
+          "answerable": 12,
+          "decided": 2,
+          "correct": 2,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "出張宿泊費規程": {
+          "answerable": 12,
+          "decided": 7,
+          "correct": 7,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 2,
+          "required": 10,
+          "ok": false
+        },
+        "夜間勤務手当規程": {
+          "answerable": 12,
+          "decided": 5,
+          "correct": 4,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "研修費補助規程": {
+          "answerable": 12,
+          "decided": 0,
+          "correct": 0,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "社用車利用規程": {
+          "answerable": 12,
+          "decided": 10,
+          "correct": 8,
+          "wrong": 3,
+          "should_hold": 3,
+          "held": 2,
+          "required": 10,
+          "ok": true
+        },
+        "資格取得奨励規程": {
+          "answerable": 12,
+          "decided": 0,
+          "correct": 0,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        }
+      },
+      "lines": {
+        "wrong_assertions_zero": false,
+        "all_held": false,
+        "decided_overall": false,
+        "decided_per_rule": false,
+        "pairs": false
+      },
+      "ok": false
+    },
+    "2": {
+      "n": 90,
+      "complete": true,
+      "answerable": 72,
+      "should_hold": 18,
+      "wrong_assertions": 5,
+      "held": 16,
+      "decided": 24,
+      "decided_required": 65,
+      "pairs": 12,
+      "pairs_both_correct": 1,
+      "pairs_required": 11,
+      "stop_reasons": {
+        "no_card": 2,
+        "extract_failed": 0,
+        "validation_failed": 37,
+        "unknown_hold": 20,
+        "confirm_mismatch": 5
+      },
+      "per_rule": {
+        "リモート機器貸与規程": {
+          "answerable": 12,
+          "decided": 2,
+          "correct": 2,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "出張宿泊費規程": {
+          "answerable": 12,
+          "decided": 7,
+          "correct": 7,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 2,
+          "required": 10,
+          "ok": false
+        },
+        "夜間勤務手当規程": {
+          "answerable": 12,
+          "decided": 5,
+          "correct": 4,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "研修費補助規程": {
+          "answerable": 12,
+          "decided": 0,
+          "correct": 0,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "社用車利用規程": {
+          "answerable": 12,
+          "decided": 10,
+          "correct": 8,
+          "wrong": 3,
+          "should_hold": 3,
+          "held": 2,
+          "required": 10,
+          "ok": true
+        },
+        "資格取得奨励規程": {
+          "answerable": 12,
+          "decided": 0,
+          "correct": 0,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        }
+      },
+      "lines": {
+        "wrong_assertions_zero": false,
+        "all_held": false,
+        "decided_overall": false,
+        "decided_per_rule": false,
+        "pairs": false
+      },
+      "ok": false
+    }
+  },
+  "ok": false,
+  "issue": 16,
+  "dev": true,
+  "stopped": null,
+  "unable_rules": [
+    "機器の返却期限（第6条）",
+    "紛失・破損時の弁償（第6条）",
+    "出張日当（第6条）",
+    "手当の額の計算（第3条）",
+    "支払い時期（第6条）",
+    "補助額の計算（第4条）",
+    "補助金の支払期限（第4条）",
+    "補助金の返還（第7条）",
+    "運行中の休憩（第6条）",
+    "ガソリン代の会社負担（第6条）",
+    "乗車定員（第6条）",
+    "奨励金の額（第6条）",
+    "支給時期（第6条）"
+  ],
+  "conditions": {
+    "conclusion_options_given_first": true,
+    "retrieval": false,
+    "no_card_goes_to_model": false
+  },
+  "set_sha256": "8f3dd5e892c312dc46d195035b27c33012c97227bc01ffbb32b2476560419428",
+  "freeze_sha256": "51ae869b7881a64993fea1da769c2d1215a645a47d2ca092bb5438410ac5b7a0",
+  "lines_definition": {
+    "wrong_assertions_max": 0,
+    "hold": "全部 (答えなかった問は数えない)",
+    "decided_overall": "9/10 以上 (切り上げ)",
+    "decided_per_rule": "8/10 以上 (切り上げ)",
+    "pairs": "9/10 以上 (切り上げ)"
+  }
+}

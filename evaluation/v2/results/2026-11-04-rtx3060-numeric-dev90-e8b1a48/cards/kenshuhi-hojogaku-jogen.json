@@ -1,0 +1,55 @@
+{
+  "format": "rule-card@1",
+  "id": "kenshuhi-hojogaku-jogen",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "研修費補助規程",
+    "section": "第4条",
+    "quote": "補助額は、受講料（税込）の80%とし、1件につき5万円を上限とする。"
+  },
+  "target": "受講料の80%が1件5万円の上限を超えるか",
+  "match": {
+    "conclusions": [
+      "超える",
+      "超えない"
+    ],
+    "keywords": [
+      "上限"
+    ]
+  },
+  "slots": {
+    "受講料": {
+      "type": "number",
+      "unit": "円",
+      "describe": "研修1件の受講料（税込）"
+    }
+  },
+  "constraints": [
+    {
+      "name": "受講料は 0 以上",
+      "left": "受講料",
+      "op": ">=",
+      "right": 0
+    }
+  ],
+  "conditions": [
+    {
+      "name": "受講料の80%が5万円を超える",
+      "left": {
+        "mul": [
+          "受講料",
+          0.8
+        ]
+      },
+      "op": ">",
+      "right": 50000
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "超える",
+    "else": "超えない"
+  }
+}

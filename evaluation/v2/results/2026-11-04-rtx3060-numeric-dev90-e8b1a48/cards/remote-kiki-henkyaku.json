@@ -1,0 +1,50 @@
+{
+  "format": "rule-card@1",
+  "id": "remote-kiki-henkyaku",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "リモート機器貸与規程",
+    "section": "第6条",
+    "quote": "貸与した機器は、在宅勤務の終了日または退職日から14日以内に返却する。"
+  },
+  "target": "貸与機器の返却期限",
+  "match": {
+    "conclusions": [
+      "超えない",
+      "超える"
+    ],
+    "keywords": [
+      "返却"
+    ]
+  },
+  "slots": {
+    "基準日": {
+      "type": "date",
+      "describe": "在宅勤務の終了日、または退職日"
+    },
+    "返却日": {
+      "type": "date",
+      "describe": "機器を返却した日（または返却する予定の日）"
+    }
+  },
+  "conditions": [
+    {
+      "name": "基準日から14日以内に返却する",
+      "left": "返却日",
+      "op": "<=",
+      "right": {
+        "add_days": [
+          "基準日",
+          14
+        ]
+      }
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "超えない",
+    "else": "超える"
+  }
+}

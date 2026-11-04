@@ -1,0 +1,60 @@
+{
+  "format": "rule-card@1",
+  "id": "kenshuhi-shinsei-kigen",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "研修費補助規程",
+    "section": "第5条",
+    "quote": "補助を受けようとする者は、研修の開始日の14日前までに、所属長の承認を得た申請書を人事部に提出する。"
+  },
+  "target": "補助の申請書の提出期限と所属長の承認",
+  "match": {
+    "conclusions": [
+      "受理される",
+      "受理されない"
+    ],
+    "keywords": [
+      "申請書"
+    ]
+  },
+  "slots": {
+    "開始日": {
+      "type": "date",
+      "describe": "研修の開始日"
+    },
+    "提出日": {
+      "type": "date",
+      "describe": "申請書を人事部に提出した日"
+    },
+    "所属長の承認": {
+      "type": "bool",
+      "describe": "申請書に所属長の承認を得ているかどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "研修の開始日の14日前までに提出した",
+      "left": {
+        "add_days": [
+          "提出日",
+          14
+        ]
+      },
+      "op": "<=",
+      "right": "開始日"
+    },
+    {
+      "name": "所属長の承認を得ている",
+      "left": "所属長の承認",
+      "op": "==",
+      "right": "あり"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "受理される",
+    "else": "受理されない"
+  }
+}
