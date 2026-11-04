@@ -45,7 +45,7 @@ _SURNAMES = """
 REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
     ("employee_id", re.compile(_A + r"([Ee]-?\d{3,}|(?i:emp)-?\d{2,})|社員(番号|ID|コード|No\.?)\s*[:=は]?\s*([A-Za-z]{0,3}-?\d+|[〇一二三四五六七八九]+)"), True),
     ("person_name", re.compile(r"[一-龥]{1,4}((?<![客皆])(さん|くん)|(?<![摂華])氏(?!名)|(?<![仕同模多各異一皆客])様(?![式子々]))"), True),
-    ("person_surname", re.compile("(" + "|".join(sorted(_SURNAMES, key=len, reverse=True)) + ")(?!部(?!長)|店(?!長)|洋|馬場|の舞台|[市区町村郡県府都道駅線])"), True),
+    ("person_surname", re.compile("(" + "|".join(sorted(_SURNAMES, key=len, reverse=True)) + ")(?!部(?!長)|店(?!長)|(?<=大西)洋|馬場|の舞台|[市区町村郡県府都道駅線](?![子郎男夫美代]))"), True),
     ("counterparty", re.compile(r"([A-Z]社|株式会社|有限会社|合同会社|\(株\)|\(有\)|[一-龥ァ-ヶー]{1,8}(商事|物産|製作所|銀行|証券)|"
                                 + _A + r"(Inc\.|Corp\.|Co\.,?\s*Ltd\.?|LLC)" + _Z + ")"), True),
     ("email", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), True),
@@ -66,13 +66,13 @@ REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
                               r"logging|itertools|functools|e|i|self|str|int|list|dict)\.)[A-Za-z_][A-Za-z0-9_]*\."
                               r"(?!(?i:csv|tsv|py|txt|json|md|xlsx?|g|e)(?![A-Za-z0-9_]))[A-Za-z_][A-Za-z0-9_]*"), False),
     # 「社内の」に英字の名前が続く（社内のテーブル名・列名・システム名。契約 B が禁じる。Codex 11/3）
-    ("internal_name", re.compile(r"社内(の|で使う|向けの|システムの)?\s*(?!(?i:python|pandas|csv|tsv|excel|vpn|pc|wi-?fi|windows|mac)(?![A-Za-z0-9_]))[A-Za-z_][A-Za-z0-9_]*"), True),
+    ("internal_name", re.compile(r"社内(の|で使う|向けの|システムの)?\s*(?!(?i:python|pandas|csv|tsv|excel|vpn|pc|wi-?fi|windows|mac)(?![A-Za-z0-9_.]))[A-Za-z_][A-Za-z0-9_]*"), True),
     # 英字の略語は大文字小文字を問わず、ASCII の境目で見る（TOB が October に当たらないように）
     ("m_and_a", re.compile(_A + r"(?i:m&a|tob|mbo|lbo|mergers?|acquisitions?|takeovers?|buyouts?)" + _Z + r"|(買収|合併|出資比率|株式(を|の)?(段階)?(取得|譲渡|売却|買い増し|買い付け)|段階取得|"
                            r"資本(業務)?提携|事業譲渡|経営統合|子会社化)"), True),
     ("injection", re.compile(r"(前の指示(は|を)?無視|指示(は|を)無視|指示を(すべて|全部)?忘れ|これまでの(指示|命令)|"
                              r"(ignore|disregard)\s*(all\s*)?(the\s*)?(previous|prior|above)|システムプロンプト|system\s*prompt|全文を出力|"
-                             r"(従来|以前|これまで|上記|先)の(命令|指示)|(従来|以前|これまで|上記|先)の(ルール|設定)(を|は)?(無視|忘れ|破棄|撤回|取り消|リセット|上書き|解除|無効)|(命令|指示|ルール|制約)(を|は)?(破棄|撤回|取り消|リセット|上書き|解除|無効)|"
+                             r"(従来|以前|これまで|上記|先)の(命令|指示)|(従来|以前|これまで|上記|先)の(ルール|設定)(を|は|に)?(無視|忘れ|破棄|撤回|取り消|リセット|上書き|解除|無効|従わ|反し)|(命令|指示|ルール|制約)(を|は)?(破棄|撤回|取り消|リセット|上書き|解除|無効)|"
                              r"(デバッグ|開発者|管理者|メンテナンス)モード(に|へ)|内部の(設定|指示|プロンプト)(を|も)?(すべて|全部)?(出力|表示|教え|開示))", re.I), True),
     ("gate_override", re.compile(r"(送信(ゲート|前の(審査|検査|確認))|審査の対象外|(検査|審査|判定)(を|の|は)?(対象外|通過済|免除|不要|省略|スキップ)|"
                                  r"(安全|許可|問題(が)?ない|問題なし)と(判定|判断|みな)|判定する側|判定(者|役|モデル)(へ|に)の?指示|"
