@@ -390,6 +390,7 @@ class CardDecision:
     hold_reason: str | None = None
     values: dict[str, Any] = field(default_factory=dict)
     conditions: list[tuple[str, bool | None]] = field(default_factory=list)
+    raw: Any = None  # モデルが拾ったままの値（検査の前。値の一致率を測るため）
 
 
 def decide(card: Card, values: Mapping[str, Any]) -> CardDecision:
@@ -470,13 +471,20 @@ class OpenAICompatExtractor:
             client = AsyncOpenAI(base_url=base_url, api_key="NONE", timeout=timeout_s)
         self._client = client
         self._model = model
+        self.last_stats: dict[str, Any] = {}  # 直前の 1 回の数（測定用）
 
     async def extract(self, messages: list[dict[str, str]], schema: dict[str, Any]) -> Any:
         resp = await self._client.chat.completions.create(
             model=self._model, messages=messages, temperature=0, max_tokens=512,
             response_format={"type": "json_schema", "json_schema": {"name": "slots", "schema": schema, "strict": True}},
         )
-        return json.loads(resp.choices[0].message.content or "null")
+        msg = resp.choices[0].message
+        # Gemma 4 は json_schema でも考える文が出る事がある (llama.cpp #30256)。枠を食うので測れるように残す
+        extra = getattr(msg, "model_extra", None) or {}
+        self.last_stats = {"finish_reason": getattr(resp.choices[0], "finish_reason", None),
+                           "completion_tokens": getattr(getattr(resp, "usage", None), "completion_tokens", None),
+                           "reasoning_chars": len(extra.get("reasoning_content") or "")}
+        return json.loads(msg.content or "null")
 
 
 async def answer_with_card(card: Card, question: str, extractor: Extractor) -> tuple[str, CardDecision]:
@@ -488,7 +496,8 @@ async def answer_with_card(card: Card, question: str, extractor: Extractor) -> t
         return render_answer(card, d), d
     values, problems = validate_extraction(card, question, raw)
     if problems:
-        d = CardDecision(card.id, None, "抽出の検査に通らない: " + "; ".join(problems[:3]), values)
+        d = CardDecision(card.id, None, "抽出の検査に通らない: " + "; ".join(problems[:3]), values, raw=raw)
         return render_answer(card, d), d
     d = decide(card, values)
+    d.raw = raw
     return render_answer(card, d), d

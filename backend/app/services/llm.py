@@ -110,6 +110,7 @@ async def stream_answer(
 
 _cards_cache: tuple[tuple[str, bool], list[rule_cards.Card]] | None = None
 _extractor: rule_cards.Extractor | None = None
+_last_card_decision: rule_cards.CardDecision | None = None
 
 
 def _load_rule_cards() -> list[rule_cards.Card]:
@@ -143,7 +144,18 @@ async def _rule_card_answer(question: str) -> str | None:
         settings.vllm_base_url, settings.rule_cards_extract_model or settings.llm_model)
     text, decision = await rule_cards.answer_with_card(card, question, extractor)
     logger.info("規程カード %s: %s", card.id, decision.conclusion or f"保留（{decision.hold_reason}）")
+    global _last_card_decision
+    _last_card_decision = decision
     return text
+
+
+def pop_rule_card_record() -> dict | None:
+    """評価用: 直前の問でカードが決めた内容を 1 回だけ返す（カードに合わなかった問は None）。"""
+    global _last_card_decision
+    d, _last_card_decision = _last_card_decision, None
+    if d is None:
+        return None
+    return {"card_id": d.card_id, "conclusion": d.conclusion, "hold_reason": d.hold_reason, "raw": d.raw}
 
 
 # 後方互換: テストで provider を直差し替えするためのフック
