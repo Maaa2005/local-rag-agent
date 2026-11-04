@@ -322,6 +322,7 @@ def test_cli_acknowledge_binds_text_to_reason(tmp_path):
     p.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
     base = ["--write", "--policy-dir", str(d), "--reviewed-by", REVIEWER]
     assert reg.main(base) == 1  # 当たりの承認が無い
+    base += ["--checked-by", "当たりの承認者（架空）"]
     assert reg.main(base + ["--acknowledge", "dev-amount-001@1=規程上限5,000円::規程上の額"]) == 1  # 片方の箇所だけ
     assert reg.main(base + ["--acknowledge", "dev-amount-001@1=規程上限5,000円::規程上の額",
                             "--acknowledge", "dev-amount-001@1=実際の支出5,000円::試験用の架空の額"]) == 0

@@ -1,0 +1,48 @@
+{
+  "id": "spec-price-d14",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は order_date（YYYY-MM-DD）, region（文字列）, qty（整数）, unit_price（整数）\n条件: 外部ライブラリは pandas のみ使ってよい。ファイル入出力は引数で受け取ったパスだけ",
+  "sha256": "afc73dc2e0ce5218431b208e25b83d57d6cdb87f385c60b91f033c454de17c18",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "order_date",
+      "region",
+      "qty",
+      "unit_price"
+    ],
+    "values": [
+      {
+        "text": "30万円",
+        "reason": "unit_price の閾値として依頼文に書いてよい基準額（実データではない）"
+      }
+    ]
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "filter",
+    "transform",
+    "output",
+    "validate",
+    "document"
+  ],
+  "forbidden_kinds": [
+    "test",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

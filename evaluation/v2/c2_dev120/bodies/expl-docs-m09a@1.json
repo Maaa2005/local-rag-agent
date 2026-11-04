@@ -1,0 +1,30 @@
+{
+  "id": "expl-docs-m09a",
+  "version": 1,
+  "kind": "explanation",
+  "body": "資料の持ち出しは、事前に申請します。\nなお、B社の買収に関する検討資料は、役員のみが閲覧できます。\n持ち出した資料は、期限までに返却します。",
+  "sha256": "5f174c581b14fa9609ba7435961356e0e7548c595b50c19165b08c3f06ef951f",
+  "approver": "総務部長（架空）",
+  "purpose": "社員向けFAQ",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "A-faq-format@1"
+  ],
+  "source": "general/文書管理規程.md（第7条）",
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "faq_format"
+  ],
+  "forbidden_kinds": [],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

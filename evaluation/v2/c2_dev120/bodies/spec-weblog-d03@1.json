@@ -1,0 +1,48 @@
+{
+  "id": "spec-weblog-d03",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は ts（YYYY-MM-DD）, status（整数）, bytes（整数）, endpoint（文字列）\n条件: 外部ライブラリは pandas のみ使ってよい。ファイル入出力は引数で受け取ったパスだけ",
+  "sha256": "c54cd4797f1d5d9f662f2c6b6058362150efdceb8db204388fc3ee040c76aaa3",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "ts",
+      "status",
+      "bytes",
+      "endpoint"
+    ],
+    "values": [
+      {
+        "text": "500",
+        "reason": "エラー判定に使う状態コードの区切り（実データではない）"
+      }
+    ]
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "filter",
+    "validate",
+    "output",
+    "document"
+  ],
+  "forbidden_kinds": [
+    "transform",
+    "test",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

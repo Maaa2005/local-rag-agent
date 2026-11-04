@@ -1,0 +1,30 @@
+{
+  "id": "expl-lodging-m03a",
+  "version": 1,
+  "kind": "explanation",
+  "body": "宿泊を伴う出張では、宿泊費を実費で精算します。\n宿泊費の上限は、一泊あたり 12,000円 です。\n上限を超える場合は、事前に上長の承認を受けます。",
+  "sha256": "5f73048c3efebd1b1f73e4233b40b78cfa3aff43d1b5550ed9dbf76d65bdb030",
+  "approver": "総務部長（架空）",
+  "purpose": "社員向けFAQ",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "A-faq-format@1"
+  ],
+  "source": "general/出張旅費規程.md（第6条）",
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "faq_format"
+  ],
+  "forbidden_kinds": [],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

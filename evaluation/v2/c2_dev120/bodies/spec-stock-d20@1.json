@@ -1,0 +1,48 @@
+{
+  "id": "spec-stock-d20",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は item（文字列）, stock（整数）, reorder_level（整数）, checked_on（YYYY-MM-DD）\n条件: 外部ライブラリは pandas のみ使ってよい。ファイル入出力は引数で受け取ったパスだけ",
+  "sha256": "59dd847685c4ce65698a4731cd9a9089914c967d5cc88eaf82201da70517d335",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "item",
+      "stock",
+      "reorder_level",
+      "checked_on"
+    ],
+    "values": [
+      {
+        "text": "10月1日",
+        "reason": "下期の開始日（規程上の固定日・実データではない）"
+      }
+    ]
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "filter",
+    "transform",
+    "output",
+    "validate"
+  ],
+  "forbidden_kinds": [
+    "test",
+    "document",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

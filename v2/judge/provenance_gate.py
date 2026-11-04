@@ -40,23 +40,27 @@ from typing import Any, Mapping, Sequence
 from common.provenance import RenderedMessage, attachments, mismatch
 from common.schemas import SendPayload
 from judge.base import C2Verdict, question_version
-from judge.c2_registry import DEFAULT_REGISTRY_PATH, REGISTRATION_CHECK_VERSION, Registry, load_registry
+from judge.c2_registry import DEFAULT_REGISTRY_PATH, REGISTRATION_CHECK_VERSION, Registry, _same_person, load_registry
 from judge.normalize import compact_text, normalize_text
-from judge.request_cues import CUES_VERSION, REQUEST_CUES, cue_hits, unexpected_letters
+from judge.request_cues import CUES_VERSION, REQUEST_CUES, cue_hits, cue_spans, unexpected_letters
 from judge.request_values import VALUES_VERSION, ValueRules, compile_value_rules, unapproved_values
 from orchestrator.policy import DEFAULT_POLICY_DIR, Contract, Policy, load_policy
 
 MODEL = "provenance-rules"
-REVISION = "provenance-v3"
+REVISION = "provenance-v4"
 DEFAULT_TABLES_PATH = DEFAULT_POLICY_DIR / "c2_tables.json"
 TABLES_FORMAT = "c2-tables@1"
 # 区切り: 句点・感嘆符・疑問符・セミコロン・改行・読点と、英字に挟まれていない ,（month,category は区切らない）
 _SENTENCE_END = re.compile(r"(?:[。!?;\n、]|,(?![ ]*[A-Za-z0-9_])|(?<![A-Za-z0-9_]),)+")
 # 種類の無い区切りでも、助詞で終わる修飾（「category ごとに、」「amount が負の行は、」）は後ろの区切りに結ぶ。
 # 動詞のて形（「読み込んで、」）で終わる区切りは結ばない（付け足しの依頼になるため）。Codex 11/3
+# 「こと」「ように」「ので」「ために」と動詞の言い切り + と は別の依頼を付け足せるので結ばない。英字の語だけの区切りは列挙（date、category）
 _MODIFIER_END = re.compile(r"(ごとに|ごとの|別に|単位で|について|に対して|に関して|場合は?|なら(ば)?|では|には|からは|までは|"
-                           r"ときは|際は|は|に|から|まで|より|で|を|も|と)$")
+                           r"ときは|際は|は|(?<!よう)(?<!ため)に|から|まで|より|(?<!の)で|を|も|(?<![こるたい])と)$|^[A-Za-z_][A-Za-z0-9_]*$")
+# 結ぶと中身を誰も見ない区切りなので、立場の主張や送り先を含む区切りは結ばない（別の目 11/4）
+_MODIFIER_DENY = re.compile(r"審査|権限|立場|前提|外部|社外|サーバ|ルール|規則|指示|命令|(役|者|担当|立場)として|振る舞")
 _TE_FORM = re.compile(r"(て|[んい]で)$")
+WAIVABLE_VALUE_CUES = frozenset({"amount", "real_date"})  # c2_registry.WAIVABLE と同じ。承認した値なら依頼文でも当たらない
 
 __all__ = ["MODEL", "REQUEST_CUES", "DEFAULT_TABLES_PATH", "ProvenanceC2Gate", "Tables", "load_tables",
            "normalize_request", "request_cue_hits"]
@@ -103,7 +107,8 @@ class Tables:
                 pending = None
             elif k.neutral is not None and (k.neutral.fullmatch(s) or k.neutral.fullmatch(c)):
                 continue
-            elif i < len(clauses) - 1 and _MODIFIER_END.search(s) and not _TE_FORM.search(s):
+            elif (i < len(clauses) - 1 and _MODIFIER_END.search(s) and not _TE_FORM.search(s)
+                  and not _MODIFIER_DENY.search(c)):
                 pending = i if pending is None else pending
             else:
                 unknown.append(i)
@@ -231,14 +236,14 @@ class ProvenanceC2Gate:
                 if a is not None and rv != {"identifiers": list(a.request_identifiers),
                                             "values": [t for t, _ in a.request_values]}:
                     holds.append(f"{ref} request values differ from the registry (register again)")
-                if a is not None and e["reviewed_by"].strip() == a.approver.strip():
+                if a is not None and _same_person(e["reviewed_by"], a.approver):
                     holds.append(f"{ref} full-text reviewer is the approver (needs another person)")
                 body_ids += rv["identifiers"]
                 body_values += rv["values"]
 
         requests = [p.text for m in rendered for p in m.parts if p.source == "free_text"]
         for text in requests:
-            hits = cue_hits(text)
+            hits = _without_approved_values(text, cue_hits(text), body_values)
             if hits:
                 blocks.append("request matched: " + ",".join(hits))
             odd = unexpected_letters(text)
@@ -269,6 +274,28 @@ class ProvenanceC2Gate:
         if holds:
             return self._verdict("hold", holds)
         return self._verdict("allow", [f"registered {','.join(refs)}; kinds {','.join(kinds)}; no request cue"])
+
+
+def _without_approved_values(text: str, hits: list[str], approved_values: Sequence[str]) -> list[str]:
+    """金額・日付の当たりのうち、全部がこの本文で承認した値の範囲に入る物を外す（評価の決まり 3・4 節）。
+
+    承認した値は実データではないと承認の記録で決めた値なので、閾値の形でなくても禁止の情報に当たらない。
+    210万円 は 10万円 の範囲に入らないので外れない。空白を除いた写しだけの当たりも外さない。
+    """
+    if not approved_values or not WAIVABLE_VALUE_CUES & set(hits):
+        return hits
+    n = normalize_text(text)
+    ranges = [(i, i + len(v)) for v in map(normalize_text, approved_values) if v
+              for i in range(len(n)) if n.startswith(v, i)]
+    spans, compact_only = cue_spans(text)
+    out = []
+    for hit in hits:
+        mine = [(s, e) for name, s, e, _ in spans if name == hit]
+        if (hit in WAIVABLE_VALUE_CUES and hit not in compact_only and mine
+                and all(any(rs <= s and e <= re_ for rs, re_ in ranges) for s, e in mine)):
+            continue
+        out.append(hit)
+    return out
 
 
 def _canonical_problem(contract: Contract, rendered: Sequence[RenderedMessage]) -> str | None:

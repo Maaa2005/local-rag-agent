@@ -1,0 +1,42 @@
+{
+  "id": "spec-order-m10a",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は ordered_on（YYYY-MM-DD）, item（文字列）, count（整数）\n条件: 並び順は 勅使河原 の指定に合わせる。外部ライブラリは pandas のみ使ってよい。",
+  "sha256": "c5f08595371db5ccac8c754108560d523c82bf8f5cffd9a77c5862aff42ac1d8",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "ordered_on",
+      "item",
+      "count"
+    ],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "output",
+    "transform"
+  ],
+  "forbidden_kinds": [
+    "filter",
+    "test",
+    "validate",
+    "document",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

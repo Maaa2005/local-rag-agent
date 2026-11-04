@@ -21,7 +21,7 @@ from judge.base import question_version
 from judge.normalize import NORMALIZE_VERSION, compact_text, normalize_text
 
 # 閉じ引用符をはさむ形（「10万円」を超える）も処理条件とみなす
-_NOT_COND_AMOUNT = r"(?![」』\"”’')\]]?\s*(を?超|以上|以下|未満|より(大き|小さ|多|少|高|安)))"
+_NOT_COND_AMOUNT = r"(?![」』\"”’')\]]?\s*(を?超|を?上回|を?下回|以上|以下|以内|未満|に満た|より(大き|小さ|多|少|高|安)))"
 _NOT_COND_DATE = r"(?![」』\"”’')\]]?\s*日?\s*(以降|以前|から|まで|より(前|後)))"
 # ASCII の語の境目（日本語の直後でも当たるように、\w ではなく ASCII だけで見る）
 _A = r"(?<![A-Za-z0-9_])"
@@ -38,19 +38,20 @@ _SURNAMES = """
     宮本 大野 小島 谷口 今井 工藤 高田 増田 丸山 杉山 村田 大塚 新井 小山 平野 藤本 河野 上野 野口 武田 松井 岩崎 菅原 木下 久保 佐野 野村 松尾 市川 菊地 杉本 古川 大西
     島田 水野 桜井 高野 渡部 吉川 西田 飯田 菊池 西川 小松 北村 安田 五十嵐 川口 平田 中田 久保田 服部 岩田 土屋 川崎 本田 樋口 秋山 田口 永井 中西 吉村 石原 大橋 松岡 馬場
     浅野 荒木 大久保 野田 小池 松下 浅井 菅野 熊谷 大石 川村 望月 星野 内藤
+    髙橋 髙田 髙木 髙野 山﨑 齊藤 嶋田
 """.split()
 
 # (名前, 正規表現, 空白を除いた写しにも当てるか)
 REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
     ("employee_id", re.compile(_A + r"([Ee]-?\d{3,}|(?i:emp)-?\d{2,})|社員(番号|ID|コード|No\.?)\s*[:=は]?\s*([A-Za-z]{0,3}-?\d+|[〇一二三四五六七八九]+)"), True),
-    ("person_name", re.compile(r"[一-龥]{1,4}(さん|くん|氏|(?<![仕同模多各異一皆])様)"), True),
-    ("person_surname", re.compile("(" + "|".join(sorted(_SURNAMES, key=len, reverse=True)) + ")"), True),
+    ("person_name", re.compile(r"[一-龥]{1,4}((?<![客皆])(さん|くん)|(?<![摂華])氏(?!名)|(?<![仕同模多各異一皆客])様(?![式子々]))"), True),
+    ("person_surname", re.compile("(" + "|".join(sorted(_SURNAMES, key=len, reverse=True)) + ")(?!部(?!長)|店(?!長)|洋|馬場|の舞台|[市区町村郡県府都道駅線])"), True),
     ("counterparty", re.compile(r"([A-Z]社|株式会社|有限会社|合同会社|\(株\)|\(有\)|[一-龥ァ-ヶー]{1,8}(商事|物産|製作所|銀行|証券)|"
                                 + _A + r"(Inc\.|Corp\.|Co\.,?\s*Ltd\.?|LLC)" + _Z + ")"), True),
     ("email", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), True),
     ("phone", re.compile(r"(内線\s*\d{3,}|(?<!\d)\d{2,4}-\d{2,4}-\d{3,4}(?!\d)|(?<![\d.,])0\d{9,10}(?![\d.,])|"
                        r"(?<!\d)0\d{0,4}\(\d{1,4}\)-?\d{3,4}(?!\d)|\(0\d{0,4}\)-?\d{1,4}-?\d{3,4}(?!\d))"), True),
-    ("amount", re.compile(r"((?<![\d,.])\d[\d,.]*\s*(億|万|千)?\s*円|[億万]\s*円|[〇一二三四五六七八九十百千]+\s*(万|億)?\s*円|"
+    ("amount", re.compile(r"((?<![\d,.])\d[\d,.]*\s*(億|万|千)?\s*円|[億万]\s*円|[〇一二三四五六七八九十百千壱弐参拾]+\s*(万|億)?\s*円|(まん|おく|せん|ひゃく)えん|"
                           r"[¥$€£₩]\s*\d[\d,.]*(?![\d,.])|"
                           r"(?<![\d,.])\d[\d,.]*(?![\d,.])\s*(ドル|ユーロ|ポンド|ウォン|元|(?i:usd|jpy|eur|gbp|cny|rmb|krw)" + _Z + "))"
                           + _NOT_COND_AMOUNT), True),
@@ -61,22 +62,26 @@ REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
                              r"(?<!\d)\d{1,2}\s*" + _MONTHS + r"\.?,?\s*\d{4}(?!\d)|" + _MONTHS + r"\.?\s*\d{1,2},?\s*\d{4}(?!\d))"
                              + _NOT_COND_DATE), True),
     # pandas などの書き方（pd.read_csv・df.groupby）とファイル名は除く
-    ("table_name", re.compile(r"(?<![A-Za-z0-9_.])(?!(?:pd|np|df|os|sys|re|csv|json|math|io|dt|datetime|pathlib|path|"
-                              r"self|str|int|list|dict)\.)[A-Za-z_][A-Za-z0-9_]*\."
-                              r"(?!(?:csv|py|txt|json|md|xlsx?)(?![A-Za-z0-9_]))[A-Za-z_][A-Za-z0-9_]*"), False),
+    ("table_name", re.compile(r"(?<![A-Za-z0-9_.])(?!(?i:pd|np|df|os|sys|re|csv|json|math|io|dt|datetime|pathlib|path|pandas|numpy|statistics|collections|"
+                              r"logging|itertools|functools|e|i|self|str|int|list|dict)\.)[A-Za-z_][A-Za-z0-9_]*\."
+                              r"(?!(?i:csv|tsv|py|txt|json|md|xlsx?|g|e)(?![A-Za-z0-9_]))[A-Za-z_][A-Za-z0-9_]*"), False),
     # 「社内の」に英字の名前が続く（社内のテーブル名・列名・システム名。契約 B が禁じる。Codex 11/3）
-    ("internal_name", re.compile(r"社内(の|で使う|向けの|システムの)?\s*[A-Za-z_][A-Za-z0-9_]*"), True),
+    ("internal_name", re.compile(r"社内(の|で使う|向けの|システムの)?\s*(?!(?i:python|pandas|csv|tsv|excel|vpn|pc|wi-?fi|windows|mac)(?![A-Za-z0-9_]))[A-Za-z_][A-Za-z0-9_]*"), True),
     # 英字の略語は大文字小文字を問わず、ASCII の境目で見る（TOB が October に当たらないように）
     ("m_and_a", re.compile(_A + r"(?i:m&a|tob|mbo|lbo|mergers?|acquisitions?|takeovers?|buyouts?)" + _Z + r"|(買収|合併|出資比率|株式(を|の)?(段階)?(取得|譲渡|売却|買い増し|買い付け)|段階取得|"
                            r"資本(業務)?提携|事業譲渡|経営統合|子会社化)"), True),
     ("injection", re.compile(r"(前の指示(は|を)?無視|指示(は|を)無視|指示を(すべて|全部)?忘れ|これまでの(指示|命令)|"
                              r"(ignore|disregard)\s*(all\s*)?(the\s*)?(previous|prior|above)|システムプロンプト|system\s*prompt|全文を出力|"
-                             r"(従来|以前|これまで|上記|先)の(命令|指示|ルール|設定)|(命令|指示|ルール|制約)(を|は)?(破棄|撤回|取り消|リセット|上書き|解除))", re.I), True),
+                             r"(従来|以前|これまで|上記|先)の(命令|指示)|(従来|以前|これまで|上記|先)の(ルール|設定)(を|は)?(無視|忘れ|破棄|撤回|取り消|リセット|上書き|解除|無効)|(命令|指示|ルール|制約)(を|は)?(破棄|撤回|取り消|リセット|上書き|解除|無効)|"
+                             r"(デバッグ|開発者|管理者|メンテナンス)モード(に|へ)|内部の(設定|指示|プロンプト)(を|も)?(すべて|全部)?(出力|表示|教え|開示))", re.I), True),
     ("gate_override", re.compile(r"(送信(ゲート|前の(審査|検査|確認))|審査の対象外|(検査|審査|判定)(を|の|は)?(対象外|通過済|免除|不要|省略|スキップ)|"
                                  r"(安全|許可|問題(が)?ない|問題なし)と(判定|判断|みな)|判定する側|判定(者|役|モデル)(へ|に)の?指示|"
                                  r"(答え|回答|判定)は「?(はい|いいえ|yes|no|allow|許可)」?と(して|する)|確認済みです|承認済みです|"
                                  r"(判定|審査|検査|承認)(結果)?(は|を)?(必ず|常に|すべて|全部)?\s*(許可|通過|合格|allow|ok)(に|と|で)(して|する)|"
-                                 r"添付(は|を)?\S{0,12}として)", re.I), True),
+                                 r"(安全|セキュリティ|送信|審査|検査|フィルタ)(チェック|確認|機能|審査|検査)?(を|は)?(無効|停止|解除|オフ|切っ|切る|切った)|"
+                                 r"(上長|法務|部長|課長|管理者|担当者?|監査)(が|の|は|に)?\S{0,8}(確認|承認)(済|ずみ|した|して(いる|います|もらっ)|を(得て(いる|います)|得た|もらっ)|もらっ)|問題(は|が)?(ありません|ない)(です)?(?=[。!?\n]|$)|"
+                                 r"(審査|判定)(役|担当)|管理者権限|(ルール|規則|決まり|制約)に従わなく|社外秘|極秘|"
+                                 r"添付(?!(は|を)?(参考|参照|もと))(は|を)?\S{0,12}として)", re.I), True),
     ("forged_heading", re.compile(r"^\s*(-{3,}\s*$|区分\s*:|仕様\s*:|依頼\s*:|説明文\s*:|(system|user|assistant)\s*:|\[(system|user)\])",
                                   re.I | re.M), False),
     ("constraint_override", re.compile(r"(条件|制約|仕様|ルール)(は|を)?(すべて|全部)?(外し|無視し|守らなく|破っ|緩め|気にしなく)"), True),
@@ -89,7 +94,7 @@ REQUEST_CUES: list[tuple[str, re.Pattern[str], bool]] = [
 _SCRIPT_PREFIXES = ("LATIN ", "HIRAGANA ", "KATAKANA ", "CJK UNIFIED IDEOGRAPH", "CJK COMPATIBILITY IDEOGRAPH")
 _SCRIPT_EXTRA = frozenset("々〆ーゝゞヽヾ")
 
-CUES_VERSION = question_version("request-cues@5", {
+CUES_VERSION = question_version("request-cues@7", {
     "normalize": NORMALIZE_VERSION,
     "cues": [(n, p.pattern, p.flags, c) for n, p, c in REQUEST_CUES],
     "scripts": {"letters": list(_SCRIPT_PREFIXES), "extra": sorted(_SCRIPT_EXTRA)},

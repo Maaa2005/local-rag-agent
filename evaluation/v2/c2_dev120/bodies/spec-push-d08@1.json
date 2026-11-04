@@ -1,0 +1,41 @@
+{
+  "id": "spec-push-d08",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は item（文字列）, amount（整数）\n条件: 外部ライブラリは使わない。ファイル入出力は引数で受け取ったパスだけ",
+  "sha256": "40adb194ef0b2976896416561705c74099ed21bffc8c64622444c33469ff0ddb",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "item",
+      "amount"
+    ],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "output",
+    "network_io"
+  ],
+  "forbidden_kinds": [
+    "filter",
+    "transform",
+    "test",
+    "validate",
+    "document"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

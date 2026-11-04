@@ -43,6 +43,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+import unicodedata
+
 from judge.base import question_version
 from judge.normalize import normalize_text
 from judge.request_cues import CUES_VERSION, cue_hits, cue_spans, unexpected_letters
@@ -62,7 +64,8 @@ REGISTRATION_CHECK_SPEC = {
     "waivable": sorted(WAIVABLE),  # これ以外の種類・空白を除いた写しだけの当たり・文字種の当たりは外せない
     "acknowledgement_unit": "span",  # 承認の text の出現の範囲に、当たりの範囲がまるごと入る
     "acknowledgement_unique": True,  # 承認の text は本文に 1 回だけ出る（1 か所に結ぶ）
-    "human_review": "reviewed_by is non-empty and differs from approver and checked_by; review is pass",
+    "human_review": "reviewed_by is non-empty and differs from approver and checked_by after NFKC/case/space; review is pass",
+    "acknowledgement_one_value": True,  # 承認の text 1 つに値は 1 つ
 }
 REGISTRATION_CHECK_VERSION = question_version("c2-registration@3", REGISTRATION_CHECK_SPEC)
 
@@ -94,6 +97,13 @@ def registration_findings(body: str) -> tuple[list[tuple[str, int, int, str]], l
     spans, compact_only = cue_spans(body)
     spans = spans + [(name, m.start(), m.end(), m.group(0)) for name, pat in _C2_PATTERNS for m in pat.finditer(n)]
     return sorted(spans, key=lambda s: (s[1], s[2], s[0])), compact_only, unexpected_letters(body)
+
+
+def _same_person(a: str, b: str) -> bool:
+    """全角半角・大文字小文字・空白の違いだけなら同じ人（「部長（架空）」と「部長(架空)」）。"""
+    def key(s: str) -> str:
+        return "".join(unicodedata.normalize("NFKC", s).casefold().split())
+    return key(a) == key(b)
 
 
 def _ack_problem(a: Any) -> str | None:
@@ -147,6 +157,14 @@ def _checked_row(approved: ApprovedText, contract: Contract, destination: str,
     if fixed:
         raise RegistrationRefused(f"{approved.key}: registration check hit {fixed}, which acknowledgement cannot waive")
     ranges = [r for t, _ in ack for r in _occurrences(n, t)]
+    # 承認は 1 か所の値に結ぶ。本文全体を text に書いて別の実額まで外すのを止める（別の目 11/4）
+    for t, _ in ack:
+        rs, re_ = _occurrences(n, t)[0]
+        inside = sorted({(s, e) for _, s, e, _ in spans if rs <= s and e <= re_})
+        merged = [sp for i, sp in enumerate(inside) if i == 0 or sp[0] >= max(x[1] for x in inside[:i])]
+        if len(merged) > 1:
+            raise RegistrationRefused(f"{approved.key}: acknowledged text {t!r} covers {len(merged)} values; "
+                                      "acknowledge each value on its own")
     open_hits = [f"{name}:{text}" for name, s, e, text in spans if not any(rs <= s and e <= re_ for rs, re_ in ranges)]
     if open_hits:
         raise RegistrationRefused(
@@ -164,9 +182,9 @@ def _checked_row(approved: ApprovedText, contract: Contract, destination: str,
 def _people_problem(approved: ApprovedText, checked_by: str, reviewed_by: str) -> str | None:
     if not isinstance(reviewed_by, str) or not reviewed_by.strip():
         return "reviewed_by must be a non-empty string"
-    if reviewed_by.strip() == approved.approver.strip():
+    if _same_person(reviewed_by, approved.approver):
         return f"reviewed_by {reviewed_by!r} is the approver of the text"
-    if reviewed_by.strip() == checked_by.strip():
+    if _same_person(reviewed_by, checked_by):
         return f"reviewed_by {reviewed_by!r} is the same as checked_by"
     return None
 
@@ -201,6 +219,11 @@ def build_entries(policy: Policy, *, checked_by: str, reviewed_by: str | None = 
                 (tuple(e["request_values"]["identifiers"]), tuple(e["request_values"]["values"])))
 
     prev = {same(e): (e["checked_by"], e["reviewed_by"]) for e in previous}
+    # 承認者が替わったら前の確認は引き継がない（全文確認は承認者と別の人である事を見た時の物なので）
+    for e in previous:
+        a0 = policy.approved.get(e["ref"])
+        if a0 is not None and _same_person(e["reviewed_by"], a0.approver):
+            prev.pop(same(e), None)
     out = []
     for a in sorted(policy.approved.values(), key=lambda x: x.key):
         for ck in a.contracts:
@@ -279,7 +302,7 @@ def _row_problem(e: Any) -> str | None:
         return f"result {e['result']!r} is not pass"
     if e["review"] != "pass":
         return f"review {e['review']!r} is not pass"
-    if e["reviewed_by"].strip() == e["checked_by"].strip():
+    if _same_person(e["reviewed_by"], e["checked_by"]):
         return "reviewed_by must differ from checked_by"
     if not isinstance(e["acknowledged"], list) or any(_ack_problem(a) for a in e["acknowledged"]):
         return "acknowledged must be a list of {text, reason} (non-empty strings)"
@@ -336,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--registry", type=Path, default=None)
     ap.add_argument("--acknowledge", action="append", default=[],
                     help="承認者が承知の上で残す当たりの箇所。ID@版=本文の文字列::理由（箇所ごとに繰り返す・--write のとき）")
-    ap.add_argument("--checked-by", default="registry-build", help="新しく登録・承認した行に残す承認をした人")
+    ap.add_argument("--checked-by", default=None, help="新しく登録・承認した行に残す承認をした人")
     ap.add_argument("--reviewed-by", default=None,
                     help="新しく登録した行に残す、本文の全文を確かめた人（承認者・--checked-by と別人。--write のとき）")
     ap.add_argument("--re-review", action="store_true",
@@ -346,6 +369,11 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--acknowledge, --reviewed-by and --re-review are only for --write")
     if a.re_review and a.reviewed_by is None:
         raise SystemExit("--re-review needs --reviewed-by")
+    if a.acknowledge and not a.checked_by:
+        raise SystemExit("--acknowledge needs --checked-by (the person who approved the hits)")
+    if a.reviewed_by is not None and not a.re_review:
+        print("note: rows that carry over keep their reviewer; use --re-review if this person read every body",
+              file=sys.stderr)
     ack_new = _parse_ack(a.acknowledge)
     path = a.registry or a.policy_dir / "c2_registry.json"
     pol = load_policy(a.policy_dir)
@@ -362,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
            if e["ref"] in pol.approved and pol.approved[e["ref"]].sha256 == e["sha256"]}
     ack.update(ack_new)
     try:
-        entries = build_entries(pol, checked_by=a.checked_by, reviewed_by=a.reviewed_by, acknowledged=ack,
+        entries = build_entries(pol, checked_by=a.checked_by or "registry-build", reviewed_by=a.reviewed_by, acknowledged=ack,
                                 previous=old.entries if old else (), re_review=a.re_review)
     except RegistrationRefused as e:
         print(f"refused: {e}", file=sys.stderr)

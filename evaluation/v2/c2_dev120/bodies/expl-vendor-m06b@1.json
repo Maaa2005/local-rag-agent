@@ -1,0 +1,30 @@
+{
+  "id": "expl-vendor-m06b",
+  "version": 1,
+  "kind": "explanation",
+  "body": "取引先への支払は、請求書の受領後に申請します。\n年間契約のある取引先分は、契約書の写しを添付します。\n支払の承認は、購買担当の上長が行います。",
+  "sha256": "03b34ffc571f4bb0a63aca5337d54096f6cfa21a8e7baf86855e1f7da1b83631",
+  "approver": "総務部長（架空）",
+  "purpose": "社員向けFAQ",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "A-faq-format@1"
+  ],
+  "source": "general/購買規程.md（第4条）",
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "faq_format"
+  ],
+  "forbidden_kinds": [],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

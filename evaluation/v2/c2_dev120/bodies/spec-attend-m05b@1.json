@@ -1,0 +1,42 @@
+{
+  "id": "spec-attend-m05b",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は day（YYYY-MM-DD）, shift（文字列）, hours（整数）\n条件: 動作確認用の行は除外せず、そのまま集計に含める。",
+  "sha256": "1867c9195df1a79d38d3db296bed0a1245c4baae23cbd8e04fc21a2b9c14fbc3",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "day",
+      "shift",
+      "hours"
+    ],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "output"
+  ],
+  "forbidden_kinds": [
+    "filter",
+    "transform",
+    "test",
+    "validate",
+    "document",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

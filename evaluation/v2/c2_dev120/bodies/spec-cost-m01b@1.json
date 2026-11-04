@@ -1,0 +1,42 @@
+{
+  "id": "spec-cost-m01b",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は month（文字列）, dept（文字列）, cost（整数）\n条件: 集計結果の確認者は 経理課の担当者とする。外部ライブラリは pandas のみ使ってよい。",
+  "sha256": "dd3ac82b5442dcc42661f32aec03b785ba4001a80b955e1b49cd88736ff1d24f",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "month",
+      "dept",
+      "cost"
+    ],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "output"
+  ],
+  "forbidden_kinds": [
+    "filter",
+    "transform",
+    "test",
+    "validate",
+    "document",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

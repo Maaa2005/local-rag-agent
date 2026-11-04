@@ -7,7 +7,7 @@
       "contract": "A-faq-format@1",
       "purpose": "社員向けFAQ",
       "destination": "claude",
-      "check_version": "c2-registration@3#f20f04fa198d",
+      "check_version": "c2-registration@3#ab1f19953280",
       "hits": [],
       "acknowledged": [],
       "request_values": {
@@ -25,7 +25,7 @@
       "contract": "B-csv-codegen@1",
       "purpose": "汎用CSV処理のコード案",
       "destination": "codex",
-      "check_version": "c2-registration@3#f20f04fa198d",
+      "check_version": "c2-registration@3#ab1f19953280",
       "hits": [],
       "acknowledged": [],
       "request_values": {

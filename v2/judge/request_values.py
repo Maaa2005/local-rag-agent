@@ -34,7 +34,7 @@ from judge.normalize import normalize_text
 
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _NUMBER = re.compile(r"(?<![A-Za-z0-9_])\d+(?:[.,]\d+)*")
-_KANJI_DIGITS = "〇一二三四五六七八九十百千万億兆"
+_KANJI_DIGITS = "〇一二三四五六七八九十百千万億兆壱弐参拾"
 _KANJI_NUMBER = re.compile(rf"[{_KANJI_DIGITS}]*〇[{_KANJI_DIGITS}]*|[{_KANJI_DIGITS}]{{2,}}|"
                            rf"[{_KANJI_DIGITS}](?=\s*(円|ドル|ユーロ|年|月|日|名|人|歳|割|%))")
 _ERA_YEAR = re.compile(r"(令和|平成|昭和|大正|明治)\s*(元|\d+|[〇一二三四五六七八九十]+)\s*年")
@@ -126,6 +126,8 @@ def unapproved_values(text: str, rules: ValueRules, body_identifiers: Iterable[s
             continue
         # 中身が承認した語・値と区切りの記号だけなら可。日本語の語などが残れば引用符ごと保留
         rest = _WORD.sub("", _NUMBER.sub("", inner))
+        for v in sorted(values, key=len, reverse=True):
+            rest = rest.replace(v, "")
         if _check(inner, rules, known, values) or re.search(r"[^\s.,:;/・-]", rest):
             bad.append((m.start(), f"quoted:{inner}"))
     bad += _check(n, rules, known, values, skip=quoted)

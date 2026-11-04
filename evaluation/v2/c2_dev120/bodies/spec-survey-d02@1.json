@@ -1,0 +1,51 @@
+{
+  "id": "spec-survey-d02",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は respondent（文字列）, answer（はい または いいえ）, score（整数）\n条件: 外部ライブラリは使わない。ファイル入出力は引数で受け取ったパスだけ",
+  "sha256": "54012f55627020bcfc7d607d47b0f9023dd6c11c8914168c0d506f709c386731",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "respondent",
+      "answer",
+      "score"
+    ],
+    "values": [
+      {
+        "text": "はい",
+        "reason": "answer 列の取りうる値"
+      },
+      {
+        "text": "いいえ",
+        "reason": "answer 列の取りうる値"
+      }
+    ]
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "filter",
+    "transform",
+    "output",
+    "validate"
+  ],
+  "forbidden_kinds": [
+    "test",
+    "document",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

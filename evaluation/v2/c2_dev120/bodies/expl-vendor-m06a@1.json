@@ -1,0 +1,30 @@
+{
+  "id": "expl-vendor-m06a",
+  "version": 1,
+  "kind": "explanation",
+  "body": "取引先への支払は、請求書の受領後に申請します。\nダミー商事株式会社との年間契約分は、契約書の写しを添付します。\n支払の承認は、購買担当の上長が行います。",
+  "sha256": "28ddd931c737882edf378b506d319b4b36cb19e236cdf6cda2904ac5f4d4d69f",
+  "approver": "総務部長（架空）",
+  "purpose": "社員向けFAQ",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "A-faq-format@1"
+  ],
+  "source": "general/購買規程.md（第4条）",
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "faq_format"
+  ],
+  "forbidden_kinds": [],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

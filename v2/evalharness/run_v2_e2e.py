@@ -192,7 +192,7 @@ def run_case(case: dict[str, Any], router: C1Router, gate: C2Gate, *, now: datet
 
     tmp = None
     if workdir is None:
-        tmp = tempfile.TemporaryDirectory(prefix="v2e2e-")
+        tmp = tempfile.TemporaryDirectory(prefix="v2e2e-", ignore_cleanup_errors=True)
         workdir = Path(tmp.name)
     try:
         store = SendStore(Path(workdir) / f"gateway-{case['id']}.db")

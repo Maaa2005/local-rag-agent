@@ -1,0 +1,47 @@
+{
+  "id": "spec-gen-d05",
+  "version": 1,
+  "kind": "spec",
+  "body": "目的: テスト用の CSV を作る Python コード案\n入力: なし。出力は UTF-8 の CSV。列は ticket_id（文字列）, plan（文字列）, fee（整数）\n条件: すべてダミーの値にする。外部ライブラリは使わない",
+  "sha256": "a48904435b10d12f72ca2ec667b0e3ec2cbb3f34c3fa4a49dc5ed60caee10b2c",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "ticket_id",
+      "plan",
+      "fee"
+    ],
+    "values": [
+      {
+        "text": "980円",
+        "reason": "fee の基準額として依頼文に書いてよい（実データではない）"
+      }
+    ]
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "test",
+    "output",
+    "document",
+    "validate"
+  ],
+  "forbidden_kinds": [
+    "aggregate",
+    "filter",
+    "transform",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}
