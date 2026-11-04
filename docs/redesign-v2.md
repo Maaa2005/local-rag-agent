@@ -88,6 +88,13 @@ flowchart LR
 3. `truncated` は真偽値（省略時は false）。true の判定は使わない（C1 は人に回す、C2 は保留）
 4. 送った質問の id ごとに答えがちょうど 1 件。重複・欠落は不正。質問にない id の答えは無視する
 5. `probs` は質問の全ラベルを過不足なく持ち、各値は 0〜1 の有限な数（真偽値は不可）、合計は 1±0.01。`answer` は最大確率のラベル（同率なら最大のどれでもよい）
+6. （11/4 追加）要求ごとに番号を付ける。アダプタが `X-Request-Id`（uuid4 の 16 進 32 字）を毎回新しく作って送り、サーバは同じ値を応答のヘッダに返してよい。返すなら同じ値でなければ不正（別の要求への応答を、この要求の判定として記録しない）。返さないサーバも受ける。番号は判定の結果（`judge_request_id`）と監査 DB（`c1_judge_request_id` / `c2_judge_request_id`）に残し、判断サーバのログ（`answered` の `req`）と 1 件ずつ突き合わせる。2 段構えでは後段の番号を残し、前段の番号は理由欄の末尾（`; first req=…`）に残す
+7. （11/4 追加）`expected_revision` を渡したアダプタは、その版の応答だけを受ける。違えば不正。渡さないときは今までどおり空でない版を受けて記録する。評価・本番で使う時は渡す
+8. （11/4 追加）応答は 1 MiB（`MAX_RESPONSE_BYTES`）まで読む。`Content-Length` が超える、または読み進めて超えたら、そこで読むのをやめて不正
+
+起動時の確かめ: `GET {base_url}/healthz` → `{"model": "<名前>", "revision": "<版>"}`（Laya・Clef の shim が返す）。アダプタの `ready()` が規則 2・7 と同じ照合をする。判定のたびの応答にも版が入るので、こちらは起動時に早く止めるためだけに使う。
+
+大きさの上限（shim が受ける上限・超えたら 422）: `context` 50,000 字、質問は Laya の shim が 16 問・Clef の shim が 1 問、選択肢 64、質問文 2,000 字。判定対象の長さはその前に guard の `max_input_chars` で切る（超えたら C1=human / C2=hold）。
 
 タイムアウト:
 
@@ -97,7 +104,7 @@ flowchart LR
 エラー時の扱い:
 
 - 2xx 以外・JSON 不正・接続失敗・タイムアウト・上の検証違反は、すべて例外として guard まで上げ、C1 は `human`、C2 は `hold` に倒す。理由は監査ログに残る
-- 再試行しない。同じ判定を二度聞いて都合のよい方を採ることを防ぐ
+- 再試行しない。同じ判定を二度聞いて都合のよい方を採ることを防ぐ。混雑の 429 / 503 に `Retry-After` が付いていても送り直さない（Laya 本体は混雑時に 503 と `Retry-After: 1` を返す。その時は C1=human / C2=hold になる）
 - リダイレクトに従わない。判定対象を社内の base_url 以外へ流さない
 
 2 段構え（6GB 構成で前段 Laya-multilingual、迷ったときだけ後段 Clef-flash）。前段の Laya は 2026-10-17 の実測で不採用（下の「Laya の初期採否」）。仕組みは前段のモデルを差し替えても使える:
@@ -109,7 +116,29 @@ flowchart LR
 
 - 後段の判定理由に「escalated from <前段モデル>@<版>」と前段の判定を残す
 - 後段も迷う場合: C1 は後段の `min_confidence`（未満なら `human`）、C2 は後段の hold がそのまま保留になる
-- 閾値（`block_at` / `allow_at` / `escalate_below` / `min_confidence`）は Issue #1 の 6GB 実測で決める。それまでは既定値（`block_at=0.5` / `allow_at=0.1`、C1 の確信度下限なし）
+- 閾値（`block_at` / `allow_at` / `escalate_below` / `min_confidence`）は今期は決めない（10/26）。判断モデルは C1・C2 とも採らないと決まり（Laya は 10/17、モデル C2 は 10/18。運用は `RuleC2Gate`）、目標も 6GB から 8〜12GB に移したため。判断モデルを再び試す時に、その GPU の規模で決め直す。それまでは既定値（`block_at=0.5` / `allow_at=0.1`、C1 の確信度下限なし）
+
+#### 公式の仕様・実装との対照（2026-11-04）
+
+同じ形の判断の窓口（質問を並べて送り、答えと確率を受け取る）の公式の仕様と実装の原文を集めて、この I/F と比べた。読めたのは GitHub・PyPI に置かれた公式のソース・OpenAPI・proto・文書で、dev.to の Jev の案内・Hugging Face のモデルカード・各社の文書サイト（learn.microsoft.com・docs.aws.amazon.com・platform.openai.com・docs.nvidia.com・docs.vllm.ai など）はこの作業環境のネットワークの決まりで読めず未確認。
+
+| 項目 | この I/F | 公式の仕様・実装 | 扱い |
+|---|---|---|---|
+| 入口 | `POST /v1/systemone` | TypeSafe Jev（`typesafe-sdk` 0.7.5 の `SYSTEM_ONE_PATH`）・Laya 本体（`laya.serve`）・llama.cpp の server が同じパス。Cloudflare の Clef は "follows the System One API" | 同じ |
+| 判定対象・質問の形 | `context` と、`id` を持つ質問の配列。`prompt`・`choices`・`descriptions`・`min`/`max` | 上流は `state` と、質問名をキーにした辞書。`instructions` と `criteria` | 変えない。上流の形への詰め替えは shim の役目（Laya・Clef の shim がそうしている）。アダプタが上流に直接つながる事は無い |
+| 確率 | 全ラベルの `probs`、合計 1±0.01、`answer` は最大 | Jev の choice は "sum to approximately 1"、Laya は 4 桁に個別に丸める、Clef は "sum to 1"。llama.cpp は "not guaranteed to be calibrated" | 変えない。今の質問は選択肢 6 つまでなので、4 桁の丸めの誤差（1 つ 0.00005）が 0.01 に届く事は無い。選択肢を 200 近くに増やす時は見直す |
+| score | `min`〜`max` の整数、`answer` は最大 | Jev・Clef は段階の説明（0 から）を渡し、`score` は確率の重み付き平均 | 使わない（C1・C2 は使っておらず、shim は 422）。使う時は上流に合わせて決め直す |
+| `model` | 返すなら頼んだ名前と同じ | Jev は "May differ from the alias"。Laya 本体は判定部の固定名 | 変えない。この I/F の相手はこちらの shim で、名前は shim が決める。違えば設定の誤りなので止める |
+| 版 | 応答ごとに `revision` 必須 | Jev・Clef・OpenAI の応答には無い。Google Model Armor は応答ごとに `filter_version`、KServe の Open Inference Protocol は `model_version`、Hugging Face TEI は `/info` の `model_sha`、Laya 本体は `/health` の `revisions` | 変えない（応答ごとに返す側の作りに合わせる）。版を決めて受ける口（規則 7）と、起動時の `/healthz` の確かめを足した |
+| 切り捨て | `truncated` 必須（省略は false）、true は使わない | Laya は `usage.truncated`（strict 互換では消える）、Clef は "Long text state is truncated" と黙って切る、Azure Content Safety は 1 万字を超えると断る、AWS ApplyGuardrail は検査した字数を返す | 変えない。上流に印が無い時は、shim が上限で断るか true を返す。guard の `max_input_chars` で先に切る |
+| 失敗の時 | すべて止める側（C1=human / C2=hold） | Envoy の外部認可 `failure_mode_allow` は既定 false（失敗は拒否）、Google の外部処理 `fail_open` も既定 false。OWASP Top 10:2025 A10 は失敗時に "failing closed" | 同じ |
+| 再試行 | しない | Google の AIP-194 は状態が変わりうる要求と DEADLINE_EXCEEDED を自動で送り直さない。NeMo Guardrails の外向き HTTP は既定で POST を送り直さない。一方 Jev・OpenAI の SDK は既定で 2 回送り直す | 変えない。判定は二度聞いて良い方を採れる形にしない |
+| リダイレクト | 従わない | NeMo Guardrails の外向き HTTP も "Does not follow redirects" | 同じ |
+| 時間切れ | アダプタ 10 秒＋guard の打ち切り | `typesafe-sdk` の `DEFAULT_TIMEOUT = 10.0` | 同じ |
+| 要求の番号 | 無かった | Jev は `x-typesafe-request-id`、AWS は `x-amzn-requestid`、OpenAI は `x-request-id`、Azure の API 指針は `x-ms-request-id` を必須、KServe は要求の `id` を応答で返す、vLLM は `--enable-request-id-headers` で `X-Request-Id` | 足した（規則 6）。番号はこちらが作り、判断サーバのログと突き合わせる |
+| 応答の大きさ | 上限なし | 応答側の上限を決めた公式の文書は見つからなかった（Laya 本体は要求を 2 MiB・Clef は質問 64 で切る） | 足した（規則 8・1 MiB はこちらで決めた柵） |
+
+出典（取得 2026-11-04）: `typesafe-sdk` 0.7.5（PyPI・`_core/constants.py`・`_core/retry.py`・`_schemas/models.py`）、`cloudflare/cloudflare-docs`（`workers-ai-models/clef.json`）、`laya` 0.4.22（`laya/serve.py`）、`ggml-org/llama.cpp`（`tools/server/README.md`）、`vllm-project/vllm`（`docs/models/pooling_models/classify.md`）、`huggingface/text-embeddings-inference`（`docs/openapi.json`）、`kserve/open-inference-protocol`（`specification/protocol/inference_rest.md`）、`Azure/azure-rest-api-specs`（ContentSafety 2024-09-01）、`microsoft/api-guidelines`（`azure/Guidelines.md`）、`googleapis/googleapis`（`modelarmor/v1/service.proto`・`networkservices/v1/dep.proto`）、`boto/botocore`（bedrock-runtime の `service-2.json`）、`openai/openai-openapi`、`NVIDIA/NeMo-Guardrails`（`docs/configure-rails/actions/outbound-http.mdx`）、`envoyproxy/envoy`（`ext_authz/v3`）、`aip-dev/google.aip.dev`（AIP-194）、OWASP Top 10:2025 A10。
 
 ### Laya-multilingual の shim（2026-10-17）
 

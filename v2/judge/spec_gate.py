@@ -50,7 +50,7 @@ class SpecC2Gate:
             return self._hold("no target")
         except SpecError as e:
             return self._hold(f"spec: {e}")
-        body, parsed = self._c.ask(req.context, [dict(req.question)])
+        body, parsed, request_id = self._c.ask(req.context, [dict(req.question)])
         p = parsed[req.question["id"]][1]["yes"]
         truncated = bool(body.get("truncated", False))
         if truncated:
@@ -63,7 +63,8 @@ class SpecC2Gate:
             decision = "hold"
         return C2Verdict(decision=decision, reason=f"{self.label} p_yes={p:.3f}", model=self._c.model,
                          revision=body["revision"], truncated=truncated, prob_block=p,
-                         question_version=self.question_version, context_sha256=req.context_sha256)
+                         question_version=self.question_version, context_sha256=req.context_sha256,
+                         judge_request_id=request_id)
 
 
 class RenderedGate(Protocol):

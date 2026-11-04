@@ -34,12 +34,16 @@ class C1Decision(schemas.C1Decision):
     question_version: str = Field(min_length=1)
     # 判断モデルが入力を切り捨てて判定したか。True の判定は guarded_c1 が human に倒す
     truncated: bool = False
+    # 判断サーバへの要求の番号（X-Request-Id）。判断サーバのログと突き合わせる。モデルに聞いていない判定は None
+    judge_request_id: str | None = None
 
 
 class C2Verdict(schemas.C2Verdict):
     question_version: str = Field(min_length=1)
     # 判断モデルに送った context の sha256（docs/v2-c2-eval-plan.md 6 章）。モデルに送っていない判定は None
     context_sha256: str | None = None
+    # 判断サーバへの要求の番号（X-Request-Id）。モデルに聞いていない判定は None
+    judge_request_id: str | None = None
 
 
 def question_version(label: str, spec: Any) -> str:
