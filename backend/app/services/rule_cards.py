@@ -58,6 +58,15 @@ TIME_PATTERN = r"^([01]\d|2[0-3]):[0-5]\d$"
 _TIME_COLON = re.compile(r"(?<![\d:.])(午前|午後)?\s*(\d{1,2}):(\d{2})(?![\d:])")
 _TIME_JI = re.compile(r"(?<![\d.])(午前|午後)?\s*(\d{1,2})時(?!間)(?:\s*(\d{1,2})分|(半))?")
 _MIDDAY = "正午"
+# 引用の中の時間の長さ: 6時間10分・3時間半・8時間（枠の単位が 分 なら分に、時間なら時間にして照合する）
+_DURATION = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)時間(?:(\d+)分|(半))?")
+DURATION_UNITS = ("分", "時間")
+ZERO_WORDS = ("ない", "なし", "ありません", "持っていない", "無い")  # 数の枠の 0 は、引用にこの語がある時だけ通す
+# 年のない日付: 12月18日・1/30（直前が「年」や数字・斜線の物は年つきの日付の一部なので除く）
+_MD_KANJI = re.compile(r"(?<![年\d])(\d{1,2})月(\d{1,2})日")
+_MD_SLASH = re.compile(r"(?<![\d/])(\d{1,2})/(\d{1,2})(?![\d/])")
+YEARLESS_BASE_YEAR = 2024  # 年のない日付だけの問で、最初の 1 つを置く年（2 月 29 日を作れる閏年）
+YEARLESS_AMBIGUOUS_DAYS = 170  # 基準の日付との差がこれ以上なら、近い方の年が定まらないので保留
 
 
 class CardError(ValueError):
@@ -273,21 +282,73 @@ def conclusion_options(question: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(o.strip() for o in _OPTIONS.findall(question)))
 
 
+# カードの選び方の定数。値は「正しい規程を選んだ・誤選択・答えない」を GPU なしで数えて決めた
+# （開発用 90 問・N 12 問・開発用 24 問。誤選択 0 の範囲で選択数が最大の点のうち、最も厳しい点）。変えたら数え直す
+SELECT_MIN_SCORE = 14  # 1 位の点の下限。語の組に合うカードが 1 枚だけの時も要る
+SELECT_MIN_MARGIN = 8  # 1 位と 2 位の点の差の下限（2 枚以上の時）
+SELECT_KEYWORD_WEIGHT = 3  # keywords の文字 2-gram の重み（他は 1）
+_NOT_GRAM = re.compile(r"[\s、。，．,.!?！？「」『』（）()・:：;；/／]")
+
+
+def _bigrams(text: str) -> set[str]:
+    s = _NOT_GRAM.sub("", unicodedata.normalize("NFKC", text))
+    return {s[i:i + 2] for i in range(len(s) - 1)}
+
+
+def _cond_texts(c: Mapping[str, Any]) -> list[str]:
+    out = [str(c.get("name") or "")]
+    for k in ("all", "any"):
+        for child in c.get(k) or ():
+            out += _cond_texts(child)
+    return out
+
+
+def card_select_weights(card: Card) -> dict[str, int]:
+    """カードの語（doc.source・doc.quote・枠の名前と describe・条件と例外の name・keywords）の文字 2-gram → 重み。"""
+    texts = [card.doc["source"], card.doc["quote"]]
+    for s in card.slots.values():
+        texts += [s.name, s.describe]
+    for c in (*card.conditions, *card.exceptions):
+        texts += _cond_texts(c)
+    weights: dict[str, int] = {}
+    for t in texts:
+        for g in _bigrams(t):
+            weights[g] = 1
+    for k in card.keywords:
+        for g in _bigrams(k):
+            weights[g] = SELECT_KEYWORD_WEIGHT
+    return weights
+
+
+def select_score(card: Card, question: str) -> int:
+    """質問本文の文字 2-gram とカードの語の 2-gram の重なり（重みの合計）。"""
+    qg = _bigrams(question_body(question))
+    return sum(w for g, w in card_select_weights(card).items() if g in qg)
+
+
 def select_card(cards: Sequence[Card], question: str) -> Card | None:
-    """質問の結論の選択肢がカードの結論と同じで、カードの手がかりの語が質問にあるカード。ただ 1 枚の時だけ返す。"""
+    """質問の結論の選択肢がカードの結論と同じカードのうち、質問との語の重なりの点が最も高い 1 枚。
+    1 位が SELECT_MIN_SCORE 以上で、2 位との差が SELECT_MIN_MARGIN 以上の時だけ返す。それ以外は None（答えない）。
+    誤ったカードを選ぶと誤断定になるので、迷う時は選ばない。"""
     opts = set(conclusion_options(question))
-    body = unicodedata.normalize("NFKC", question_body(question))
-    hits = [c for c in cards if opts == set(c.conclusions) and (not c.keywords or any(k in body for k in c.keywords))]
-    return hits[0] if len(hits) == 1 else None
+    ranked = sorted(((select_score(c, question), i) for i, c in enumerate(cards) if opts == set(c.conclusions)),
+                    key=lambda x: (-x[0], x[1]))
+    if not ranked or ranked[0][0] < SELECT_MIN_SCORE:
+        return None
+    if len(ranked) > 1 and ranked[0][0] - ranked[1][0] < SELECT_MIN_MARGIN:
+        return None
+    return cards[ranked[0][1]]
 
 
 # ---------------------------------------------------------------- 抽出の形
 
 
-def extraction_schema(card: Card) -> dict[str, Any]:
-    """llama.cpp / vLLM の json_schema に渡す形。項目ごとに value と quote（質問からそのまま抜き出した部分）。"""
+def extraction_schema(card: Card, *, reverse: bool = False) -> dict[str, Any]:
+    """llama.cpp / vLLM の json_schema に渡す形。項目ごとに quote（質問からそのまま抜き出した部分）→ value の順。
+    reverse=True は枠の順を逆にする（2 回目の読み直し用）。"""
     props: dict[str, Any] = {}
-    for s in card.slots.values():
+    slots = list(card.slots.values())
+    for s in reversed(slots) if reverse else slots:
         if s.type == "number":
             value: dict[str, Any] = {"type": ["number", "null"]}
         elif s.type == "date":
@@ -296,20 +357,24 @@ def extraction_schema(card: Card) -> dict[str, Any]:
             value = {"type": ["string", "null"], "pattern": TIME_PATTERN}
         else:
             value = {"type": ["string", "null"], "enum": [*BOOL_VALUES, None]}
-        props[s.name] = {"type": "object", "properties": {"value": value, "quote": {"type": ["string", "null"]}},
-                         "required": ["value", "quote"], "additionalProperties": False}
+        # quote を value より先に出させる（先に質問の文を抜き、その文から値を決める）。properties と required の両方で
+        props[s.name] = {"type": "object", "properties": {"quote": {"type": ["string", "null"]}, "value": value},
+                         "required": ["quote", "value"], "additionalProperties": False}
     return {"type": "object", "properties": props, "required": list(props), "additionalProperties": False}
 
 
-def extraction_messages(card: Card, question: str) -> list[dict[str, str]]:
+def extraction_messages(card: Card, question: str, *, reverse: bool = False) -> list[dict[str, str]]:
     lines = []
-    for s in card.slots.values():
+    slots = list(card.slots.values())
+    for s in reversed(slots) if reverse else slots:
         kind = {"number": f"数（単位 {s.unit}）" if s.unit else "数", "date": "日付（YYYY-MM-DD）",
                 "time": "時刻（HH:MM・24 時間表記。午後10時は 22:00）", "bool": "「あり」か「なし」"}[s.type]
         lines.append(f"- {s.name}: {s.describe}。{kind}")
-    system = ("質問の文から、次の項目の値と、その値が書かれた質問の部分を JSON で答えてください。\n"
-              "quote には質問の文をそのまま抜き出して入れます（言い換えない）。\n"
-              "質問に書かれていない項目は value と quote を null にします。計算・推測・換算はしません。\n"
+    system = ("質問の文から、次の項目について、先に根拠になる質問の文をそのまま抜き出し（quote）、次にその文から値（value）を決めて、"
+              "JSON で答えてください。\n"
+              "quote には質問の文を言い換えずにそのまま入れます。value は quote に書かれている通りに決めます。\n"
+              "質問に書かれていない項目は quote と value を null にします。計算・推測・換算はしません。"
+              "ただし、数の単位が 分 や 時間 で quote が「6時間10分」「3時間半」のような時間の長さの時だけは、その単位の数に直します。\n"
               + "\n".join(lines))
     return [{"role": "system", "content": system}, {"role": "user", "content": question_body(question).strip()}]
 
@@ -321,17 +386,45 @@ def _norm(s: str) -> str:
     return numnorm.normalize_numbers(s)
 
 
+def _durations(text: str) -> list[tuple[int, int, Decimal]]:
+    """引用の時間の言い方 6時間10分・3時間半・8時間 → (始まり, 終わり, 分の数)。"""
+    out = []
+    for m in _DURATION.finditer(text):
+        minutes = Decimal(m[1]) * 60 + (Decimal(m[2]) if m[2] else Decimal(30) if m[3] else Decimal(0))
+        out.append((m.start(), m.end(), minutes))
+    return out
+
+
 def _numbers_with_unit(text: str, unit: str | None) -> list[Decimal]:
     out = []
     aliases = UNIT_ALIASES.get(unit or "", (unit,)) if unit else ()
+    durations = _durations(text) if unit in DURATION_UNITS else []
+    # 「6時間10分」の 6 や 10 は、複合の値の一部。単独の数としては数えない（6 時間と読み違えない）
+    compound = [(a, b) for a, b, _ in durations if text[a:b].endswith(("分", "半"))]
     for m in _NUM.finditer(text):
         if aliases and not any(text[m.end():].lstrip().startswith(a) for a in aliases):
+            continue
+        if any(a <= m.start() < b for a, b in compound):
             continue
         try:
             out.append(Decimal(m.group().replace(",", "")))
         except InvalidOperation:
             continue
+    for _, _, minutes in durations:
+        out.append(minutes if unit == "分" else minutes / 60)
     return out
+
+
+def _number_in_quote(dv: Decimal, quote: str, unit: str | None) -> bool:
+    cands = _numbers_with_unit(quote, unit)
+    if unit == "時間":  # 6時間10分 = 6.1666… に対して 6.17 を通す（±0.01）
+        return any(abs(dv - c) <= Decimal("0.01") for c in cands if c != c.to_integral_value()) or dv in cands
+    return dv in cands
+
+
+def _zero_in_quote(quote: str) -> bool:
+    """数の枠の 0: 引用に「ない・なし・ありません・持っていない・無い」のどれかがある。"""
+    return any(w in quote for w in ZERO_WORDS)
 
 
 def _dates(text: str) -> list[date]:
@@ -342,6 +435,38 @@ def _dates(text: str) -> list[date]:
         except ValueError:
             continue
     return out
+
+
+def _month_days(text: str) -> list[tuple[int, int]]:
+    """引用の中の年のない日付（月, 日）。"""
+    out = []
+    for rx in (_MD_KANJI, _MD_SLASH):
+        for m in rx.finditer(text):
+            mo, d = int(m[1]), int(m[2])
+            if 1 <= mo <= 12 and 1 <= d <= 31:
+                out.append((mo, d))
+    return out
+
+
+def _place_yearless(month: int, day: int, anchors: Sequence[date]) -> tuple[date | None, str | None]:
+    """年のない日付に年を付ける: 基準の日付のどれかとの差の絶対値が最小になる年。
+    差が YEARLESS_AMBIGUOUS_DAYS 日以上なら、近い方の年が定まらないので (None, 理由)。"""
+    best: tuple[int, date] | None = None
+    for a in anchors:
+        for y in range(a.year - 4, a.year + 5):
+            try:
+                d = date(y, month, day)
+            except ValueError:  # 2 月 29 日は閏年だけ
+                continue
+            diff = abs((d - a).days)
+            if best is None or diff < best[0]:
+                best = (diff, d)
+    if best is None:
+        return None, f"{month}月{day}日 の年を決められない（そういう日付が基準の近くに無い）"
+    if best[0] >= YEARLESS_AMBIGUOUS_DAYS:
+        return None, (f"{month}月{day}日 の年を決められない（基準の日付との差が {YEARLESS_AMBIGUOUS_DAYS} 日以上で、"
+                      "近い方の年が定まらない）")
+    return best[1], None
 
 
 def _clock(ampm: str | None, hour: int, minute: int) -> Clock | None:
@@ -414,6 +539,7 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
     """
     problems: list[str] = []
     values: dict[str, Any] = {}
+    yearless: list[tuple[str, int, int]] = []  # 年のない日付の枠（名前, 月, 日）
     if not isinstance(raw, dict):
         return {}, ["extraction is not an object"]
     body = _norm(question_body(question))
@@ -441,7 +567,10 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
             if dv < 0:
                 problems.append(f"{name}: negative value")
                 continue
-            if dv not in _numbers_with_unit(nq, s.unit):
+            if dv == 0 and _zero_in_quote(nq):  # 「ない」「ありません」など。0 という数字は引用に無くてよい
+                values[name] = dv
+                continue
+            if not _number_in_quote(dv, nq, s.unit):
                 problems.append(f"{name}: value {dv} is not the number in its quote")
                 continue
             values[name] = dv
@@ -450,10 +579,13 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
                 dd = date.fromisoformat(v) if isinstance(v, str) else None
             except ValueError:
                 dd = None
-            if dd is None or dd not in _dates(nq):
+            if dd is not None and dd in _dates(nq):
+                values[name] = dd
+            elif dd is not None and (dd.month, dd.day) in _month_days(nq):
+                yearless.append((name, dd.month, dd.day))  # 年はモデルの値を使わず、後でコードが決める
+            else:
                 problems.append(f"{name}: date {v!r} is not the date in its quote")
                 continue
-            values[name] = dd
         elif s.type == "time":
             tv = parse_time(v)
             if tv is None or tv not in _times(nq):
@@ -465,6 +597,28 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
                 problems.append(f"{name}: value must be あり or なし")
                 continue
             values[name] = v
+    if yearless:
+        anchors = _dates(body)  # 年つきの日付が同じ問にあれば、その年を基準にする
+        todo = list(yearless)
+        if not anchors:  # 年のない日付だけ: 最初の 1 つを固定の年に置き、他はそれに最も近い年にする
+            name, mo, d = todo.pop(0)
+            try:
+                values[name] = date(YEARLESS_BASE_YEAR, mo, d)
+                anchors = [values[name]]
+            except ValueError:
+                problems.append(f"{name}: {mo}月{d}日 という日付は無い")
+        for name, mo, d in todo:
+            placed, why = _place_yearless(mo, d, anchors) if anchors else (None, "基準の日付が決まらない")
+            if placed is None:
+                problems.append(f"{name}: {why}")
+            else:
+                values[name] = placed
+    # derive の先の枠が照合に落ちた時は、保留にせず捨てる。元の枠が全部読めていればコードが計算する（decide）。
+    # 元の枠が無い・落ちた時は、従来どおり保留（先の問題を残す）
+    for target, e in card.derive.items():
+        sources = _names(e, card.slots)
+        if sources and all(values.get(n) is not None for n in sources):
+            problems = [p for p in problems if p.split(":", 1)[0] != target or p.endswith("needs value and quote")]
     unused = _unused_slots(card, values)
     problems = [p for p in problems if p.split(":", 1)[0] not in unused]
     for name in unused:
@@ -593,6 +747,13 @@ class CardDecision:
     values: dict[str, Any] = field(default_factory=dict)
     conditions: list[tuple[str, bool | None]] = field(default_factory=list)
     raw: Any = None  # モデルが拾ったままの値（検査の前。値の一致率を測るため）
+    # 2 回読みの記録（確認なしの成績も同じ記録から数えられるように）。first_conclusion は 1 回目だけの結論（保留は None）、
+    # second_conclusion は 2 回目の結論（読み直さなかった・保留は None）。pass_stats は各回の extractor.last_stats
+    first_conclusion: str | None = None
+    second_conclusion: str | None = None
+    second_hold_reason: str | None = None
+    second_raw: Any = None
+    pass_stats: list[dict[str, Any]] = field(default_factory=list)
 
 
 def decide(card: Card, values: Mapping[str, Any]) -> CardDecision:
@@ -705,17 +866,37 @@ class OpenAICompatExtractor:
         return json.loads(msg.content or "null")
 
 
-async def answer_with_card(card: Card, question: str, extractor: Extractor) -> tuple[str, CardDecision]:
-    """カードで答える。抽出の失敗・形の崩れ・検査に通らない値は保留（モデルだけの答えには戻さない）。"""
+CONFIRM_PASSES = 2  # 1 回目で結論が決まった時、枠の順を逆にした別の呼び出しで読み直す回数（1 なら確認しない）
+HOLD_MISMATCH = "2 回の読みが一致しない"
+
+
+async def _read_once(card: Card, question: str, extractor: Extractor, *, reverse: bool) -> tuple[CardDecision, dict[str, Any]]:
+    """抽出 1 回 → 検査 → decide。抽出の失敗・形の崩れ・検査に通らない値は保留。(判定, その回の last_stats)。"""
     try:
-        raw = await extractor.extract(extraction_messages(card, question), extraction_schema(card))
+        raw = await extractor.extract(extraction_messages(card, question, reverse=reverse),
+                                      extraction_schema(card, reverse=reverse))
     except Exception as e:  # noqa: BLE001  抽出の失敗はすべて保留
-        d = CardDecision(card.id, None, f"抽出に失敗した（{type(e).__name__}）")
-        return render_answer(card, d), d
+        return CardDecision(card.id, None, f"抽出に失敗した（{type(e).__name__}）"), dict(getattr(extractor, "last_stats", {}) or {})
+    stats = dict(getattr(extractor, "last_stats", {}) or {})
     values, problems = validate_extraction(card, question, raw)
     if problems:
-        d = CardDecision(card.id, None, "抽出の検査に通らない: " + "; ".join(problems[:3]), values, raw=raw)
-        return render_answer(card, d), d
+        return CardDecision(card.id, None, "抽出の検査に通らない: " + "; ".join(problems[:3]), values, raw=raw), stats
     d = decide(card, values)
     d.raw = raw
+    return d, stats
+
+
+async def answer_with_card(card: Card, question: str, extractor: Extractor) -> tuple[str, CardDecision]:
+    """カードで答える。抽出の失敗・形の崩れ・検査に通らない値は保留（モデルだけの答えには戻さない）。
+    1 回目で結論が決まった時だけ、枠の順を逆にした 2 回目の抽出を別の呼び出しで行い、2 回の結論が同じ時だけ決める
+    （問い方を変えた呼び出しの不一致を保留の信号に使う）。"""
+    d, stats = await _read_once(card, question, extractor, reverse=False)
+    d.pass_stats = [stats]
+    d.first_conclusion = d.conclusion
+    if d.conclusion is not None and CONFIRM_PASSES >= 2:
+        d2, stats2 = await _read_once(card, question, extractor, reverse=True)
+        d.pass_stats.append(stats2)
+        d.second_conclusion, d.second_hold_reason, d.second_raw = d2.conclusion, d2.hold_reason, d2.raw
+        if d2.conclusion != d.conclusion:
+            d.conclusion, d.hold_reason, d.conditions = None, HOLD_MISMATCH, []
     return render_answer(card, d), d

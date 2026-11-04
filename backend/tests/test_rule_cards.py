@@ -758,3 +758,352 @@ def test_current_twelve_cards_still_load_with_the_pair_check():
     pairs = [c for c in CARDS if c.doc["source"].endswith("福利厚生規程.md") and set(c.conclusions) == {"対象になる", "対象にならない"}]
     assert {c.id for c in pairs} == {"fukuri-jutaku-teate", "fukuri-ningen-dock"}
     assert len(load_cards(CARDS_DIR, allow_draft=True)) == 12
+
+
+# ===== カードの選び方: 文字 2-gram の点・下限・差（誤選択 0 を優先し、迷う時は答えない） =====
+
+_OPT_YN = "最後の行には「結論: 必要」または「結論: 不要」のどちらかだけを書いてください。"
+DEV90_QUESTIONS = ROOT / "evaluation" / "v2" / "numeric_dev90" / "questions.jsonl"
+DEV90_CARDS = Path.home() / ".cache" / "lr-gpu" / "dev90-2" / "cards"
+
+
+def test_select_constants_are_the_counted_values():
+    # 値を変えたら「正しく選ぶ・誤選択・答えない」を数え直す（docs/v2-rule-card-procedure.md）
+    assert (rule_cards.SELECT_MIN_SCORE, rule_cards.SELECT_MIN_MARGIN, rule_cards.SELECT_KEYWORD_WEIGHT) == (14, 8, 3)
+
+
+def test_select_weights_use_source_quote_slots_conditions_and_keywords():
+    c = BY_ID["keihi-buchou-shounin"]
+    w = rule_cards.card_select_weights(c)
+    assert w["部門"] == rule_cards.SELECT_KEYWORD_WEIGHT          # keywords「部門長」
+    assert w["経費"] == 1 and w["精算"] == 1                       # doc.source「経費精算規程.md」
+    assert rule_cards.select_score(c, QUESTIONS[0]["question"]) >= rule_cards.SELECT_MIN_SCORE
+
+
+def test_select_card_needs_a_floor_even_for_a_single_card():
+    c = BY_ID["keihi-buchou-shounin"]
+    assert select_card([c], QUESTIONS[0]["question"]) is c
+    # 結論の語の組は合うが、規程の語が質問に無い（別の規程の問）→ 1 枚だけでも選ばない
+    other = "旅行の積立金が3万円あります。友人に貸しても大丈夫ですか？" + _OPT_YN
+    assert rule_cards.select_score(c, other) < rule_cards.SELECT_MIN_SCORE
+    assert select_card([c], other) is None and select_card(CARDS, other) is None
+
+
+def test_select_card_needs_a_margin_over_the_second():
+    c = BY_ID["keihi-buchou-shounin"]
+    q = QUESTIONS[0]["question"]
+    near = parse_card(dict(c.raw, id="near", keywords=["部門長", "経費"]))
+    assert select_card([c, near], q) is None                     # 同点
+    far = parse_card(dict(c.raw, id="far", doc={**c.raw["doc"], "source": "x.md", "quote": "別の文。"},
+                          slots={"額": {"type": "number", "unit": "円", "describe": "金"}},
+                          conditions=[{"name": "条", "left": "額", "op": ">", "right": 1}], keywords=["別"]))
+    assert select_card([far, c], q) is c and select_card([c, far], q) is c
+
+
+@pytest.mark.parametrize("q", QUESTIONS, ids=lambda q: q["id"])
+def test_no_wrong_card_is_picked_when_the_right_card_is_absent(q):
+    # 規程のカードが無い（作れなかった）問: 同じ語の組の別の規程のカードを選ばない
+    rest = [c for c in CARDS if c.id != RULE_TO_CARD[q["rule_id"]]]
+    assert select_card(rest, q["question"]) is None
+
+
+def test_dev90_questions_pick_none_of_the_other_rules_cards():
+    rows = [json.loads(line) for line in DEV90_QUESTIONS.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(rows) == 90
+    assert [r["id"] for r in rows if select_card(CARDS, r["question"]) is not None] == []
+
+
+@pytest.mark.skipif(not DEV90_CARDS.is_dir(), reason="dev90 のカードは手元の置き場にだけある")
+def test_dev90_selection_table_has_no_wrong_selection():
+    cards = [rule_cards.load_card(p) for p in sorted(DEV90_CARDS.glob("*.json")) if p.name != "unable.json"]
+    rows = [json.loads(line) for line in DEV90_QUESTIONS.read_text(encoding="utf-8").splitlines() if line.strip()]
+    right = wrong = none = 0
+    for r in rows:
+        want = [c.id for c in cards if c.doc["source"] == r["rule_id"]
+                and set(c.conclusions) == set(rule_cards.conclusion_options(r["question"]))]
+        got = select_card(cards, r["question"])
+        if got is None:
+            none += 1
+        elif [got.id] == want:
+            right += 1
+        else:
+            wrong += 1
+    assert wrong == 0 and right >= 88 and none <= 2   # 旧: 正 60・答えない 30
+
+
+# ===== 値の照合: 時間の複合・年のない日付・derive の先・0 =====
+
+def _dur_card(unit):
+    return _mk({"運行時間": {"type": "number", "unit": unit, "describe": "運行の時間"}},
+               [_leaf("6時間以内", "運行時間", "<=", 360 if unit == "分" else 6)])
+
+
+@pytest.mark.parametrize("unit,quote,value", [
+    ("分", "6時間10分", 370), ("分", "3時間半", 210), ("分", "8時間", 480), ("分", "1時間30分", 90), ("分", "45分", 45),
+    ("時間", "6時間10分", 6.17), ("時間", "6時間10分", 6.16), ("時間", "3時間半", 3.5), ("時間", "8時間", 8),
+    ("時間", "2.5時間", 2.5),
+])
+def test_duration_compound_matches_its_unit(unit, quote, value):
+    q = f"社用車を{quote}使いました。"
+    values, problems = validate_extraction(_dur_card(unit), q, {"運行時間": {"value": value, "quote": quote}})
+    assert problems == [] and values["運行時間"] == Decimal(str(value))
+
+
+@pytest.mark.parametrize("unit,quote,value", [
+    ("分", "6時間10分", 10), ("分", "6時間10分", 6), ("分", "6時間10分", 371), ("分", "3時間半", 30), ("分", "8時間", 8),
+    ("時間", "6時間10分", 6), ("時間", "6時間10分", 6.2), ("時間", "6時間10分", 10), ("時間", "3時間半", 3),
+    ("時間", "3時間半", 4), ("時間", "8時間", 480),
+])
+def test_duration_compound_rejects_a_misread_part(unit, quote, value):
+    q = f"社用車を{quote}使いました。"
+    _, problems = validate_extraction(_dur_card(unit), q, {"運行時間": {"value": value, "quote": quote}})
+    assert problems and "not the number" in problems[0]
+
+
+def _span_dates(order=("開始", "終了")):
+    slots = {n: {"type": "date", "describe": n + "した日"} for n in order}
+    return _mk(slots, [_leaf("20日以内", {"sub": ["終了", "開始"]}, "<=", 20)])
+
+
+def _dates_extraction(start, end):
+    return {"開始": {"value": start[0], "quote": start[1]}, "終了": {"value": end[0], "quote": end[1]}}
+
+
+def test_yearless_dates_across_the_new_year_use_the_nearest_year_and_ignore_the_models_year():
+    q = "12月18日に始めて、1月5日に終えました。"
+    ex = _dates_extraction(("2031-12-18", "12月18日に始めて"), ("1999-01-05", "1月5日に終えました"))
+    for order in (("開始", "終了"), ("終了", "開始")):   # 枠の順が逆でも差は同じ（18 日）
+        c = _span_dates(order)
+        values, problems = validate_extraction(c, q, ex)
+        assert problems == [] and abs((values["終了"] - values["開始"]).days) == 18
+        assert (values["終了"] - values["開始"]).days == 18
+        assert decide(c, values).conclusion == "対象"
+    # 最初の年なし日付は固定の年（閏年）に置く
+    values, _ = validate_extraction(_span_dates(), q, ex)
+    assert values["開始"] == date(rule_cards.YEARLESS_BASE_YEAR, 12, 18) and values["終了"].year == values["開始"].year + 1
+
+
+def test_yearless_date_follows_the_year_of_a_dated_date_in_the_same_question():
+    q = "2025年12月20日に始めて、1月5日に終えました。"
+    ex = _dates_extraction(("2025-12-20", "2025年12月20日に始めて"), ("2024-01-05", "1月5日に終えました"))
+    values, problems = validate_extraction(_span_dates(), q, ex)
+    assert problems == [] and values["終了"] == date(2026, 1, 5)
+    # 年つきの日付は今までどおり引用の年と合う事
+    bad = _dates_extraction(("2024-12-20", "2025年12月20日に始めて"), ("2026-01-05", "1月5日に終えました"))
+    assert validate_extraction(_span_dates(), q, bad)[1]
+
+
+def test_yearless_date_must_match_month_and_day_of_its_quote():
+    q = "12月18日に始めて、1月5日に終えました。"
+    for bad in (("2024-12-19", "12月18日に始めて"), ("2024-11-18", "12月18日に始めて")):
+        _, problems = validate_extraction(_span_dates(), q, _dates_extraction(bad, ("2025-01-05", "1月5日に終えました")))
+        assert problems and "not the date in its quote" in problems[0]
+    q2 = "1/30に始めて、2/3に終えました。"   # 月/日の書き方
+    ex2 = _dates_extraction(("2024-01-30", "1/30に始めて"), ("2024-02-03", "2/3に終えました"))
+    values, problems = validate_extraction(_span_dates(), q2, ex2)
+    assert problems == [] and (values["終了"] - values["開始"]).days == 4
+    # 「2025年12月18日」の 12月18日 は年つきの日付の一部で、年のない日付ではない
+    q3 = "2025年12月18日に始めて、2026年1月5日に終えました。"
+    ex3 = _dates_extraction(("2024-12-18", "2025年12月18日に始めて"), ("2026-01-05", "2026年1月5日に終えました"))
+    assert validate_extraction(_span_dates(), q3, ex3)[1]
+
+
+def test_yearless_dates_170_days_apart_are_held_with_a_reason():
+    c = _span_dates()
+    # 1月1日 → 6月18日は 169 日（近い方が決まる）、6月19日は 170 日（決まらない）
+    values, problems = validate_extraction(c, "1月1日に始めて、6月18日に終えました。",
+                                           _dates_extraction(("2024-01-01", "1月1日に始めて"), ("2024-06-18", "6月18日に終えました")))
+    assert problems == [] and (values["終了"] - values["開始"]).days == 169
+    q = "1月1日に始めて、6月19日に終えました。"
+    ex = _dates_extraction(("2024-01-01", "1月1日に始めて"), ("2024-06-19", "6月19日に終えました"))
+    _, problems = validate_extraction(c, q, ex)
+    assert problems and "終了" in problems[0] and f"{rule_cards.YEARLESS_AMBIGUOUS_DAYS} 日以上" in problems[0]
+    text, d = run(rule_cards.answer_with_card(c, q, FakeExtractor(lambda m, s: ex)))
+    assert d.conclusion is None and "年を決められない" in d.hold_reason and text.endswith("結論: 保留")
+
+
+def test_feb_29_is_built_on_a_leap_year():
+    c = _span_dates()
+    values, problems = validate_extraction(c, "2月29日に始めて、3月5日に終えました。",
+                                           _dates_extraction(("2024-02-29", "2月29日に始めて"), ("2024-03-05", "3月5日に終えました")))
+    assert problems == [] and values["開始"] == date(2024, 2, 29) and (values["終了"] - values["開始"]).days == 5
+    # 基準が閏年でない近くにあると 2 月 29 日の年は決められない → 保留
+    _, problems = validate_extraction(c, "2025年3月1日に始めて、2月29日に終えました。",
+                                      _dates_extraction(("2025-03-01", "2025年3月1日に始めて"), ("2024-02-29", "2月29日に終えました")))
+    assert problems and "終了" in problems[0]
+
+
+YUKYU_Q = "入社から6ヶ月が経過しました。この期間の全労働日は120日で、欠勤は30日でした。年次有給休暇は付与されますか？"
+
+
+def _yukyu_raw(**change):
+    raw = {"勤続月数": {"quote": "入社から6ヶ月が経過", "value": 6}, "全労働日数": {"quote": "全労働日は120日", "value": 120},
+           "欠勤日数": {"quote": "欠勤は30日", "value": 30}, "出勤日数": {"quote": None, "value": None}}
+    raw.update(change)
+    return raw
+
+
+def test_failed_derive_target_is_dropped_and_computed_from_its_sources():
+    raw = _yukyu_raw(出勤日数={"quote": "欠勤は30日", "value": 80})    # 先の値が引用の数と違う
+    values, problems = validate_extraction(YUKYU, YUKYU_Q, raw)
+    assert problems == [] and values.get("出勤日数") is None
+    d = decide(YUKYU, values)
+    assert d.values["出勤日数"] == 90 and d.conclusion == "付与されない"   # 120 - 30 = 90 → 0.75
+    # 引用が質問に無い時も同じ（保留にしない）
+    values, problems = validate_extraction(YUKYU, YUKYU_Q, _yukyu_raw(出勤日数={"quote": "出勤は90日", "value": 90}))
+    assert problems == [] and decide(YUKYU, values).values["出勤日数"] == 90
+
+
+def test_failed_derive_target_stays_a_hold_when_a_source_is_missing_or_failed():
+    bad_target = {"quote": "欠勤は30日", "value": 80}
+    _, problems = validate_extraction(YUKYU, YUKYU_Q, _yukyu_raw(出勤日数=bad_target, 欠勤日数={"quote": None, "value": None}))
+    assert any(p.startswith("出勤日数") for p in problems)           # 元の枠が無い → 従来どおり保留
+    _, problems = validate_extraction(YUKYU, YUKYU_Q, _yukyu_raw(出勤日数=bad_target, 欠勤日数={"quote": "欠勤は30日", "value": 31}))
+    assert any(p.startswith("出勤日数") for p in problems) and any(p.startswith("欠勤日数") for p in problems)
+    # derive の先でない枠の失敗は今までどおり保留
+    _, problems = validate_extraction(YUKYU, YUKYU_Q, _yukyu_raw(全労働日数={"quote": "全労働日は120日", "value": 12}))
+    assert any(p.startswith("全労働日数") for p in problems)
+    # 先の形の崩れ（value/quote が無い）は捨てない
+    raw = _yukyu_raw()
+    raw["出勤日数"] = {"value": 1}
+    assert any("needs value and quote" in p for p in validate_extraction(YUKYU, YUKYU_Q, raw)[1])
+
+
+def _zero_card():
+    return _mk({"貸与中": {"type": "number", "unit": "円", "describe": "貸与中の機器の金額"}},
+               [_leaf("0 円", "貸与中", "<", 1)])
+
+
+@pytest.mark.parametrize("quote", ["他に借りている機器はありません", "機器は借りていない", "貸与中の機器はなし",
+                                   "貸与中の機器は無い", "貸与中の機器は持っていない", "貸与中は0円"])
+def test_zero_passes_only_with_a_negation_word_or_a_literal_zero(quote):
+    values, problems = validate_extraction(_zero_card(), quote + "です。", {"貸与中": {"value": 0, "quote": quote}})
+    assert problems == [] and values["貸与中"] == 0
+
+
+@pytest.mark.parametrize("quote,value", [("他に3万円の機器を借りています", 0), ("機器を借りています", 0),
+                                         ("機器は借りていません", 5), ("貸与中の機器はありません", 1)])
+def test_zero_is_rejected_without_a_negation_word_and_negation_does_not_make_other_numbers(quote, value):
+    _, problems = validate_extraction(_zero_card(), quote + "。", {"貸与中": {"value": value, "quote": quote}})
+    assert problems and "not the number" in problems[0]
+
+
+# ===== 抽出の形: quote を value より先に・2 回目は枠の順を逆にする =====
+
+def test_extraction_schema_puts_quote_before_value_and_reverses_for_the_second_read():
+    s = rule_cards.extraction_schema(YUKYU)
+    assert list(s["properties"]) == list(YUKYU.slots) and s["required"] == list(YUKYU.slots)
+    for item in s["properties"].values():
+        assert list(item["properties"]) == ["quote", "value"] and item["required"] == ["quote", "value"]
+    r = rule_cards.extraction_schema(YUKYU, reverse=True)
+    assert list(r["properties"]) == list(YUKYU.slots)[::-1] and r["required"] == list(r["properties"])
+    text = json.dumps(s, ensure_ascii=False)
+    assert text.index('"quote"') < text.index('"value"')
+    msg = rule_cards.extraction_messages(YUKYU, N07)[0]["content"]
+    rev = rule_cards.extraction_messages(YUKYU, N07, reverse=True)[0]["content"]
+    assert msg.index("先に") < msg.index("次に") and "そのまま" in msg
+    names = list(YUKYU.slots)
+    assert [msg.index(f"- {n}:") for n in names] == sorted(msg.index(f"- {n}:") for n in names)
+    assert [rev.index(f"- {n}:") for n in names] == sorted((rev.index(f"- {n}:") for n in names), reverse=True)
+
+
+# ===== 2 回読み（CONFIRM_PASSES）=====
+
+class SeqExtractor:
+    """呼び出しごとに決めた答えを返す抽出役（例外も投げられる）。last_stats は呼び出しごとに変わる。"""
+
+    def __init__(self, *replies):
+        self.replies, self.calls, self.last_stats = list(replies), [], {}
+
+    async def extract(self, messages, schema):
+        self.calls.append((messages, schema))
+        self.last_stats = {}
+        r = self.replies[min(len(self.calls), len(self.replies)) - 1]
+        if isinstance(r, Exception):
+            raise r
+        self.last_stats = {"completion_tokens": 10 * len(self.calls), "finish_reason": "stop", "reasoning_chars": 0}
+        return r
+
+
+def _amount_card():
+    slots = {"金額": {"type": "number", "unit": "円", "describe": "申請の金額"},
+             "件数": {"type": "number", "unit": "件", "describe": "申請の件数"}}
+    return _mk(slots, [_leaf("100円以上", "金額", ">=", 100)])
+
+
+AQ = "金額は150円と50円です。件数は2件です。"
+
+
+def _ex(amount, quote, n=2):
+    return {"金額": {"quote": quote, "value": amount}, "件数": {"quote": "件数は2件", "value": n}}
+
+
+def test_two_reads_agree_then_decide_and_record_both_conclusions():
+    c = _amount_card()
+    ex = SeqExtractor(_ex(150, "金額は150円"), _ex(150, "金額は150円"))
+    text, d = run(rule_cards.answer_with_card(c, AQ, ex))
+    assert len(ex.calls) == rule_cards.CONFIRM_PASSES == 2
+    assert (d.conclusion, d.first_conclusion, d.second_conclusion, d.hold_reason) == ("対象", "対象", "対象", None)
+    assert text.splitlines()[-1] == "結論: 対象"
+    # 別の呼び出しで、枠の順を逆にして読む
+    assert list(ex.calls[0][1]["properties"]) == ["金額", "件数"] and list(ex.calls[1][1]["properties"]) == ["件数", "金額"]
+    assert ex.calls[0][0] != ex.calls[1][0]
+    assert d.pass_stats == [{"completion_tokens": 10, "finish_reason": "stop", "reasoning_chars": 0},
+                            {"completion_tokens": 20, "finish_reason": "stop", "reasoning_chars": 0}]
+    assert ex.last_stats["completion_tokens"] == 20          # last_stats は直前の 1 回のまま
+    assert d.raw == _ex(150, "金額は150円") and d.second_raw == d.raw
+
+
+def test_two_reads_that_disagree_are_held_with_the_fixed_reason():
+    c = _amount_card()
+    ex = SeqExtractor(_ex(150, "金額は150円"), _ex(50, "50円"))
+    text, d = run(rule_cards.answer_with_card(c, AQ, ex))
+    assert d.conclusion is None and d.hold_reason == rule_cards.HOLD_MISMATCH == "2 回の読みが一致しない"
+    assert (d.first_conclusion, d.second_conclusion) == ("対象", "対象外")
+    assert text.splitlines()[-1] == "結論: 保留" and "2 回の読みが一致しない" in text
+
+
+@pytest.mark.parametrize("second,why", [
+    (_ex(None, None), "決まらない"),                                  # 2 回目が保留（値が読めない）
+    (_ex(150, "金額は99円"), "検査に通らない"),                       # 2 回目が検査落ち
+    (TimeoutError("slow"), "抽出に失敗"),                             # 2 回目の抽出の失敗
+])
+def test_second_read_that_holds_or_fails_makes_the_whole_answer_a_hold(second, why):
+    ex = SeqExtractor(_ex(150, "金額は150円"), second)
+    _, d = run(rule_cards.answer_with_card(_amount_card(), AQ, ex))
+    assert d.conclusion is None and d.hold_reason == rule_cards.HOLD_MISMATCH
+    assert d.first_conclusion == "対象" and d.second_conclusion is None and why in d.second_hold_reason
+
+
+def test_first_read_that_holds_is_not_read_again():
+    ex = SeqExtractor(_ex(None, None), _ex(150, "金額は150円"))
+    _, d = run(rule_cards.answer_with_card(_amount_card(), AQ, ex))
+    assert len(ex.calls) == 1 and d.conclusion is None and d.hold_reason != rule_cards.HOLD_MISMATCH
+    assert (d.first_conclusion, d.second_conclusion) == (None, None) and len(d.pass_stats) == 1
+
+
+def test_confirmation_can_be_turned_off_and_the_record_still_has_first_conclusion(monkeypatch):
+    monkeypatch.setattr(rule_cards, "CONFIRM_PASSES", 1)
+    ex = SeqExtractor(_ex(150, "金額は150円"), _ex(50, "50円"))
+    _, d = run(rule_cards.answer_with_card(_amount_card(), AQ, ex))
+    assert len(ex.calls) == 1 and d.conclusion == "対象" and (d.first_conclusion, d.second_conclusion) == ("対象", None)
+
+
+def test_sealed_record_has_first_and_second_conclusions_without_breaking_the_old_fields():
+    try:
+        from evaluation.gpu_local import numeric_sealed as ns
+    except ImportError:
+        pytest.skip("evaluation を読み込めない")
+    c = _amount_card()
+    item = {"id": "q1", "question": AQ, "rule_id": "R", "should_hold": False, "expected_conclusion": "対象"}
+    ex = SeqExtractor(_ex(150, "金額は150円"), _ex(150, "金額は150円"))
+    _, d = run(rule_cards.answer_with_card(c, AQ, ex))
+    rec = ns.make_record(item, 0, 1, c, d, d.pass_stats[0], 0.5)
+    assert rec["outcome"] == "decided" and rec["conclusion"] == "対象"
+    assert (rec["first_conclusion"], rec["second_conclusion"]) == ("対象", "対象")
+    assert rec["completion_tokens"] == 10 and rec["second_completion_tokens"] == 20 and rec["finish_reason"] == "stop"
+    ex = SeqExtractor(_ex(150, "金額は150円"), _ex(50, "50円"))
+    _, d = run(rule_cards.answer_with_card(c, AQ, ex))
+    rec = ns.make_record(item, 0, 1, c, d, d.pass_stats[0], 0.5)
+    assert (rec["outcome"], rec["stop_reason"], rec["conclusion"]) == ("held", ns.CONFIRM_MISMATCH, None)
+    assert (rec["first_conclusion"], rec["second_conclusion"]) == ("対象", "対象外")

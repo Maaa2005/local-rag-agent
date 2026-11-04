@@ -40,9 +40,11 @@ WRONG_ASSERTIONS_MAX = 0
 
 # 止まった理由 (answer_with_card の保留の文頭と対応する)
 NO_CARD, EXTRACT_FAILED, VALIDATION_FAILED, UNKNOWN_HOLD = "no_card", "extract_failed", "validation_failed", "unknown_hold"
-STOP_REASONS = (NO_CARD, EXTRACT_FAILED, VALIDATION_FAILED, UNKNOWN_HOLD)
+CONFIRM_MISMATCH = "confirm_mismatch"  # 1 回目で決まったが、2 回目の読みと結論が合わず保留にした
+STOP_REASONS = (NO_CARD, EXTRACT_FAILED, VALIDATION_FAILED, UNKNOWN_HOLD, CONFIRM_MISMATCH)
 _PREFIX_EXTRACT = "抽出に失敗した"
 _PREFIX_VALIDATION = "抽出の検査に通らない"
+_PREFIX_MISMATCH = "2 回の読みが一致しない"  # rule_cards.HOLD_MISMATCH
 
 
 # ---------------------------------------------------------------- 指紋 (freeze)
@@ -189,6 +191,8 @@ def stop_reason(decision: Any) -> str | None:
         return EXTRACT_FAILED
     if reason.startswith(_PREFIX_VALIDATION):
         return VALIDATION_FAILED
+    if reason.startswith(_PREFIX_MISMATCH):
+        return CONFIRM_MISMATCH
     return UNKNOWN_HOLD
 
 
@@ -201,9 +205,18 @@ def make_record(item: dict, index: int, run: int, card: Any, decision: Any, stat
         rec.update(outcome=NO_CARD, stop_reason=NO_CARD, card_id=None, conclusion=None, hold_reason=None)
         return rec
     reason = stop_reason(decision)
+    # first_conclusion / second_conclusion: 2 回読みの 1 回目・2 回目の結論（保留・読み直さなかった時は None）。
+    # 確認なしの成績は first_conclusion から数えられる（確認なしなら conclusion = first_conclusion）
     rec.update(outcome="decided" if reason is None else "held", stop_reason=reason, card_id=card.id,
                conclusion=decision.conclusion, hold_reason=decision.hold_reason, raw=decision.raw,
+               first_conclusion=getattr(decision, "first_conclusion", None),
+               second_conclusion=getattr(decision, "second_conclusion", None),
+               second_hold_reason=getattr(decision, "second_hold_reason", None),
+               second_raw=getattr(decision, "second_raw", None),
                seconds=round(seconds, 3), **(stats or {}))
+    second = (getattr(decision, "pass_stats", None) or [None, None])[1:2]
+    if second and second[0]:  # 2 回目の数（1 回目の数は上の stats のまま）
+        rec.update({f"second_{k}": v for k, v in second[0].items()})
     return rec
 
 
@@ -219,8 +232,9 @@ async def sealed_round(rows: list[dict], cards: list, extractor: Any, run: int) 
             continue
         t = time.perf_counter()
         _, d = await rule_cards.answer_with_card(card, item["question"], extractor)
-        out.append(make_record(item, i, run, card, d, dict(getattr(extractor, "last_stats", {}) or {}),
-                               time.perf_counter() - t))
+        # last_stats は直前の 1 回（2 回目）の数。従来の欄は 1 回目の数のままにする
+        first = d.pass_stats[0] if d.pass_stats else dict(getattr(extractor, "last_stats", {}) or {})
+        out.append(make_record(item, i, run, card, d, dict(first), time.perf_counter() - t))
     return out
 
 

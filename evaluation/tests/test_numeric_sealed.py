@@ -293,7 +293,11 @@ def _round(rows, reply):
     return asyncio.run(ns.sealed_round(rows, [_card()], ex, 1)), ex
 
 
-def test_round_classifies_stop_reasons_and_skips_model_for_no_card():
+def test_round_classifies_stop_reasons_and_skips_model_for_no_card(monkeypatch):
+    # 小さな架空カードなので、選ぶ下限はこの試験の中だけ下げる
+    from app.services import rule_cards
+    monkeypatch.setattr(rule_cards, "SELECT_MIN_SCORE", 1)
+    monkeypatch.setattr(rule_cards, "SELECT_MIN_MARGIN", 0)
     q = "申請の金額は 12,000円です。" + OPT
     ok = {"金額": {"value": 12000, "quote": "12,000円"}}
     recs, ex = _round([_item("a", q, rule_id="R1", should_hold=False, expected_conclusion="必要")], ok)
