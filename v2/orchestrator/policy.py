@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -64,6 +65,9 @@ class ApprovedText:
     contracts: tuple[str, ...]
     source: str | None
     source_level: int
+    # 依頼文に書いてよい自由な値（Issue #17・本人決定 11/3）。英字の識別子と、値そのもの（文字列, 理由）
+    request_identifiers: tuple[str, ...] = ()
+    request_values: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -138,8 +142,29 @@ def load_policy(policy_dir: Path | str = DEFAULT_POLICY_DIR) -> Policy:
             contracts=tuple(a["contracts"]),
             source=a.get("source"),
             source_level=int(a["source_level"]),
+            **_request_values(key, a.get("request_values")),
         )
     return Policy(users=users, contracts=contracts, approved=approved)
+
+
+_ASCII_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _request_values(key: str, rv: Any) -> dict[str, Any]:
+    """承認済み本文の request_values（{"identifiers": [英字の語], "values": [{"text", "reason"}]}）を読む。"""
+    if rv is None:
+        return {}
+    if not isinstance(rv, dict) or not set(rv) <= {"identifiers", "values"}:
+        raise ValueError(f"承認済み本文 {key} の request_values は identifiers と values だけを持つ")
+    ids = rv.get("identifiers", [])
+    if not isinstance(ids, list) or not all(isinstance(x, str) and _ASCII_WORD.fullmatch(x) for x in ids):
+        raise ValueError(f"承認済み本文 {key} の request_values.identifiers は英字の語の列")
+    vals = rv.get("values", [])
+    if not isinstance(vals, list) or not all(
+            isinstance(v, dict) and set(v) == {"text", "reason"} and all(isinstance(v[k], str) and v[k].strip()
+                                                                        for k in ("text", "reason")) for v in vals):
+        raise ValueError(f"承認済み本文 {key} の request_values.values は {{text, reason}}（空でない文字列）の列")
+    return {"request_identifiers": tuple(ids), "request_values": tuple((v["text"], v["reason"]) for v in vals)}
 
 
 def _source_level(source: str) -> int | None:

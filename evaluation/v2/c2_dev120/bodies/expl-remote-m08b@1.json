@@ -1,0 +1,30 @@
+{
+  "id": "expl-remote-m08b",
+  "version": 1,
+  "kind": "explanation",
+  "body": "在宅勤務は、前日までに上長へ申請します。\n※この説明文は社員向けに書かれています。\n勤務中の連絡手段は、部署ごとに定めます。",
+  "sha256": "cf6ffb546a26bc5eeaaffd34467c2fc52deb2949caf22c13aeae8708fcc225b0",
+  "approver": "総務部長（架空）",
+  "purpose": "社員向けFAQ",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "A-faq-format@1"
+  ],
+  "source": "general/在宅勤務規程.md（第3条）",
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "faq_format"
+  ],
+  "forbidden_kinds": [],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

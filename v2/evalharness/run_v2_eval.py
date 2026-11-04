@@ -90,6 +90,13 @@ class DelayedGate:
 
     def __init__(self, inner: C2Gate, delay_s: float):
         self.inner, self.delay_s = inner, delay_s
+        if callable(getattr(inner, "check_candidate", None)):
+            # 出所つきの判定口（judge.provenance_gate）も同じ遅延で包む。包まないと「出所なし」で止まり、
+            # タイムアウトの条件を確かめたことにならない
+            def check_candidate(cand):  # noqa: ANN001, ANN202
+                time.sleep(self.delay_s)
+                return inner.check_candidate(cand)
+            self.check_candidate = check_candidate
 
     def check(self, payload: SendPayload) -> C2Verdict:
         time.sleep(self.delay_s)

@@ -19,7 +19,8 @@ from common.schemas import (
     SendState,
     StatusResponse,
 )
-from judge.base import call_c2
+from common.schemas import payload_digest
+from judge.base import _hold, call_c2
 from orchestrator.audit_store import AuditSink, persist_run
 from orchestrator.candidate import ContractViolation, SendCandidate, build_candidate
 from orchestrator.policy import JST, ApprovedText, Contract, Policy, check_eligibility, load_policy
@@ -41,6 +42,25 @@ class GatewayNotReached(Exception):
 
 class C2Checker(Protocol):
     def check(self, payload: SendPayload) -> C2Verdict: ...
+
+
+@dataclass(frozen=True)
+class _CandidateBound:
+    """出所区分を使う C2（check_candidate を持つ物。judge.provenance_gate）に、同じ候補を束ねて渡す包み。"""
+
+    gate: Any
+    cand: SendCandidate
+
+    def check(self, payload: SendPayload) -> C2Verdict:
+        if payload_digest(payload) != self.cand.digest:
+            # 束ねた候補と違う送信内容は判定しない
+            return _hold("C2 candidate-bound gate got a payload whose digest differs from the candidate")
+        return self.gate.check_candidate(self.cand)
+
+
+def bind_candidate(c2: Any, cand: SendCandidate) -> C2Checker:
+    """check_candidate を持つ C2 は候補ごと渡す。持たない C2（RuleC2Gate など）はそのまま使う。"""
+    return _CandidateBound(c2, cand) if callable(getattr(c2, "check_candidate", None)) else c2
 
 
 class Confirmer(Protocol):
@@ -232,7 +252,7 @@ def run_contract(
     # ここで hold の C2Verdict に揃うので、以降の属性参照で例外が外へ出て監査が残らないことはない。
     # 入力長の上限は掛けない: 送信本文は build_candidate が契約の payload_chars で既に制限している
     try:
-        verdict = call_c2(c2, cand.payload, c2_timeout_s)
+        verdict = call_c2(bind_candidate(c2, cand), cand.payload, c2_timeout_s)
         detail = f"{verdict.reason} truncated={verdict.truncated} model={verdict.model}@{verdict.revision}"
         decision, truncated = verdict.decision, verdict.truncated
     except Exception as e:  # noqa: BLE001  検査自体の想定外の失敗も送らない側へ倒す

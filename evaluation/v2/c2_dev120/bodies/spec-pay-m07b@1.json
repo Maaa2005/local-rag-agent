@@ -1,0 +1,42 @@
+{
+  "id": "spec-pay-m07b",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は month（文字列）, grade（文字列）, total（整数）\n条件: 外部ライブラリは pandas のみ使ってよい。ファイル入出力は引数で受け取ったパスだけ",
+  "sha256": "2584e84eb0734919f4785baac3b78cad3da2032ac2b6e7c2f0789965d1aafcd9",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "month",
+      "grade",
+      "total"
+    ],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate",
+    "output"
+  ],
+  "forbidden_kinds": [
+    "filter",
+    "transform",
+    "test",
+    "validate",
+    "document",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "spec-section-d07",
+  "version": 1,
+  "kind": "spec",
+  "body": "入力: UTF-8 の CSV。列は section（文字列）, hours（整数）, month（文字列）\n条件: 外部ライブラリは pandas のみ使ってよい。ファイル入出力は引数で受け取ったパスだけ",
+  "sha256": "9c3cb4badd020cc782585f56e0b3b6c039ce77507f0cb58f3f8a6af43ec72341",
+  "approver": "情報システム部長（架空）",
+  "purpose": "汎用CSV処理のコード案",
+  "destinations": [
+    "claude",
+    "codex"
+  ],
+  "expires": "2026-12-31",
+  "contracts": [
+    "B-csv-codegen@1"
+  ],
+  "source": null,
+  "source_level": 1,
+  "request_values": {
+    "identifiers": [
+      "section",
+      "hours",
+      "month"
+    ],
+    "values": []
+  },
+  "acknowledged": [],
+  "allowed_kinds": [
+    "aggregate"
+  ],
+  "forbidden_kinds": [
+    "filter",
+    "transform",
+    "output",
+    "test",
+    "validate",
+    "document",
+    "network_io"
+  ],
+  "reviewed_by": "fixture:dev",
+  "checked_by": "fixture:dev-check"
+}
