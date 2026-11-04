@@ -1,0 +1,62 @@
+{
+  "format": "rule-card@1",
+  "id": "kenshuhi-taishosha-kokkashikaku",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "研修費補助規程",
+    "section": "第6条",
+    "quote": "ただし、国家資格の取得に直結する研修については、第2条の定めにかかわらず、勤続1年以上の正社員を対象とする。"
+  },
+  "target": "国家資格の取得に直結する研修の対象者",
+  "match": {
+    "conclusions": [
+      "対象",
+      "対象外"
+    ],
+    "keywords": [
+      "国家資格"
+    ]
+  },
+  "slots": {
+    "勤続年数": {
+      "type": "number",
+      "unit": "年",
+      "describe": "入社日から補助の申請日までの期間"
+    },
+    "正社員": {
+      "type": "bool",
+      "describe": "正社員かどうか（契約社員・嘱託社員・アルバイトは なし）"
+    },
+    "国家資格直結": {
+      "type": "bool",
+      "describe": "国家資格の取得に直結する研修かどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "国家資格の取得に直結する研修である",
+      "left": "国家資格直結",
+      "op": "==",
+      "right": "あり"
+    },
+    {
+      "name": "正社員である",
+      "left": "正社員",
+      "op": "==",
+      "right": "あり"
+    },
+    {
+      "name": "勤続1年以上",
+      "left": "勤続年数",
+      "op": ">=",
+      "right": 1
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "対象",
+    "else": "対象外"
+  }
+}

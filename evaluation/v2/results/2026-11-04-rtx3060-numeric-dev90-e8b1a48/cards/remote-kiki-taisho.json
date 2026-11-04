@@ -1,0 +1,41 @@
+{
+  "format": "rule-card@1",
+  "id": "remote-kiki-taisho",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "リモート機器貸与規程",
+    "section": "第2条",
+    "quote": "貸与を受けられるのは、在宅勤務の承認を受けた社員とする。承認は、人事部が発行する在宅勤務承認通知で確認する。承認通知が届く前の社員には貸与しない。"
+  },
+  "target": "機器貸与の対象者",
+  "match": {
+    "conclusions": [
+      "対象",
+      "対象外"
+    ],
+    "keywords": [
+      "承認"
+    ]
+  },
+  "slots": {
+    "在宅勤務承認通知": {
+      "type": "bool",
+      "describe": "人事部が発行する在宅勤務承認通知が届いているかどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "在宅勤務承認通知が届いている",
+      "left": "在宅勤務承認通知",
+      "op": "==",
+      "right": "あり"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "対象",
+    "else": "対象外"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "format": "rule-card@1",
+  "id": "shayousha-unkou-jikan-enpou",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "社用車利用規程",
+    "section": "第4条",
+    "quote": "ただし、遠方の客先を訪問する運行で、あらかじめ部長が書面で認めたものは、10時間以内まで運行できる。"
+  },
+  "target": "部長が書面で認めた遠方の客先への運行時間",
+  "match": {
+    "conclusions": [
+      "認められる",
+      "認められない"
+    ],
+    "keywords": [
+      "部長"
+    ]
+  },
+  "slots": {
+    "運行時間": {
+      "type": "number",
+      "unit": "時間",
+      "describe": "車庫を出てから戻るまでの時間（客先での滞在や休憩の時間も含む）"
+    },
+    "遠方の客先の訪問": {
+      "type": "bool",
+      "describe": "遠方の客先を訪問する運行かどうか"
+    },
+    "部長の書面承認": {
+      "type": "bool",
+      "describe": "あらかじめ部長が書面で認めているかどうか"
+    }
+  },
+  "constraints": [
+    {
+      "name": "運行時間は 0 以上",
+      "left": "運行時間",
+      "op": ">=",
+      "right": 0
+    }
+  ],
+  "conditions": [
+    {
+      "name": "遠方の客先を訪問する運行である",
+      "left": "遠方の客先の訪問",
+      "op": "==",
+      "right": "あり"
+    },
+    {
+      "name": "あらかじめ部長が書面で認めた",
+      "left": "部長の書面承認",
+      "op": "==",
+      "right": "あり"
+    },
+    {
+      "name": "10時間以内",
+      "left": "運行時間",
+      "op": "<=",
+      "right": 10
+    }
+  ],
+  "combine": "all",
+  "exceptions": [
+    {
+      "name": "6時間以内の運行は承認がなくても認められる",
+      "left": "運行時間",
+      "op": "<=",
+      "right": 6,
+      "conclusion": "認められる",
+      "if_unknown": "hold"
+    }
+  ],
+  "conclusion": {
+    "then": "認められる",
+    "else": "認められない"
+  }
+}

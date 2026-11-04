@@ -1,0 +1,55 @@
+{
+  "format": "rule-card@1",
+  "id": "shayousha-teiin",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "社用車利用規程",
+    "section": "第6条",
+    "quote": "乗車定員は車両ごとの定員に従う。"
+  },
+  "target": "乗車定員",
+  "match": {
+    "conclusions": [
+      "超えない",
+      "超える"
+    ],
+    "keywords": [
+      "定員"
+    ]
+  },
+  "slots": {
+    "乗車人数": {
+      "type": "number",
+      "unit": "人",
+      "describe": "乗車する人数"
+    },
+    "車両の定員": {
+      "type": "number",
+      "unit": "人",
+      "describe": "その車両の乗車定員"
+    }
+  },
+  "constraints": [
+    {
+      "name": "車両の定員は 0 より大きい",
+      "left": "車両の定員",
+      "op": ">",
+      "right": 0
+    }
+  ],
+  "conditions": [
+    {
+      "name": "乗車人数が車両の定員以内",
+      "left": "乗車人数",
+      "op": "<=",
+      "right": "車両の定員"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "超えない",
+    "else": "超える"
+  }
+}

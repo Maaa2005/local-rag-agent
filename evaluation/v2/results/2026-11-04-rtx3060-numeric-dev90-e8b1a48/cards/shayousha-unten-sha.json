@@ -1,0 +1,41 @@
+{
+  "format": "rule-card@1",
+  "id": "shayousha-unten-sha",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "社用車利用規程",
+    "section": "第2条",
+    "quote": "社用車を運転できるのは、会社の安全運転講習を修了した社員に限る。"
+  },
+  "target": "社用車の運転",
+  "match": {
+    "conclusions": [
+      "認められる",
+      "認められない"
+    ],
+    "keywords": [
+      "講習"
+    ]
+  },
+  "slots": {
+    "安全運転講習の修了": {
+      "type": "bool",
+      "describe": "会社の安全運転講習を修了しているかどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "会社の安全運転講習を修了した",
+      "left": "安全運転講習の修了",
+      "op": "==",
+      "right": "あり"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "認められる",
+    "else": "認められない"
+  }
+}

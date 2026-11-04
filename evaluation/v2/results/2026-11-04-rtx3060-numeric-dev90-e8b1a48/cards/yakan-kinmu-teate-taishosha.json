@@ -1,0 +1,55 @@
+{
+  "format": "rule-card@1",
+  "id": "yakan-kinmu-teate-taishosha",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "夜間勤務手当規程",
+    "section": "第2条",
+    "quote": "手当の対象は、管理職を除く社員とする。管理職には役職手当を支給しているため、本手当は支給しない。"
+  },
+  "target": "夜間勤務手当の対象者",
+  "match": {
+    "conclusions": [
+      "対象",
+      "対象外"
+    ],
+    "keywords": [
+      "管理職"
+    ]
+  },
+  "slots": {
+    "管理職": {
+      "type": "bool",
+      "describe": "その社員が管理職かどうか"
+    },
+    "夜勤担当": {
+      "type": "bool",
+      "describe": "所定の勤務時間に22時以降の時間が含まれるシフト勤務者（夜勤担当）かどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "管理職ではない",
+      "left": "管理職",
+      "op": "==",
+      "right": "なし"
+    }
+  ],
+  "combine": "all",
+  "exceptions": [
+    {
+      "name": "シフト勤務者（夜勤担当）には本手当は支給しない",
+      "left": "夜勤担当",
+      "op": "==",
+      "right": "あり",
+      "conclusion": "対象外",
+      "if_unknown": "ignore"
+    }
+  ],
+  "conclusion": {
+    "then": "対象",
+    "else": "対象外"
+  }
+}

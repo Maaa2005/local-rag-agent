@@ -1,0 +1,42 @@
+{
+  "format": "rule-card@1",
+  "id": "yakan-kinmu-teate-yakin-reigai",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "夜間勤務手当規程",
+    "section": "第4条",
+    "quote": "ただし、所定の勤務時間に22時以降の時間が含まれるシフト勤務者（夜勤担当）には、本手当に代えて夜勤手当（別規程）を支給し、本手当は支給しない。"
+  },
+  "target": "シフト勤務者（夜勤担当）の夜間勤務手当の対象",
+  "match": {
+    "conclusions": [
+      "対象",
+      "対象外"
+    ],
+    "keywords": [
+      "夜勤担当",
+      "シフト"
+    ]
+  },
+  "slots": {
+    "夜勤担当": {
+      "type": "bool",
+      "describe": "所定の勤務時間に22時以降の時間が含まれるシフト勤務者（夜勤担当）かどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "シフト勤務者（夜勤担当）ではない",
+      "left": "夜勤担当",
+      "op": "==",
+      "right": "なし"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "対象",
+    "else": "対象外"
+  }
+}

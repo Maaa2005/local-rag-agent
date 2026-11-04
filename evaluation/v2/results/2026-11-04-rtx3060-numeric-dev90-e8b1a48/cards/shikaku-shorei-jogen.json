@@ -1,0 +1,56 @@
+{
+  "format": "rule-card@1",
+  "id": "shikaku-shorei-jogen",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "資格取得奨励規程",
+    "section": "第6条",
+    "quote": "奨励金は、受験料（税込）の50%とし、1資格につき3万円を上限とする。"
+  },
+  "target": "受験料の50%が奨励金の上限3万円を超えるか",
+  "match": {
+    "conclusions": [
+      "超える",
+      "超えない"
+    ],
+    "keywords": [
+      "受験料",
+      "上限"
+    ]
+  },
+  "slots": {
+    "受験料": {
+      "type": "number",
+      "unit": "円",
+      "describe": "合格した資格の受験料（税込）"
+    }
+  },
+  "constraints": [
+    {
+      "name": "受験料は 0 以上",
+      "left": "受験料",
+      "op": ">=",
+      "right": 0
+    }
+  ],
+  "conditions": [
+    {
+      "name": "受験料の50%が1資格の上限3万円を超える",
+      "left": {
+        "mul": [
+          "受験料",
+          0.5
+        ]
+      },
+      "op": ">",
+      "right": 30000
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "超える",
+    "else": "超えない"
+  }
+}

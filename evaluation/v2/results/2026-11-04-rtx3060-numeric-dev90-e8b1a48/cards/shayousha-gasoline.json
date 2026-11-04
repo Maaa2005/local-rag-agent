@@ -1,0 +1,41 @@
+{
+  "format": "rule-card@1",
+  "id": "shayousha-gasoline",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "社用車利用規程",
+    "section": "第6条",
+    "quote": "ガソリン代は、満タン返しを条件に会社が負担する。"
+  },
+  "target": "ガソリン代の会社負担",
+  "match": {
+    "conclusions": [
+      "精算できる",
+      "精算できない"
+    ],
+    "keywords": [
+      "ガソリン代"
+    ]
+  },
+  "slots": {
+    "満タン返し": {
+      "type": "bool",
+      "describe": "満タンにして返したかどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "満タン返しをした",
+      "left": "満タン返し",
+      "op": "==",
+      "right": "あり"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "精算できる",
+    "else": "精算できない"
+  }
+}

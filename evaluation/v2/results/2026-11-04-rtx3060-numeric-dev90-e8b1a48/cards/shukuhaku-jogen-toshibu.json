@@ -1,0 +1,60 @@
+{
+  "format": "rule-card@1",
+  "id": "shukuhaku-jogen-toshibu",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "出張宿泊費規程",
+    "section": "第4条",
+    "quote": "ただし、東京23区、大阪市、名古屋市で宿泊する場合は、前条の上限を1泊あたり1万5千円（税込）とする。"
+  },
+  "target": "宿泊費の1泊あたりの上限（東京23区・大阪市・名古屋市で宿泊する場合）",
+  "match": {
+    "conclusions": [
+      "精算できる",
+      "精算できない"
+    ],
+    "keywords": [
+      "宿泊費"
+    ]
+  },
+  "slots": {
+    "宿泊費": {
+      "type": "number",
+      "unit": "円",
+      "describe": "1泊あたりの宿泊費（税込。朝食代など宿泊料金に含まれる費用も含めた額）"
+    },
+    "都市部宿泊": {
+      "type": "bool",
+      "describe": "東京23区、大阪市、名古屋市のいずれかで宿泊したかどうか"
+    }
+  },
+  "constraints": [
+    {
+      "name": "このカードは東京23区・大阪市・名古屋市での宿泊に使う",
+      "left": "都市部宿泊",
+      "op": "==",
+      "right": "あり"
+    },
+    {
+      "name": "宿泊費は 0 以上",
+      "left": "宿泊費",
+      "op": ">=",
+      "right": 0
+    }
+  ],
+  "conditions": [
+    {
+      "name": "1泊あたり1万5千円（税込）以下である",
+      "left": "宿泊費",
+      "op": "<=",
+      "right": 15000
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "精算できる",
+    "else": "精算できない"
+  }
+}

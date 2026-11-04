@@ -1,0 +1,41 @@
+{
+  "format": "rule-card@1",
+  "id": "shukuhaku-ryoshusho-atena",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "出張宿泊費規程",
+    "section": "第5条",
+    "quote": "精算を受けようとする者は、宿泊先の領収書（宛名が会社名のもの）を添えて申請する。宛名が会社名でない領収書では精算できない。"
+  },
+  "target": "領収書の宛名による宿泊費の精算可否",
+  "match": {
+    "conclusions": [
+      "精算できる",
+      "精算できない"
+    ],
+    "keywords": [
+      "領収書"
+    ]
+  },
+  "slots": {
+    "宛名が会社名": {
+      "type": "bool",
+      "describe": "宿泊先の領収書の宛名が会社名になっているかどうか"
+    }
+  },
+  "conditions": [
+    {
+      "name": "領収書の宛名が会社名である",
+      "left": "宛名が会社名",
+      "op": "==",
+      "right": "あり"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "精算できる",
+    "else": "精算できない"
+  }
+}
