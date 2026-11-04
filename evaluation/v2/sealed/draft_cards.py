@@ -1,7 +1,7 @@
 """規程カードの下書きを流す小さな道具 (Issue #16・docs/v2-rule-card-procedure.md の流れ 1)。
 
 prepare: 規程ごとにプロンプト (<規程名>.prompt.md) を作り、指紋を draft_manifest.json に書く。
-collect : 答え (<規程名>.answer.md) から <cards>・<unable> を取り出し、parse_card と quote の実在を確かめて
+collect : 答え (<規程名>.answer.md) から <cards>・<unable> を取り出し、parse_card と quote (doc.quote と、あれば条件・例外ごとの quote) の実在を確かめて
           通った物を <cards>/<id>.json に書く。形が崩れた物は直さず <drafts>/unable.json に足す (作り直さない)。
 
 使い方 (PYTHONUTF8=1・PYTHONPATH=backend):
@@ -135,6 +135,23 @@ def _check_card(doc, regulation: str, status: str, seen: set[str]) -> str | None
         return f"status が {status} でない: {doc['status']}"
     if _squash(doc["doc"]["quote"]) not in _squash(regulation):
         return "quote が規程の文に無い"
+    bad = _missing_quote(doc.get("conditions"), regulation) or _missing_quote(doc.get("exceptions"), regulation)
+    if bad:
+        return f"条件の quote が規程の文に無い: {bad}"
+    return None
+
+
+def _missing_quote(conds, regulation: str) -> str | None:
+    """条件・例外 (入れ子も) の quote が規程の文に無ければその条件の名前を返す。quote は任意で、あれば確かめる。"""
+    reg = _squash(regulation)
+    for c in conds or []:
+        if "quote" in c and _squash(c["quote"]) not in reg:
+            return str(c.get("name"))
+        for k in ("all", "any"):
+            if k in c:
+                inner = _missing_quote(c[k], regulation)
+                if inner:
+                    return inner
     return None
 
 

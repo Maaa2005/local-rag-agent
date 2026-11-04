@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -417,3 +417,344 @@ def test_normalize_arm_rewrites_question_and_context(monkeypatch):
     monkeypatch.setattr(settings, "numeric_normalize_enabled", True)
     on = llm._build_messages(q, chunks)[1]["content"]
     assert "十万円" in off and "100,000円" in on and "98,000円" in on
+
+
+# ===== 時刻・min/max・月末・夜またぎ・入れ子の条件・例外の結論が同じ時（rule-card@1 の足した部品） =====
+
+from app.services.rule_cards import Clock  # noqa: E402
+
+
+def _mk(slots, conditions, *, derive=None, exceptions=None, combine="all", conclusions=("対象", "対象外"), **over):
+    """試験用の小さなカード。"""
+    raw = {"format": "rule-card@1", "id": "t-card", "status": "draft", "drafted_by": "x", "confirmed_by": None,
+           "doc": {"source": "架空規程.md", "section": "第1条", "quote": "架空の定め。"}, "target": "架空",
+           "match": {"conclusions": list(conclusions), "keywords": ["架空"]}, "slots": slots, "conditions": conditions,
+           "combine": combine, "conclusion": {"then": conclusions[0], "else": conclusions[1]}}
+    if derive:
+        raw["derive"] = derive
+    if exceptions:
+        raw["exceptions"] = exceptions
+    raw.update(over)
+    return parse_card(raw)
+
+
+def _leaf(name, left, op, right, **kw):
+    return {"name": name, "left": left, "op": op, "right": right, **kw}
+
+
+TIME_SLOT = {"退勤": {"type": "time", "describe": "退勤した時刻"}}
+D = Decimal
+
+
+def _after_22():
+    return _mk(TIME_SLOT, [_leaf("22時以降", "退勤", ">=", {"time": "22:00"})])
+
+
+def test_time_slot_extracts_and_compares_in_minutes():
+    c = _after_22()
+    q = "昨日は22時ちょうどに退勤しました。深夜手当の対象ですか？"
+    values, problems = validate_extraction(c, q, {"退勤": {"value": "22:00", "quote": "22時ちょうどに退勤"}})
+    assert problems == [] and values["退勤"] == Clock(22 * 60)
+    assert decide(c, values).conclusion == "対象"  # 以降は >=（ちょうどを含む）
+    assert decide(c, {"退勤": Clock(21 * 60 + 59)}).conclusion == "対象外"
+    assert decide(c, {"退勤": None}).conclusion is None
+    s = rule_cards.extraction_schema(c)["properties"]["退勤"]["properties"]["value"]
+    assert s["type"] == ["string", "null"] and re.fullmatch(s["pattern"], "23:59") and not re.fullmatch(s["pattern"], "24:00")
+    assert "HH:MM" in rule_cards.extraction_messages(c, q)[0]["content"]
+
+
+@pytest.mark.parametrize("quote,value", [
+    ("22時に退勤", "22:00"), ("22時30分に退勤", "22:30"), ("22:30に退勤", "22:30"), ("午後10時に退勤", "22:00"),
+    ("午前9時に退勤", "09:00"), ("正午に退勤", "12:00"), ("午後10時30分に退勤", "22:30"), ("22時半に退勤", "22:30"),
+    ("０時に退勤", "00:00"), ("２２：３０に退勤", "22:30"),
+])
+def test_time_readings(quote, value):
+    values, problems = validate_extraction(_after_22(), quote + "しました。", {"退勤": {"value": value, "quote": quote}})
+    assert problems == [] and values["退勤"] == rule_cards.parse_time(value)
+
+
+@pytest.mark.parametrize("quote,value", [
+    ("22時30分に退勤", "22:00"),        # 引用の時刻と違う
+    ("22時に退勤", "10:00"),            # 午前午後の取り違え
+    ("午後10時に退勤", "10:00"),
+    ("午前9時に退勤", "21:00"),
+    ("24時に退勤", "24:00"),            # 24:00 は無効
+    ("24時に退勤", "00:00"),            # 24時を 0 時と読み替えない
+    ("午前12時に退勤", "00:00"),        # 午前12時は読まない（曖昧）
+    ("3時間働いて退勤", "03:00"),       # 「3時間」は時刻ではない
+    ("22時に退勤", "22:00:00"), ("22時に退勤", "2200"), ("22時に退勤", 22), ("22時に退勤", "25:00"),
+])
+def test_time_value_must_match_its_quote(quote, value):
+    _, problems = validate_extraction(_after_22(), quote + "しました。", {"退勤": {"value": value, "quote": quote}})
+    assert problems and "time" in problems[0]
+
+
+def test_time_card_shape_is_checked():
+    with pytest.raises(CardError, match="bad time"):
+        _mk(TIME_SLOT, [_leaf("x", "退勤", ">=", {"time": "24:00"})])
+    for bad in ("9:00", "22:60", "22時", 2200):
+        with pytest.raises(CardError, match="bad time"):
+            _mk(TIME_SLOT, [_leaf("x", "退勤", ">=", {"time": bad})])
+    # 時刻と数を比べるカードの誤りは保留（例外にしない）
+    d = decide(_mk(TIME_SLOT, [_leaf("x", "退勤", ">=", 22)]), {"退勤": Clock(1320)})
+    assert d.conclusion is None and "計算できない" in d.hold_reason
+    assert "22:30" in rule_cards.render_answer(_after_22(), decide(_after_22(), {"退勤": Clock(22 * 60 + 30)}))
+
+
+def test_min_and_max():
+    slots = {"請求額": {"type": "number", "unit": "円", "describe": "請求額"},
+             "実費": {"type": "number", "unit": "円", "describe": "実費"}}
+    c = _mk(slots, [_leaf("上限以内", "請求額", "<=", {"min": ["実費", 8000]})])
+    assert decide(c, {"請求額": D(8000), "実費": D(9000)}).conclusion == "対象"   # 小さい方は 8000
+    assert decide(c, {"請求額": D(8001), "実費": D(9000)}).conclusion == "対象外"
+    assert decide(c, {"請求額": D(6001), "実費": D(6000)}).conclusion == "対象外"   # 小さい方は実費
+    assert decide(c, {"請求額": D(6000), "実費": None}).conclusion is None            # 1 つでも不明なら不明
+    cmax = _mk(slots, [_leaf("x", "請求額", ">=", {"max": ["実費", 8000]})])
+    assert decide(cmax, {"請求額": D(9000), "実費": D(9000)}).conclusion == "対象"
+    assert decide(cmax, {"請求額": D(8999), "実費": D(9000)}).conclusion == "対象外"
+    assert decide(cmax, {"請求額": D(9000), "実費": None}).conclusion is None
+    for bad in ({"min": ["実費"]}, {"max": []}, {"min": "実費"}):
+        with pytest.raises(CardError):
+            _mk(slots, [_leaf("x", "請求額", "<=", bad)])
+    # 型の違う物を混ぜたカードの誤りは保留
+    tc = _mk({**slots, **TIME_SLOT}, [_leaf("x", "請求額", "<=", {"min": ["実費", "退勤"]})])
+    assert decide(tc, {"請求額": D(1), "実費": D(1), "退勤": Clock(60)}).conclusion is None
+
+
+DATE_SLOTS = {"期限日": {"type": "date", "describe": "期限の日"}, "提出日": {"type": "date", "describe": "提出した日"}}
+
+
+def _month_end_card():
+    return _mk(DATE_SLOTS, [_leaf("翌月末まで", "提出日", "<=", {"month_end": {"add_months": ["期限日", 1]}})])
+
+
+@pytest.mark.parametrize("deadline,submitted,expected", [
+    ("2026-01-15", "2026-02-28", "対象"), ("2026-01-15", "2026-03-01", "対象外"),   # 翌月末は 2 月 28 日
+    ("2028-01-15", "2028-02-29", "対象"), ("2028-01-15", "2028-03-01", "対象外"),   # うるう年は 29 日
+    ("2026-12-10", "2027-01-31", "対象"), ("2026-12-10", "2027-02-01", "対象外"),   # 年をまたぐ
+])
+def test_month_end_of_next_month(deadline, submitted, expected):
+    values = {"期限日": date.fromisoformat(deadline), "提出日": date.fromisoformat(submitted)}
+    assert decide(_month_end_card(), values).conclusion == expected
+    assert decide(_month_end_card(), {"期限日": None, "提出日": values["提出日"]}).conclusion is None
+
+
+@pytest.mark.parametrize("start,k,expected", [
+    ("2026-01-31", 1, "2026-02-28"), ("2028-01-31", 1, "2028-02-29"), ("2026-03-31", 1, "2026-04-30"),
+    ("2026-01-30", 1, "2026-02-28"), ("2026-01-15", 1, "2026-02-15"), ("2026-11-30", 3, "2027-02-28"),
+    ("2026-03-31", -1, "2026-02-28"), ("2026-01-31", 12, "2027-01-31"),
+])
+def test_add_months_rounds_to_month_end(start, k, expected):
+    c = _mk(DATE_SLOTS, [_leaf("x", "提出日", "==", {"add_months": ["期限日", k]})])
+    assert decide(c, {"期限日": date.fromisoformat(start), "提出日": date.fromisoformat(expected)}).conclusion == "対象"
+    wrong = date.fromisoformat(expected) + timedelta(days=1)
+    assert decide(c, {"期限日": date.fromisoformat(start), "提出日": wrong}).conclusion == "対象外"
+    e = _mk(DATE_SLOTS, [_leaf("x", "提出日", "==", {"month_end": "期限日"})])
+    assert decide(e, {"期限日": date(2026, 2, 3), "提出日": date(2026, 2, 28)}).conclusion == "対象"
+
+
+def test_month_end_and_add_months_misuse_is_held_or_rejected():
+    n = {"回数": {"type": "number", "describe": "回数"}, **DATE_SLOTS}
+    d = decide(_mk(n, [_leaf("x", "提出日", "==", {"month_end": "回数"})]), {"回数": D(3), "提出日": date(2026, 1, 1)})
+    assert d.conclusion is None and "計算できない" in d.hold_reason
+    d = decide(_mk(n, [_leaf("x", "提出日", "==", {"add_months": ["期限日", 1.5]})]),
+               {"期限日": date(2026, 1, 1), "提出日": date(2026, 1, 1)})
+    assert d.conclusion is None and "計算できない" in d.hold_reason
+    with pytest.raises(CardError, match="takes 2"):
+        _mk(n, [_leaf("x", "提出日", "==", {"add_months": ["期限日"]})])
+
+
+MIN_SLOTS = {"開始": {"type": "time", "describe": "開始"}, "終了": {"type": "time", "describe": "終了"}}
+
+
+def _span_card():
+    return _mk(MIN_SLOTS, [_leaf("4 時間以上", {"minutes_between": ["開始", "終了"]}, ">=", 240)])
+
+
+@pytest.mark.parametrize("start,end,expected", [
+    ("09:00", "13:00", "対象"), ("09:00", "12:59", "対象外"),
+    ("22:00", "02:00", "対象"),    # 夜をまたぐ: 4 時間
+    ("22:00", "01:59", "対象外"),
+    ("23:30", "00:00", "対象外"),  # 30 分
+    ("10:00", "10:00", "対象外"),  # 同時刻は 0 分（24 時間にしない）
+])
+def test_minutes_between_wraps_over_midnight(start, end, expected):
+    v = {"開始": rule_cards.parse_time(start), "終了": rule_cards.parse_time(end)}
+    assert decide(_span_card(), v).conclusion == expected
+    assert decide(_span_card(), {**v, "終了": None}).conclusion is None
+
+
+def test_minutes_between_needs_times():
+    c = _mk({**MIN_SLOTS, "数": {"type": "number", "describe": "x"}},
+            [_leaf("x", {"minutes_between": ["開始", "数"]}, ">=", 1)])
+    d = decide(c, {"開始": Clock(0), "終了": None, "数": D(1)})
+    assert d.conclusion is None and "計算できない" in d.hold_reason
+
+
+# ----- 入れ子の条件（3 値） -----
+
+B = {"a": {"type": "bool", "describe": "a"}, "b": {"type": "bool", "describe": "b"}}
+
+
+def _group(kind, name="g"):
+    return {"name": name, kind: [_leaf("a", "a", "==", "あり"), _leaf("b", "b", "==", "あり")]}
+
+
+@pytest.mark.parametrize("kind,a,b,expected", [
+    ("all", "あり", "あり", "対象"), ("all", "あり", "なし", "対象外"), ("all", "なし", None, "対象外"),   # 1 つでも不成立なら不成立
+    ("all", "あり", None, None), ("all", None, None, None),                                          # 残りは不明
+    ("any", "なし", "あり", "対象"), ("any", None, "あり", "対象"), ("any", "なし", "なし", "対象外"),  # 1 つでも成立なら成立
+    ("any", "なし", None, None), ("any", None, None, None),
+])
+def test_nested_conditions_are_three_valued(kind, a, b, expected):
+    c = _mk(B, [_group(kind)])
+    assert decide(c, {"a": a, "b": b}).conclusion == expected
+
+
+def test_nested_conditions_combine_with_siblings_and_nest_deeper():
+    slots = {**B, "c": {"type": "bool", "describe": "c"}}
+    deep = {"name": "deep", "all": [_group("any", "inner"), _leaf("c", "c", "==", "あり")]}
+    c = _mk(slots, [deep])
+    assert decide(c, {"a": None, "b": "あり", "c": "あり"}).conclusion == "対象"
+    assert decide(c, {"a": None, "b": None, "c": "なし"}).conclusion == "対象外"
+    assert decide(c, {"a": None, "b": None, "c": "あり"}).conclusion is None
+    c2 = _mk(slots, [_group("any"), _leaf("c", "c", "==", "あり")], combine="all")
+    assert decide(c2, {"a": "あり", "b": None, "c": "なし"}).conclusion == "対象外"
+
+
+def test_nested_exception_and_unused_slot_detection():
+    slots = {"金額": {"type": "number", "unit": "円", "describe": "金額"}, **B}
+    c = _mk(slots, [_leaf("5万円超", "金額", ">", 50000)],
+            exceptions=[{**_group("any", "例外"), "conclusion": "対象外", "if_unknown": "hold"}])
+    assert decide(c, {"金額": D(60000), "a": "なし", "b": "あり"}).conclusion == "対象外"
+    assert decide(c, {"金額": D(60000), "a": "なし", "b": "なし"}).conclusion == "対象"
+    assert decide(c, {"金額": D(60000), "a": "なし", "b": None}).conclusion is None
+    # 入れ子の中の枠も「使う枠」と数える（抽出の検査に通らなければ保留）
+    q = "金額は60,000円です。"
+    ex = {"金額": {"value": 60000, "quote": "60,000円"}, "a": {"value": "あり", "quote": "ある"},
+          "b": {"value": None, "quote": None}}
+    assert validate_extraction(c, q, ex)[1]
+
+
+@pytest.mark.parametrize("bad", [
+    {"name": "g", "all": []}, {"name": "g", "all": [_leaf("a", "a", "==", "あり")], "any": [_leaf("b", "b", "==", "あり")]},
+    {"name": "g", "all": [_leaf("a", "a", "==", "あり")], "left": "a"}, {"name": "g", "all": "a"},
+    {"name": "g", "all": [{"name": "x", "left": "zzz", "op": "==", "right": "あり"}]},
+    {"name": "g", "any": [{"name": "x", "left": "a", "op": "=>", "right": "あり"}]},
+    {"name": "g", "all": [_leaf("a", "a", "==", "あり", quote="")]},
+])
+def test_bad_nested_conditions_are_rejected(bad):
+    with pytest.raises(CardError):
+        _mk(B, [bad])
+
+
+def test_nesting_depth_is_limited():
+    node = _leaf("a", "a", "==", "あり")
+    for i in range(8):
+        node = {"name": f"n{i}", "all": [node]}
+    with pytest.raises(CardError, match="too deep"):
+        _mk(B, [node])
+
+
+def test_quote_on_conditions_and_exceptions_is_optional_but_checked_for_shape():
+    c = _mk(B, [_leaf("a", "a", "==", "あり", quote="根拠の文。")],
+            exceptions=[_leaf("b", "b", "==", "あり", quote="ただし書き。", conclusion="対象外")])
+    assert c.conditions[0]["quote"] == "根拠の文。" and decide(c, {"a": "あり", "b": "なし"}).conclusion == "対象"
+    for bad in ({"quote": 5}, {"quote": ""}, {"quote": None}):
+        with pytest.raises(CardError):
+            _mk(B, [_leaf("a", "a", "==", "あり", **bad)])
+    with pytest.raises(CardError):
+        _mk(B, [_leaf("a", "a", "==", "あり")], exceptions=[_leaf("b", "b", "==", "あり", quote=7, conclusion="対象外")])
+
+
+# ----- decide: 例外が不明でも結論が同じなら決める -----
+
+EXC_SLOTS = {"金額": {"type": "number", "unit": "円", "describe": "金額"}, "緊急": {"type": "bool", "describe": "緊急か"}}
+
+
+def _exc_card(exc_conclusion, *, if_unknown="hold", conds=None):
+    return _mk(EXC_SLOTS, conds or [_leaf("5万円超", "金額", ">", 50000)], conclusions=("必要", "不要"),
+               exceptions=[_leaf("緊急", "緊急", "==", "あり", conclusion=exc_conclusion, if_unknown=if_unknown)])
+
+
+def test_unknown_exception_with_same_conclusion_does_not_hold():
+    # 例外（緊急）の結論が「不要」。金額が 5 万円以下なら例外が無くても「不要」なので、緊急かどうか不明でも決まる
+    c = _exc_card("不要")
+    assert decide(c, {"金額": D(50000), "緊急": None}).conclusion == "不要"
+    # 5 万円超なら例外の有無で結論が変わるので保留のまま
+    d = decide(c, {"金額": D(50001), "緊急": None})
+    assert d.conclusion is None and "例外" in d.hold_reason
+    # 例外が無い時の結論が不明（金額も不明）なら、決まらない
+    assert decide(c, {"金額": None, "緊急": None}).conclusion is None
+    # 例外の結論が「必要」で、条件が成り立つ（必要）なら例外が不明でも決まる
+    c2 = _exc_card("必要")
+    assert decide(c2, {"金額": D(60000), "緊急": None}).conclusion == "必要"
+    assert decide(c2, {"金額": D(50000), "緊急": None}).conclusion is None
+    # 例外が成り立てば（不明でなければ）従来どおりその結論
+    assert decide(c, {"金額": D(60000), "緊急": "あり"}).conclusion == "不要"
+    assert decide(c, {"金額": D(60000), "緊急": "なし"}).conclusion == "必要"
+
+
+def test_true_exception_decides_even_when_conditions_are_unknown():
+    c = _exc_card("不要")
+    assert decide(c, {"金額": None, "緊急": "あり"}).conclusion == "不要"
+    # 例外が 2 つ。先の例外が不明（結論 不要）・後の例外が成立（結論 不要）→ 不要。後が「必要」なら保留
+    two = _mk(EXC_SLOTS, [_leaf("5万円超", "金額", ">", 50000)], conclusions=("必要", "不要"), exceptions=[
+        _leaf("緊急", "緊急", "==", "あり", conclusion="不要"),
+        _leaf("小額", "金額", "<=", 1000, conclusion="不要")])
+    assert decide(two, {"金額": D(500), "緊急": None}).conclusion == "不要"
+    two2 = _mk(EXC_SLOTS, [_leaf("5万円超", "金額", ">", 50000)], conclusions=("必要", "不要"), exceptions=[
+        _leaf("緊急", "緊急", "==", "あり", conclusion="不要"),
+        _leaf("小額", "金額", "<=", 1000, conclusion="必要")])
+    assert decide(two2, {"金額": D(500), "緊急": None}).conclusion is None
+
+
+def test_ignore_exception_still_ignores_unknown():
+    assert decide(_exc_card("不要", if_unknown="ignore"), {"金額": D(60000), "緊急": None}).conclusion == "必要"
+
+
+def test_true_exception_skips_condition_evaluation():
+    # 成立する例外があれば、条件の式が計算できなくても例外の結論で決まる（従来どおり）
+    c = _mk(EXC_SLOTS, [_leaf("x", "金額", ">", {"date": "2026-01-01"})], conclusions=("必要", "不要"),
+            exceptions=[_leaf("緊急", "緊急", "==", "あり", conclusion="不要")])
+    assert decide(c, {"金額": D(1), "緊急": "あり"}).conclusion == "不要"
+
+
+# ----- 同じ文書で結論の語の組が同じカード -----
+
+def _write(dirpath, cid, source, concl, keywords):
+    raw = dict(BY_ID["keihi-buchou-shounin"].raw, id=cid, doc={"source": source, "quote": "q"},
+               match={"conclusions": list(concl), "keywords": list(keywords)},
+               conclusion={"then": concl[0], "else": concl[1]})
+    (dirpath / f"{cid}.json").write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+
+def test_same_source_same_pair_is_rejected(tmp_path):
+    _write(tmp_path, "a", "規程A.md", ("必要", "不要"), ["承認"])
+    _write(tmp_path, "b", "規程A.md", ("不要", "必要"), ["部長"])   # 語の順が逆でも同じ組。語が重ならなければ許す
+    assert len(load_cards(tmp_path, allow_draft=True)) == 2
+    _write(tmp_path, "c", "規程A.md", ("必要", "不要"), ["承認の手続"])   # 「承認」を含むので重なる
+    with pytest.raises(CardError, match="same conclusions pair"):
+        load_cards(tmp_path, allow_draft=True)
+
+
+def test_same_pair_is_allowed_across_sources_and_with_distinct_keywords(tmp_path):
+    _write(tmp_path, "a", "規程A.md", ("必要", "不要"), ["承認"])
+    _write(tmp_path, "b", "規程B.md", ("必要", "不要"), ["承認"])
+    assert len(load_cards(tmp_path, allow_draft=True)) == 2
+    _write(tmp_path, "c", "規程A.md", ("必要", "不要"), ["稟議"])
+    assert len(load_cards(tmp_path, allow_draft=True)) == 3
+
+
+def test_same_source_same_pair_without_keywords_is_rejected(tmp_path):
+    _write(tmp_path, "a", "規程A.md", ("必要", "不要"), ["承認"])
+    _write(tmp_path, "b", "規程A.md", ("必要", "不要"), [])
+    with pytest.raises(CardError, match="same conclusions pair"):
+        load_cards(tmp_path, allow_draft=True)
+
+
+def test_current_twelve_cards_still_load_with_the_pair_check():
+    # 福利厚生規程の住宅手当と人間ドックは同じ組だが keywords が重ならないので許される
+    pairs = [c for c in CARDS if c.doc["source"].endswith("福利厚生規程.md") and set(c.conclusions) == {"対象になる", "対象にならない"}]
+    assert {c.id for c in pairs} == {"fukuri-jutaku-teate", "fukuri-ningen-dock"}
+    assert len(load_cards(CARDS_DIR, allow_draft=True)) == 12

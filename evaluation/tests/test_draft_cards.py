@@ -137,3 +137,68 @@ def test_collect_merges_unable_and_checks_status(prepared, capsys):
     u = json.loads((out / "unable.json").read_text(encoding="utf-8"))
     assert {"rule": "出張の時刻", "reason": "時刻の型が無い"} in u
     assert any(x["rule"] == "shucchou-shounin" and "status" in x["reason"] for x in u)
+
+
+def _cond(name, quote=None, **over):
+    c = {"name": name, "left": "申請日", "op": "<=", "right": {"add_days": ["購入日", 14]}}
+    if quote is not None:
+        c["quote"] = quote
+    c.update(over)
+    return c
+
+
+def test_collect_checks_condition_and_exception_quotes(prepared):
+    tmp, out, _ = prepared
+    slots = {"購入日": {"type": "date", "describe": "購入した日"}, "申請日": {"type": "date", "describe": "申請した日"},
+             "緊急": {"type": "bool", "describe": "緊急か"}}
+    exc = {"name": "緊急", "left": "緊急", "op": "==", "right": "あり", "conclusion": "受理", "quote": QUOTE_A}
+    # 条件の quote が規程に有る (改行や空白の違いは許す) ・例外の quote も有る → 通る
+    ok = _card("bihin-kigen", QUOTE_A, slots=slots, conditions=[_cond("14日以内", QUOTE_A[:6] + " " + QUOTE_A[6:])],
+               exceptions=[exc])
+    (out / "bihin.answer.md").write_text(_answer([ok]), encoding="utf-8")
+    (out / "shucchou.answer.md").write_text(_answer([_card("shucchou-shounin", QUOTE_B)]), encoding="utf-8")
+    assert dc.collect(out, tmp / "cards1") == (2, 0)
+    # quote が無い条件 (任意) も通る
+    (out / "bihin.answer.md").write_text(_answer([_card("bihin-kigen", QUOTE_A)]), encoding="utf-8")
+    assert dc.collect(out, tmp / "cards2") == (2, 0)
+
+
+@pytest.mark.parametrize("where", ["condition", "exception", "nested", "nested-exception"])
+def test_collect_rejects_condition_quote_not_in_regulation(prepared, where):
+    tmp, out, _ = prepared
+    slots = {"購入日": {"type": "date", "describe": "購入した日"}, "申請日": {"type": "date", "describe": "申請した日"},
+             "緊急": {"type": "bool", "describe": "緊急か"}}
+    bad = "規程に無い言い換えた文。"
+    exc = {"name": "緊急", "left": "緊急", "op": "==", "right": "あり", "conclusion": "受理"}
+    conds = [_cond("14日以内", QUOTE_A)]
+    if where == "condition":
+        conds = [_cond("14日以内", bad)]
+    elif where == "exception":
+        exc["quote"] = bad
+    elif where == "nested":
+        conds = [{"name": "g", "all": [_cond("14日以内", QUOTE_A), _cond("入れ子", bad)]}]
+    else:
+        child = {"name": "x", "left": "緊急", "op": "==", "right": "あり", "quote": bad}
+        exc = {"name": "g", "any": [child], "conclusion": "受理"}
+    card = _card("bihin-kigen", QUOTE_A, slots=slots, conditions=conds, exceptions=[exc])
+    (out / "bihin.answer.md").write_text(_answer([card]), encoding="utf-8")
+    (out / "shucchou.answer.md").write_text(_answer([_card("shucchou-shounin", QUOTE_B)]), encoding="utf-8")
+    cards = tmp / "cards"
+    assert dc.collect(out, cards) == (1, 1)
+    assert not (cards / "bihin-kigen.json").exists()
+    u = json.loads((out / "unable.json").read_text(encoding="utf-8"))
+    assert u[0]["rule"] == "bihin-kigen" and "条件の quote" in u[0]["reason"]
+
+
+def test_collect_accepts_time_card_and_rejects_bad_time(prepared):
+    tmp, out, _ = prepared
+    slots = {"退勤": {"type": "time", "describe": "退勤時刻"}}
+    good = _card("bihin-kigen", QUOTE_A, slots=slots,
+                 conditions=[{"name": "22時以降", "left": "退勤", "op": ">=", "right": {"time": "22:00"}}])
+    bad = _card("shucchou-shounin", QUOTE_B, slots=slots,
+                conditions=[{"name": "24時以降", "left": "退勤", "op": ">=", "right": {"time": "24:00"}}])
+    (out / "bihin.answer.md").write_text(_answer([good]), encoding="utf-8")
+    (out / "shucchou.answer.md").write_text(_answer([bad]), encoding="utf-8")
+    assert dc.collect(out, tmp / "cards") == (1, 1)
+    u = json.loads((out / "unable.json").read_text(encoding="utf-8"))
+    assert "parse_card" in u[0]["reason"] and "bad time" in u[0]["reason"]
