@@ -192,3 +192,47 @@ def test_internal_app_dockerfile_copies_only_common_and_orchestrator(services):
     assert not any("/run/gateway" in ln for ln in lines)
     users = [ln for ln in lines if ln.startswith("USER")]
     assert users and users[-1].split()[1] == services["internal-app"]["user"]
+
+
+# ---- vllm の配置（Issue #14・2026-11-04） ----
+
+VLLM_DIGEST = "sha256:e4f88a835143cd22aee2397a26ec6bb80b3a4a6fe0c882bcbc63822904766089"
+
+
+def test_vllm_image_is_pinned_by_digest(services):
+    image = services["vllm"]["image"]
+    assert image == f"vllm/vllm-openai:v0.25.1@{VLLM_DIGEST}"
+    assert re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image)
+
+
+def test_vllm_usage_stats_are_off(services):
+    env = services["vllm"]["environment"]
+    # 値は文字列の "1" の時だけ効く（"true" では効かない）
+    for k in ("VLLM_NO_USAGE_STATS", "VLLM_DO_NOT_TRACK", "DO_NOT_TRACK", "HF_HUB_DISABLE_TELEMETRY"):
+        assert env[k] == "1", k
+    for k in ("HOME", "XDG_CACHE_HOME", "VLLM_CONFIG_ROOT", "VLLM_CACHE_ROOT", "TRITON_CACHE_DIR"):
+        assert str(env[k]).startswith("/tmp"), k
+
+
+def test_vllm_runs_as_the_supported_non_root_user(services):
+    svc = services["vllm"]
+    # 公式の vllm-openai が非 root で支えるのは同梱の vllm（UID 2000・GID 0）だけ（v0.25.1 docs/deployment/docker.md）
+    assert str(svc["user"]) == "2000:0"
+    assert svc["cap_drop"] == ["ALL"] and svc["read_only"] is True
+    others = {str(s.get("user", "")).split(":")[0] for n, s in services.items() if n != "vllm"}
+    assert "2000" not in others
+
+
+def test_only_vllm_tmp_is_exec(services):
+    for name, svc in services.items():
+        for t in svc.get("tmpfs", []):
+            opts = str(t).split(":", 1)[1].split(",") if ":" in str(t) else []
+            if "exec" in opts:
+                assert (name, str(t)) == ("vllm", "/tmp:exec,size=1g"), (name, t)
+
+
+def test_vllm_text_only_and_single_sequence(services):
+    cmd = services["vllm"]["command"].split()
+    assert "--language-model-only" in cmd
+    assert cmd[cmd.index("--max-num-seqs") + 1] == "1"
+    assert "--quantization" not in cmd

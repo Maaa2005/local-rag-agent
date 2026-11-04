@@ -104,6 +104,13 @@ Gateway は起動時に送信中（ATTEMPTING）の行をすべて「結果不�
 - frontend は公開のため非 internal の `frontend-publish` にも参加する。frontend が社内への中継や外部への出口にならないことは、本物の frontend（リバースプロキシ設定）ができてから試験を追加する。
 - UDS の所有者・権限: gateway は uid 10001、internal-app は uid 10002・gid 10001 で共有グループ。10/26 の dind 試験で internal-app からソケットに接続でき、`/status/{id}` が 404 を返した（umask の調整は不要だった）。
 - qdrant（unprivileged イメージ）は read_only / 非 root / cap_drop ALL で起動を確認（10/26。snapshots の tmpfs を uid 1000 所有にする必要があった）。vllm・llama.cpp は未確認（v1 では vllm の read_only を見送っていた）。必要な書込先は tmpfs で足りるかを GPU 実機で実測する。
+- **vllm の配置を 11/4 に直した（起動は未確認・GPU が要る）。** Issue #14 の調査（`docs/research/2026-11-02/vllm-wsl.md`）と v0.25.1 の原文（`vllm/envs.py`・`vllm/usage/usage_lib.py`・`docs/deployment/docker.md`・`vllm/engine/arg_utils.py`）で確かめた分だけ入れた。
+  - イメージをダイジェストで固定（`v0.25.1@sha256:e4f88a83…`。11/4 に registry API で索引と amd64 の両方が調査の値と一致）
+  - 利用統計を止める: `VLLM_NO_USAGE_STATS=1`・`VLLM_DO_NOT_TRACK=1`・`DO_NOT_TRACK=1`（既定では `https://stats.vllm.ai` へ送り `usage_stats.json` を書く。値は `"1"` の時だけ効く）。`HF_HUB_DISABLE_TELEMETRY=1` も足した
+  - 利用者を `2000:0`（同梱の `vllm`）に。公式の `vllm-openai` が非 root で支えるのはこれだけで、前の `10003:10003` は支えの外だった
+  - `/tmp` を `exec,size=1g` に（Docker の tmpfs は既定で noexec。Triton が作る `.so` を読むため。nosuid・nodev は残る）。設定・キャッシュの書き先は `/tmp` の下
+  - `--language-model-only`（画像・音声の部品を読まない）と `--max-num-seqs 1`、WSL2 用の `VLLM_WSL2_ENABLE_PIN_MEMORY=1`（WSL2 以外では読まれない）
+  - 未確認: GPU 実機での起動そのもの、read_only と exec の `/tmp` で足りるか（`docker diff` で書込先を洗う）、AWQ の既定モデルで `--language-model-only` が通るか、NVIDIA のフックが read_only で動くか（nvidia-container-toolkit#2131 は podman/CRI-O の報告）、FlashInfer が起動時に `edge.urm.nvidia.com` を見に行く呼び出し（社内ゾーンでは届かず 5 秒待つだけと見ているが未確認）、`/dev/shm` の大きさ
 - judge-laya・internal-app・frontend はプレースホルダ。judge-clef のモデルパス・GPU レイヤ数も仮置き。
 - vllm の起動値（`--max-model-len 4096` / `--gpu-memory-utilization 0.6`）は 6GB 想定のまま。目標を 8〜12GB に移した後、採用モデルは決まっていない（候補はすべて不合格）。`--quantization awq` は既定モデル（compressed-tensors）で起動を止めるため 10/26 に外した（止まることは固定版 0.25.1 のソースで、外せば読み込めることは 10/19 の Colab・vLLM 0.32.0 で確認。0.25.1 での起動は未確認）。
 - IPv6 経路、DNS 以外の名前解決（/etc/hosts の注入等）は試験対象外。
