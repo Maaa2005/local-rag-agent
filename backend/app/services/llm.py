@@ -14,7 +14,7 @@ import posixpath
 from typing import AsyncIterator
 
 from app.config import settings
-from app.services import numeric_check
+from app.services import numeric_check, numnorm, rule_cards
 from app.services.providers import LLMProvider, get_meta, get_provider, reset_instances
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,10 @@ def _build_context(chunks: list[dict]) -> str:
 
 
 def _build_messages(question: str, chunks: list[dict]) -> list[dict]:
+    if settings.numeric_normalize_enabled:
+        # 数の正規化の腕: モデルと C が見る質問・参考情報の数と日付の表記をそろえる
+        question = numnorm.normalize_numbers(question)
+        chunks = [dict(c, content=numnorm.normalize_numbers(str(c.get("content", "")))) for c in chunks]
     context = _build_context(chunks)
     calc = _numeric_check_block(question, chunks) if settings.numeric_check_enabled else None
     if calc:
@@ -70,7 +74,15 @@ def _numeric_check_block(question: str, chunks: list[dict]) -> str | None:
         return None
     if result.sentence is None:
         logger.info("numeric_check 保留: %s", result.hold_reason)
-    return result.sentence
+        return None
+    parts = [result.sentence]
+    if settings.numeric_contrast_enabled:
+        parts.extend(numeric_check.contrast_lines(result))
+    if settings.numeric_codeform_enabled:
+        code = numeric_check.code_form(result)
+        if code:
+            parts.append(code)
+    return "\n".join(parts)
 
 
 async def _resolve_provider(name: str) -> LLMProvider:
@@ -84,11 +96,66 @@ async def _resolve_provider(name: str) -> LLMProvider:
 async def stream_answer(
     question: str, chunks: list[dict], provider_name: str | None = None
 ) -> AsyncIterator[str]:
+    if settings.rule_cards_enabled:
+        text = await _rule_card_answer(question)
+        if text is not None:
+            yield text
+            return
     name = provider_name or settings.llm_provider
     provider = await _resolve_provider(name)
     messages = _build_messages(question, chunks)
     async for token in provider.stream(messages):
         yield token
+
+
+_cards_cache: tuple[tuple[str, bool], list[rule_cards.Card]] | None = None
+_extractor: rule_cards.Extractor | None = None
+_last_card_decision: rule_cards.CardDecision | None = None
+
+
+def _load_rule_cards() -> list[rule_cards.Card]:
+    """カードを読む（設定が同じ間は使い回す）。形のおかしいカードがあれば例外（何も使わない）。"""
+    global _cards_cache
+    key = (settings.rule_cards_dir, settings.rule_cards_allow_draft)
+    if _cards_cache is None or _cards_cache[0] != key:
+        cards = (rule_cards.load_cards(settings.rule_cards_dir, allow_draft=settings.rule_cards_allow_draft)
+                 if settings.rule_cards_dir else [])
+        _cards_cache = (key, cards)
+    return _cards_cache[1]
+
+
+def set_rule_card_extractor(extractor: rule_cards.Extractor | None) -> None:
+    """テスト用: 値を拾う役を差し替える（None で既定に戻す）。"""
+    global _extractor
+    _extractor = extractor
+
+
+async def _rule_card_answer(question: str) -> str | None:
+    """カードに合う質問なら、カードで決めた答えの全文。合わなければ None（今までどおりモデルが答える）。"""
+    try:
+        cards = _load_rule_cards()
+    except rule_cards.CardError:
+        logger.exception("規程カードの形がおかしいため、カード方式を使わない")
+        return None
+    card = rule_cards.select_card(cards, question)
+    if card is None:
+        return None
+    extractor = _extractor or rule_cards.OpenAICompatExtractor(
+        settings.vllm_base_url, settings.rule_cards_extract_model or settings.llm_model)
+    text, decision = await rule_cards.answer_with_card(card, question, extractor)
+    logger.info("規程カード %s: %s", card.id, decision.conclusion or f"保留（{decision.hold_reason}）")
+    global _last_card_decision
+    _last_card_decision = decision
+    return text
+
+
+def pop_rule_card_record() -> dict | None:
+    """評価用: 直前の問でカードが決めた内容を 1 回だけ返す（カードに合わなかった問は None）。"""
+    global _last_card_decision
+    d, _last_card_decision = _last_card_decision, None
+    if d is None:
+        return None
+    return {"card_id": d.card_id, "conclusion": d.conclusion, "hold_reason": d.hold_reason, "raw": d.raw}
 
 
 # 後方互換: テストで provider を直差し替えするためのフック

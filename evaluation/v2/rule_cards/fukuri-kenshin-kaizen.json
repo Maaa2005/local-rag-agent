@@ -1,0 +1,42 @@
+{
+  "format": "rule-card@1",
+  "id": "fukuri-kenshin-kaizen",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/福利厚生規程.md",
+    "section": "第2条（健康診断）",
+    "quote": "健康診断の受診率が90%未満の部署には、改善計画の提出を求める。"
+  },
+  "target": "健康診断の改善計画",
+  "match": {
+    "conclusions": [
+      "求められる",
+      "求められない"
+    ],
+    "keywords": [
+      "健康診断"
+    ]
+  },
+  "slots": {
+    "受診率": {
+      "type": "number",
+      "unit": "%",
+      "describe": "部署の健康診断の受診率"
+    }
+  },
+  "conditions": [
+    {
+      "name": "受診率が90%未満",
+      "left": "受診率",
+      "op": "<",
+      "right": 90
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "求められる",
+    "else": "求められない"
+  }
+}

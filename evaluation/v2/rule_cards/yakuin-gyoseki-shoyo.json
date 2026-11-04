@@ -1,0 +1,62 @@
+{
+  "format": "rule-card@1",
+  "id": "yakuin-gyoseki-shoyo",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "executive/役員報酬規程.md",
+    "section": "第8条（業績連動賞与の算定）",
+    "quote": "業績連動賞与は、営業利益目標の達成率とROE（自己資本利益率）目標の達成率をそれぞれ50%ずつ加重して算定する。達成率が80%を下回る場合、業績連動賞与は支給しない。"
+  },
+  "target": "業績連動賞与の支給",
+  "match": {
+    "conclusions": [
+      "支給されない",
+      "支給される"
+    ],
+    "keywords": [
+      "業績連動賞与"
+    ]
+  },
+  "slots": {
+    "営業利益達成率": {
+      "type": "number",
+      "unit": "%",
+      "describe": "営業利益目標の達成率"
+    },
+    "ROE達成率": {
+      "type": "number",
+      "unit": "%",
+      "describe": "ROE目標の達成率"
+    }
+  },
+  "conditions": [
+    {
+      "name": "加重した達成率が80%を下回る",
+      "left": {
+        "add": [
+          {
+            "mul": [
+              "営業利益達成率",
+              0.5
+            ]
+          },
+          {
+            "mul": [
+              "ROE達成率",
+              0.5
+            ]
+          }
+        ]
+      },
+      "op": "<",
+      "right": 80
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "支給されない",
+    "else": "支給される"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "format": "rule-card@1",
+  "id": "bihin-eizoku-hyosho",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/備品購入規程.md",
+    "section": "第4条（表彰）",
+    "quote": "2026年11月1日以降に入社した社員は、当年度の永年勤続表彰の対象外とする。"
+  },
+  "target": "永年勤続表彰の対象",
+  "match": {
+    "conclusions": [
+      "対象にならない",
+      "対象になる"
+    ],
+    "keywords": [
+      "永年勤続表彰"
+    ]
+  },
+  "slots": {
+    "入社日": {
+      "type": "date",
+      "describe": "社員が入社した日"
+    }
+  },
+  "conditions": [
+    {
+      "name": "2026年11月1日以降に入社した",
+      "left": "入社日",
+      "op": ">=",
+      "right": {
+        "date": "2026-11-01"
+      }
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "対象にならない",
+    "else": "対象になる"
+  }
+}

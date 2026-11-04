@@ -1,0 +1,43 @@
+{
+  "format": "rule-card@1",
+  "id": "fukuri-ningen-dock",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/福利厚生規程.md",
+    "section": "第4条（人間ドック補助）",
+    "quote": "人間ドックの補助は、2026年12月1日より前に受診した分を対象とする。"
+  },
+  "target": "人間ドック補助の対象",
+  "match": {
+    "conclusions": [
+      "対象になる",
+      "対象にならない"
+    ],
+    "keywords": [
+      "人間ドック"
+    ]
+  },
+  "slots": {
+    "受診日": {
+      "type": "date",
+      "describe": "人間ドックを受診した日"
+    }
+  },
+  "conditions": [
+    {
+      "name": "2026年12月1日より前に受診した",
+      "left": "受診日",
+      "op": "<",
+      "right": {
+        "date": "2026-12-01"
+      }
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "対象になる",
+    "else": "対象にならない"
+  }
+}
