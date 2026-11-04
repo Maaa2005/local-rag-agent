@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from evalharness.run_c2_set import reason_class, run_set
 from orchestrator.policy import DEFAULT_POLICY_DIR
 
@@ -53,6 +55,11 @@ def test_run_set_counts_each_side_and_refused_bodies(tmp_path):
     assert res["all"]["false_pass"] == 0
     assert res["all"]["false_stop_ids"] == ["d"]
     assert res["by_side"]["request"]["false_stop"] == 0 and res["by_side"]["body"]["false_stop"] == 1
+
+
+def test_sealed_refuses_fixture_reviewers(tmp_path):
+    with pytest.raises(SystemExit, match="fixture"):
+        run_set(_set(tmp_path), sealed=True)
 
 
 def test_reason_class():

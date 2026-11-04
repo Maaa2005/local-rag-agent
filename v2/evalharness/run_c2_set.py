@@ -45,12 +45,17 @@ def reason_class(reason: str) -> str:
     return "other"
 
 
-def build_policy_dir(set_dir: Path, policy_dir: Path) -> dict[str, str]:
-    """写しに本文・表・登録簿を足す。登録を断られた本文は {ref: 理由} で返す（登録簿には入れない）。"""
+def build_policy_dir(set_dir: Path, policy_dir: Path, sealed: bool = False) -> dict[str, str]:
+    """写しに本文・表・登録簿を足す。登録を断られた本文は {ref: 理由} で返す（登録簿には入れない）。
+
+    sealed なら fixture: の確認者を止める（評価の決まり 5 節。開発用の架空本文だけに使う確認者）。
+    """
     shutil.copytree(DEFAULT_POLICY_DIR, policy_dir)
     records = {}
     for p in sorted((set_dir / "bodies").glob("*.json")):
         a = json.loads(p.read_text(encoding="utf-8"))
+        if sealed and str(a.get("reviewed_by", "")).startswith("fixture:"):
+            raise SystemExit(f"{p.name}: 封印用の本文に fixture: の確認者は使えない")
         a["sha256"] = sha256_text(a["body"])
         (policy_dir / "approved" / p.name).write_text(json.dumps(a, ensure_ascii=False), encoding="utf-8")
         records[f'{a["id"]}@{a["version"]}'] = a
@@ -111,11 +116,11 @@ def tally(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "false_pass_ids": missed, "false_stop_ids": stopped}
 
 
-def run_set(set_dir: Path) -> dict[str, Any]:
+def run_set(set_dir: Path, sealed: bool = False) -> dict[str, Any]:
     cases = [json.loads(line) for line in (set_dir / "cases.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     with tempfile.TemporaryDirectory() as tmp:
         policy_dir = Path(tmp) / "policies"
-        refused = build_policy_dir(set_dir, policy_dir)
+        refused = build_policy_dir(set_dir, policy_dir, sealed)
         policy = load_policy(policy_dir)
         gate = ProvenanceC2Gate(policy=policy, registry_path=policy_dir / "c2_registry.json",
                                 tables_path=policy_dir / "c2_tables.json")
@@ -130,8 +135,9 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("set_dir", type=Path)
     p.add_argument("--out", type=Path)
+    p.add_argument("--sealed", action="store_true", help="封印用: fixture: の確認者を止める")
     a = p.parse_args(argv)
-    res = run_set(a.set_dir)
+    res = run_set(a.set_dir, sealed=a.sealed)
     if a.out:
         a.out.write_text(json.dumps(res, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(json.dumps({k: res[k] for k in ("all", "by_side", "by_group")}, ensure_ascii=False))
