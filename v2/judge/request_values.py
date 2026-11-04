@@ -125,9 +125,10 @@ def unapproved_values(text: str, rules: ValueRules, body_identifiers: Iterable[s
         if not inner.strip() or inner.strip() in values:
             continue
         # 中身が承認した語・値と区切りの記号だけなら可。日本語の語などが残れば引用符ごと保留
-        rest = _WORD.sub("", _NUMBER.sub("", inner))
+        rest = inner
         for v in sorted(values, key=len, reverse=True):
             rest = rest.replace(v, "")
+        rest = _WORD.sub("", _NUMBER.sub("", rest))
         if _check(inner, rules, known, values) or re.search(r"[^\s.,:;/・-]", rest):
             bad.append((m.start(), f"quoted:{inner}"))
     bad += _check(n, rules, known, values, skip=quoted)

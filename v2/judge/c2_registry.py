@@ -43,8 +43,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
-import unicodedata
-
 from judge.base import question_version
 from judge.normalize import normalize_text
 from judge.request_cues import CUES_VERSION, cue_hits, cue_spans, unexpected_letters
@@ -64,7 +62,7 @@ REGISTRATION_CHECK_SPEC = {
     "waivable": sorted(WAIVABLE),  # これ以外の種類・空白を除いた写しだけの当たり・文字種の当たりは外せない
     "acknowledgement_unit": "span",  # 承認の text の出現の範囲に、当たりの範囲がまるごと入る
     "acknowledgement_unique": True,  # 承認の text は本文に 1 回だけ出る（1 か所に結ぶ）
-    "human_review": "reviewed_by is non-empty and differs from approver and checked_by after NFKC/case/space; review is pass",
+    "human_review": "reviewed_by is non-empty and differs from approver and checked_by after normalize_text/case/space; review is pass",
     "acknowledgement_one_value": True,  # 承認の text 1 つに値は 1 つ
 }
 REGISTRATION_CHECK_VERSION = question_version("c2-registration@3", REGISTRATION_CHECK_SPEC)
@@ -100,9 +98,9 @@ def registration_findings(body: str) -> tuple[list[tuple[str, int, int, str]], l
 
 
 def _same_person(a: str, b: str) -> bool:
-    """全角半角・大文字小文字・空白の違いだけなら同じ人（「部長（架空）」と「部長(架空)」）。"""
+    """全角半角・大文字小文字・空白・見えない文字の違いだけなら同じ人（「部長（架空）」と「部長(架空)」）。"""
     def key(s: str) -> str:
-        return "".join(unicodedata.normalize("NFKC", s).casefold().split())
+        return "".join(normalize_text(s).casefold().split())
     return key(a) == key(b)
 
 

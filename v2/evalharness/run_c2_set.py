@@ -54,7 +54,7 @@ def build_policy_dir(set_dir: Path, policy_dir: Path, sealed: bool = False) -> d
     records = {}
     for p in sorted((set_dir / "bodies").glob("*.json")):
         a = json.loads(p.read_text(encoding="utf-8"))
-        if sealed and str(a.get("reviewed_by", "")).startswith("fixture:"):
+        if sealed and any(str(a.get(k, "")).strip().casefold().startswith("fixture:") for k in ("reviewed_by", "checked_by")):
             raise SystemExit(f"{p.name}: 封印用の本文に fixture: の確認者は使えない")
         a["sha256"] = sha256_text(a["body"])
         (policy_dir / "approved" / p.name).write_text(json.dumps(a, ensure_ascii=False), encoding="utf-8")

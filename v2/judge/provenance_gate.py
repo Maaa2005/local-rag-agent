@@ -42,7 +42,7 @@ from common.schemas import SendPayload
 from judge.base import C2Verdict, question_version
 from judge.c2_registry import DEFAULT_REGISTRY_PATH, REGISTRATION_CHECK_VERSION, Registry, _same_person, load_registry
 from judge.normalize import compact_text, normalize_text
-from judge.request_cues import CUES_VERSION, REQUEST_CUES, cue_hits, cue_spans, unexpected_letters
+from judge.request_cues import CUES_VERSION, REQUEST_CUES, cue_hits, unexpected_letters
 from judge.request_values import VALUES_VERSION, ValueRules, compile_value_rules, unapproved_values
 from orchestrator.policy import DEFAULT_POLICY_DIR, Contract, Policy, load_policy
 
@@ -54,11 +54,11 @@ TABLES_FORMAT = "c2-tables@1"
 _SENTENCE_END = re.compile(r"(?:[。!?;\n、]|,(?![ ]*[A-Za-z0-9_])|(?<![A-Za-z0-9_]),)+")
 # 種類の無い区切りでも、助詞で終わる修飾（「category ごとに、」「amount が負の行は、」）は後ろの区切りに結ぶ。
 # 動詞のて形（「読み込んで、」）で終わる区切りは結ばない（付け足しの依頼になるため）。Codex 11/3
-# 「こと」「ように」「ので」「ために」と動詞の言い切り + と は別の依頼を付け足せるので結ばない。英字の語だけの区切りは列挙（date、category）
+# 「こと」「ように」「ので」「ために」「と」は別の依頼を付け足せるので結ばない。英字の語だけの区切りは列挙（date、category）
 _MODIFIER_END = re.compile(r"(ごとに|ごとの|別に|単位で|について|に対して|に関して|場合は?|なら(ば)?|では|には|からは|までは|"
-                           r"ときは|際は|は|(?<!よう)(?<!ため)に|から|まで|より|(?<!の)で|を|も|(?<![こるたい])と)$|^[A-Za-z_][A-Za-z0-9_]*$")
+                           r"ときは|際は|は|(?<!よう)(?<!ため)に|から|まで|より|(?<!の)で|を|も|使わず)$|^[A-Za-z_][A-Za-z0-9_]*$")
 # 結ぶと中身を誰も見ない区切りなので、立場の主張や送り先を含む区切りは結ばない（別の目 11/4）
-_MODIFIER_DENY = re.compile(r"審査|権限|立場|前提|外部|社外|サーバ|ルール|規則|指示|命令|(役|者|担当|立場)として|振る舞")
+_MODIFIER_DENY = re.compile(r"審査|立場|外部(?!ライブラリ)|社外|サーバ|指示|命令|(役|者|担当|立場)として|振る舞")
 _TE_FORM = re.compile(r"(て|[んい]で)$")
 WAIVABLE_VALUE_CUES = frozenset({"amount", "real_date"})  # c2_registry.WAIVABLE と同じ。承認した値なら依頼文でも当たらない
 
@@ -107,7 +107,7 @@ class Tables:
                 pending = None
             elif k.neutral is not None and (k.neutral.fullmatch(s) or k.neutral.fullmatch(c)):
                 continue
-            elif (i < len(clauses) - 1 and _MODIFIER_END.search(s) and not _TE_FORM.search(s)
+            elif (i < len(clauses) - 1 and _MODIFIER_END.search(c) and not _TE_FORM.search(c)
                   and not _MODIFIER_DENY.search(c)):
                 pending = i if pending is None else pending
             else:
@@ -280,19 +280,22 @@ def _without_approved_values(text: str, hits: list[str], approved_values: Sequen
     """金額・日付の当たりのうち、全部がこの本文で承認した値の範囲に入る物を外す（評価の決まり 3・4 節）。
 
     承認した値は実データではないと承認の記録で決めた値なので、閾値の形でなくても禁止の情報に当たらない。
-    210万円 は 10万円 の範囲に入らないので外れない。空白を除いた写しだけの当たりも外さない。
+    210万円 は 10万円 の範囲に入らないので外れない。空白を除いた写しの当たりも同じ値の範囲に入る時だけ外す。
     """
     if not approved_values or not WAIVABLE_VALUE_CUES & set(hits):
         return hits
     n = normalize_text(text)
-    ranges = [(i, i + len(v)) for v in map(normalize_text, approved_values) if v
-              for i in range(len(n)) if n.startswith(v, i)]
-    spans, compact_only = cue_spans(text)
+    values = [v for v in map(normalize_text, approved_values) if v]
+
+    def covered(pat: re.Pattern[str], written: str, vals: Sequence[str]) -> bool:
+        ranges = [(i, i + len(v)) for v in vals for i in range(len(written)) if written.startswith(v, i)]
+        return all(any(rs <= m.start() and m.end() <= re_ for rs, re_ in ranges) for m in pat.finditer(written))
+
     out = []
     for hit in hits:
-        mine = [(s, e) for name, s, e, _ in spans if name == hit]
-        if (hit in WAIVABLE_VALUE_CUES and hit not in compact_only and mine
-                and all(any(rs <= s and e <= re_ for rs, re_ in ranges) for s, e in mine)):
+        pat = next((p for name, p, _ in REQUEST_CUES if name == hit), None)
+        if (hit in WAIVABLE_VALUE_CUES and pat is not None and covered(pat, n, values)
+                and covered(pat, compact_text(n), [compact_text(v) for v in values])):
             continue
         out.append(hit)
     return out
