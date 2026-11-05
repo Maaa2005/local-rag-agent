@@ -51,19 +51,23 @@ def load_questions(repo: Path) -> list[dict]:
     return out
 
 
-async def run_queries(questions: list[dict], n: int, retrieve, is_timeout) -> list[dict]:
-    """questions を順に n 回 retrieve し、1 回ごとの {i, id, seconds, ok, error, timeout} を返す。"""
+async def run_queries(questions: list[dict], n: int, retrieve, is_timeout, on_row=None) -> list[dict]:
+    """questions を順に n 回 retrieve し、1 回ごとの {i, id, seconds, ok, error, timeout, empty} を返す。
+    on_row: 1 回終わるごとに呼ぶ（途中で殺されても、そこまでの記録を残すため）。"""
     rows = []
     for i in range(n):
         q = questions[i % len(questions)]
         t = time.perf_counter()
         try:
-            await retrieve(q["question"], q["level"])
-            ok, err, to = True, None, False
+            got = await retrieve(q["question"], q["level"])
+            ok, err, to, empty = True, None, False, not got
         except Exception as e:  # noqa: BLE001  失敗は数えて続ける
-            ok, err, to = False, type(e).__name__, bool(is_timeout(e))
-        rows.append({"i": i, "id": q["id"], "seconds": round(time.perf_counter() - t, 4), "ok": ok,
-                     "error": err, "timeout": to})
+            ok, err, to, empty = False, type(e).__name__, bool(is_timeout(e)), False
+        row = {"i": i, "id": q["id"], "seconds": round(time.perf_counter() - t, 4), "ok": ok,
+               "error": err, "timeout": to, "empty": empty}
+        rows.append(row)
+        if on_row:
+            on_row(row)
     return rows
 
 
@@ -79,6 +83,7 @@ def summarize(rows: list[dict], retry_count: int | None) -> dict:
         "n": len(rows),
         "failed": sum(1 for r in rows if not r["ok"]),
         "timeouts": sum(1 for r in rows if r["timeout"]),
+        "empty": sum(1 for r in rows if r.get("empty")),
         "errors": sorted({r["error"] for r in rows if r["error"]}),
         "retries": retry_count,
         "p50": pct(times, 50), "p95": pct(times, 95), "p99": pct(times, 99),
@@ -109,9 +114,11 @@ def pressure_window(rows: list[dict], start: float, end: float, target_mib: int,
             "valid": abs(med - target_mib) <= band_mib and floors == 0 and gap <= max_gap_s and tool_alive}
 
 
-def e4_line_checks(summary: dict, pressure: dict | None) -> dict:
+def e4_line_checks(summary: dict, pressure: dict | None, *, rc: int = 0) -> dict:
     """E4 の 1 回分を線と比べる。絞る条件が守れなかった回は合否を出さない（無効）。回数は固定の E4_N と比べる。"""
     valid = pressure is not None and pressure.get("valid") is True
+    # 子が途中で落ちた回（OOM など）と、全部が空で返った回は、検索の遅さや失敗の測定になっていない
+    valid = valid and rc == 0 and not (summary["n"] > 0 and summary.get("empty", 0) == summary["n"])
     lines = {
         "L1_no_failure": summary["n"] == E4_N and summary["failed"] == 0,
         "L2_p95": summary["p95"] <= E4_P95,
@@ -142,10 +149,10 @@ def child_main(a: argparse.Namespace) -> int:
     from app.services import qdrant as qmod
     from app.services.retriever import retrieve
 
-    async def go():
+    async def go(on_row):
         await init_db()
         try:
-            return await run_queries(load_questions(Path(a.repo)), a.n, retrieve, qmod.is_timeout)
+            return await run_queries(load_questions(Path(a.repo)), a.n, retrieve, qmod.is_timeout, on_row)
         finally:
             # aiosqlite 0.20.0 の接続は非 daemon のスレッドなので、閉じないとプロセスが終わらず親が待ち続ける
             try:
@@ -153,11 +160,22 @@ def child_main(a: argparse.Namespace) -> int:
             finally:
                 await close_db()
 
-    rows = asyncio.run(go())
-    with open(a.rows, "w", encoding="utf-8") as f:
-        for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        f.write(json.dumps({"retry_count": qmod.retry_count}) + "\n")
+    f = None  # 1 回目が終わるまで作らない（問を読めずに落ちた時は何も残さない）
+
+    def on_row(r):
+        nonlocal f
+        if f is None:
+            f = open(a.rows, "w", encoding="utf-8")
+        f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        f.flush()
+
+    try:
+        asyncio.run(go(on_row))
+        if f is not None:
+            f.write(json.dumps({"retry_count": qmod.retry_count}) + "\n")
+    finally:
+        if f is not None:
+            f.close()
     return 0
 
 
@@ -223,7 +241,7 @@ def parent_main(a: argparse.Namespace) -> int:
         summary["pressure"] = pressure_window(_read_jsonl(plog), t_start, t_end, a.pressure_target_mib,
                                               a.pressure_valid_band_mib, tool_alive=pressure_alive)
         summary["pressure"]["before_free_mib"] = (_read_jsonl(plog) or [{}])[0].get("free_mib")
-    summary["lines"] = e4_line_checks(summary["numbers"], summary.get("pressure"))
+    summary["lines"] = e4_line_checks(summary["numbers"], summary.get("pressure"), rc=rc)
     (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=str) + "\n")
     print(json.dumps({"numbers": summary["numbers"], "lines": summary["lines"]}, ensure_ascii=False, default=str))
     return 0

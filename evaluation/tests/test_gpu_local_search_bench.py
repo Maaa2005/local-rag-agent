@@ -311,3 +311,33 @@ def test_compose_forwards_qdrant_settings_with_same_default(name):
     default = str(Settings.model_fields[name.lower()].default)
     assert default == "0"  # 既定は今までと同じ（時間切れは qdrant-client の既定・送り直しなし）
     assert env[name] == "${%s:-%s}" % (name, default)
+
+
+def test_a_run_whose_child_died_is_invalid_not_failed():
+    got = sb.e4_line_checks(sb.summarize([], None), {"valid": True}, rc=137)
+    assert got["verdict"] == "無効"
+
+
+def test_all_empty_results_are_invalid_not_passed():
+    rows = [{"i": i, "id": "q", "seconds": 0.01, "ok": True, "error": None, "timeout": False, "empty": True}
+            for i in range(sb.E4_N)]
+    got = sb.e4_line_checks(sb.summarize(rows, 0), {"valid": True})
+    assert got["verdict"] == "無効"
+    rows[0]["empty"] = False
+    s = sb.summarize(rows, 0)
+    assert s["empty"] == sb.E4_N - 1
+    assert sb.e4_line_checks(s, {"valid": True})["verdict"] == "通る"
+
+
+def test_rows_are_handed_over_one_by_one_so_a_kill_keeps_them():
+    seen = []
+
+    async def retrieve(q, level):
+        if len(seen) == 2:
+            raise KeyboardInterrupt
+        return ["hit"]
+
+    qs = [{"id": "a", "question": "x", "level": 1}]
+    with pytest.raises(KeyboardInterrupt):
+        asyncio.run(sb.run_queries(qs, 5, retrieve, lambda e: False, seen.append))
+    assert [r["i"] for r in seen] == [0, 1]
