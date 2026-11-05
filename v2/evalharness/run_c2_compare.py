@@ -27,6 +27,9 @@
   python -m evalharness.run_c2_compare --method F --set B15 --base-url http://127.0.0.1:8082 \\
       --c2-model clef-flash --timeout 60 --max-input-chars 4000
   python -m evalharness.run_c2_compare --method FT --set dev47 --base-url http://127.0.0.1:8082 --timeout 60
+
+判断モデルの版は --expected-revision で決める（docs/redesign-v2.md 検証規則 7）。渡すと始める前に ready() で確かめ、
+違う版の応答は不正として failure_hold に倒す。記録にはケースごとの要求の番号（judge_request_id）を残す（未使用集合を除く）。
 """
 from __future__ import annotations
 
@@ -48,7 +51,7 @@ from judge.base import GUARD_MODEL, C2Gate, C2Verdict, guarded_c2
 from judge.c2_specs import (SPECS, NoTarget, SpecError, _normalized, build_request, has_target, sha256_text, spec_hash,
                             spec_version)
 from judge.ft_gate import FAULT_KINDS, FT_RUN, FT_SPEC, FTC2Gate, FTVerdict, ft_hash, ft_version
-from judge.http_adapter import C2_QUESTION_VERSION, C2_QUESTIONS, HttpC2Gate
+from judge.http_adapter import C2_QUESTION_VERSION, C2_QUESTIONS, HttpC2Gate, ready_or_exit
 from judge.spec_gate import Bound, SpecC2Gate
 from orchestrator.candidate import ContractViolation, SendCandidate, build_candidate
 from orchestrator.policy import JST, ApprovedText, Policy, load_policy
@@ -343,7 +346,7 @@ def judge_item(method: str, item: Item, gate: Any, *, timeout_s: float, max_inpu
     sent = v.context_sha256
     rec.update(p=v.prob_block, decision=v.decision, reason=v.reason, reason_code=code,
                bucket=bucket_of(code, v.decision), model=v.model, revision=v.revision,
-               question_version=v.question_version, context_sha256=sent,
+               question_version=v.question_version, context_sha256=sent, judge_request_id=v.judge_request_id,
                context_match=None if sent is None else sent == rec["expected_context_sha256"],
                elapsed_s=round(time.perf_counter() - t0, 3))
     if method == "FT":
@@ -475,7 +478,13 @@ def run(args: argparse.Namespace, *, git: Callable[[], tuple[str, list[str]]] = 
     else:
         items = load_dev_items(args.set, pol, Path(args.cases))
     version, short = method_version(args.method)
-    gate = make_gate(args.method, args.base_url, args.c2_model, args.timeout, **(gate_kw or {}))
+    expected_revision = args.expected_revision
+    if not expected_revision:
+        print("warning: --expected-revision is not set; any revision is accepted", file=sys.stderr)
+    gate = make_gate(args.method, args.base_url, args.c2_model, args.timeout, expected_revision=expected_revision,
+                     **(gate_kw or {}))
+    # 版を決めたら、始める前に確かめる（版を決めない今までの呼び方では何も聞かない）
+    ready = ready_or_exit("C2", gate) if expected_revision else None
     started = datetime.now(timezone.utc)
     recs: list[dict[str, Any]] = []
     stopped_at = None
@@ -506,6 +515,7 @@ def run(args: argparse.Namespace, *, git: Callable[[], tuple[str, list[str]]] = 
         "spec_hash": None if args.method == "Q0" else ft_hash() if ft else spec_hash(args.method),
         "spec": spec, "ft_run": FT_RUN if ft else None, "rules": RULES,
         "git_head": head, "c2_model": args.c2_model, "base_url": args.base_url, "timeout_s": args.timeout,
+        "expected_revision": expected_revision, "ready": ready,
         "max_input_chars": args.max_input_chars, "pass_allow_max": PASS_ALLOW_MAX, "auc_min": AUC_MIN,
         "started_at": started.isoformat(), "finished_at": datetime.now(timezone.utc).isoformat(),
         "cases_sha256": None if heldout_sha else hashlib.sha256(Path(args.cases).read_bytes()).hexdigest(),
@@ -532,6 +542,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--dev28", default=str(DEV28_PATH))
     ap.add_argument("--base-url", required=True)
     ap.add_argument("--c2-model", default="clef-flash")
+    ap.add_argument("--expected-revision", help="この版の応答だけを受ける（始める前に ready で確かめる）")
     ap.add_argument("--timeout", type=float, default=60.0)
     ap.add_argument("--max-input-chars", type=int, default=4000)
     ap.add_argument("--out-dir", default=str(RESULTS_DIR))
