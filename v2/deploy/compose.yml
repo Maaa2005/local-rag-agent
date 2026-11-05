@@ -84,26 +84,53 @@ services:
     <<: *hardening
     # Clef-flash 構成（profile clef）では起動しない。
     profiles: ["laya"]
-    image: vllm/vllm-openai:v0.25.1
+    # 版をダイジェストで固定する（タグの付け替え・壊れた取得で別の中身にならないように。Issue #14）。
+    # v0.25.1 の索引（複数アーキテクチャ）のダイジェスト。linux/amd64 は
+    # sha256:f0b9a0dc75a9fca3b6811e3279367b2d6a448055a000bfd13859587d74cef268。どちらも 11/2 と 11/4 に Docker Hub の registry API で確認
+    image: vllm/vllm-openai:v0.25.1@sha256:e4f88a835143cd22aee2397a26ec6bb80b3a4a6fe0c882bcbc63822904766089
     runtime: nvidia
-    user: "10003:10003"
+    # 公式の vllm-openai イメージが非 root で支えるのは同梱の vllm（UID 2000・GID 0）だけ
+    # （v0.25.1 docs/deployment/docker.md "prepared to run as the built-in `vllm` user (UID 2000, GID 0)"。
+    # GID 0 の任意の UID は別の vllm-openai-nonroot 用の作りでの話）。前の 10003:10003 はイメージの /etc/passwd に無く、
+    # 支えの外だった。cap_drop ALL・read_only・no-new-privileges は変えない。UID 2000 はほかのサービスと重ならない
+    user: "2000:0"
     environment:
       <<: *offline-env
       HOME: /tmp
       XDG_CACHE_HOME: /tmp/.cache
+      # 利用統計を送らない・書かない（既定では stats.vllm.ai へ送り、usage_stats.json を書く。値は "1" の時だけ効く。
+      # v0.25.1 vllm/envs.py・vllm/usage/usage_lib.py・docs/usage/usage_stats.md）。社内ゾーンは外へ出られないが、明示して止める
+      VLLM_NO_USAGE_STATS: "1"
+      VLLM_DO_NOT_TRACK: "1"
+      DO_NOT_TRACK: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      # 設定・キャッシュの書き先を tmpfs に寄せる（read_only のため。既定は ~/.config/vllm・~/.cache/vllm）
+      VLLM_CONFIG_ROOT: /tmp/vllm-config
+      VLLM_CACHE_ROOT: /tmp/vllm-cache
+      TRITON_CACHE_DIR: /tmp/triton
+      # WSL2 で pinned メモリを使えるようにする（v0.25.0 から既定の V2 ランナーは WSL2 で "UVA is not available" に
+      # なる報告。WSL2 以外では読まれない。v0.25.1 vllm/envs.py・platforms/cuda.py）
+      VLLM_WSL2_ENABLE_PIN_MEMORY: "1"
     volumes:
       - models:/models:ro
     tmpfs:
-      - /tmp
+      # Docker の tmpfs は既定で noexec,nosuid,nodev。Triton が /tmp に作る .so を読めるよう、ここだけ exec にする
+      # （nosuid,nodev は残る。moby daemon/oci_linux.go）。大きさは 1 GiB まで
+      - /tmp:exec,size=1g
     # モデルは事前取得済みのローカルパス（revision 固定は取得手順側で行う）。取得用トークンは渡さない。
     # --quantization は付けない。既定モデルの config は compressed-tensors で、awq を指定すると起動時に止まる
     # （固定版 0.25.1 のソースで確認）。無指定なら config から読む（10/19 Colab・vLLM 0.32.0 で確認。0.25.1 での起動は未確認）。
-    # 下の値は 6GB 想定のままで、8〜12GB 向けには未調整。
+    # --language-model-only: 画像・音声の入力を全部 0 にし、その部品（tower）を読まない（v0.25.1 の arg_utils.py。
+    #   --limit-mm-per-prompt を全種類 0 にするのと同じ）。社内規程の RAG は文字だけ
+    # --max-num-seqs 1: 同時に処理する列を 1 本にする（測ったのは llama-server の -np 1。既定は 256）
+    # --max-model-len・--gpu-memory-utilization は 6GB 想定のままで、8〜12GB 向けには未調整（値は実測で決める）。
     command: >
       --model /models/${LLM_MODEL_DIR:-gemma-4-E2B-it-AWQ-INT4}
       --dtype auto
       --max-model-len 4096
       --gpu-memory-utilization 0.6
+      --max-num-seqs 1
+      --language-model-only
       --served-model-name local-llm
     deploy:
       resources:
