@@ -1,0 +1,65 @@
+{
+  "format": "rule-card@1",
+  "id": "jikan-tani-nenkyu-shinsei-kyubyo",
+  "status": "draft",
+  "drafted_by": "claude-fable-5-1",
+  "confirmed_by": null,
+  "doc": {
+    "source": "時間単位年休規程",
+    "section": "第5条・第6条",
+    "quote": "本人又は同居の家族の急病のときは、当日の始業時刻までに上長へ連絡すれば、前条の申請に代えることができる。"
+  },
+  "target": "時間単位の年休の勤怠システムでの申請（急病の特例）",
+  "match": {
+    "conclusions": [
+      "省略可",
+      "必須"
+    ],
+    "keywords": [
+      "時間単位"
+    ]
+  },
+  "slots": {
+    "急病": {
+      "type": "bool",
+      "absent": "なし",
+      "mention": [
+        "急病",
+        "病気",
+        "体調",
+        "発熱",
+        "具合"
+      ],
+      "describe": "本人又は同居の家族の急病か"
+    },
+    "連絡時刻": {
+      "type": "time",
+      "describe": "上長へ連絡した時刻"
+    },
+    "始業時刻": {
+      "type": "time",
+      "describe": "当日の始業時刻"
+    }
+  },
+  "conditions": [
+    {
+      "name": "本人又は同居の家族の急病",
+      "left": "急病",
+      "op": "==",
+      "right": "あり",
+      "quote": "本人又は同居の家族の急病のときは、当日の始業時刻までに上長へ連絡すれば、前条の申請に代えることができる。"
+    },
+    {
+      "name": "当日の始業時刻までに上長へ連絡した",
+      "left": "連絡時刻",
+      "op": "<=",
+      "right": "始業時刻",
+      "quote": "本人又は同居の家族の急病のときは、当日の始業時刻までに上長へ連絡すれば、前条の申請に代えることができる。"
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "省略可",
+    "else": "必須"
+  }
+}

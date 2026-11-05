@@ -1,0 +1,62 @@
+{
+  "format": "numeric-sealed-freeze@1",
+  "allow_draft": true,
+  "cards_dir": "C:\\Users\\mtkzi\\.cache\\lr-gpu\\v3d\\cards",
+  "cards": [
+    {
+      "id": "bunsho-haiki-kahi",
+      "status": "draft"
+    },
+    {
+      "id": "buppin-aimitsumori-hissu",
+      "status": "draft"
+    },
+    {
+      "id": "buppin-mitsumorisho-hozon",
+      "status": "draft"
+    },
+    {
+      "id": "einen-kinzoku-kinenhin",
+      "status": "draft"
+    },
+    {
+      "id": "jikan-tani-nenkyu-shinsei-kyubyo",
+      "status": "draft"
+    },
+    {
+      "id": "jikan-tani-nenkyu-shutoku",
+      "status": "draft"
+    },
+    {
+      "id": "okugai-sagyo-chushi",
+      "status": "draft"
+    },
+    {
+      "id": "shain-kashitsuke-kahi",
+      "status": "draft"
+    }
+  ],
+  "files": {
+    "bunsho-haiki-kahi.json": "a508eee999b082f3adec835e8dfbe55abc0f6a7b4b66375f0ca1b03786380f34",
+    "buppin-aimitsumori-hissu.json": "13ced905d7d49ec428d7939afc860ba1bc77ff51cebf0b04434a5eca15da5991",
+    "buppin-mitsumorisho-hozon.json": "266d1ba7c09f62d2bd91fa189da8f6fe87c3f4a57dbf272a296934a20ab75859",
+    "einen-kinzoku-kinenhin.json": "7a6e580874b5c35577907d186bdb1d47dbf314af4e559b2839f9354d8cdaa755",
+    "jikan-tani-nenkyu-shinsei-kyubyo.json": "5a2f9f4366e5e57424c438c9ec097ffc385f71a69ff30cf752773f3a14857ab6",
+    "jikan-tani-nenkyu-shutoku.json": "710aa2f3b44e429f65f7985a5948abf506e317355b86db1c956f3eece0c204f5",
+    "okugai-sagyo-chushi.json": "f85329825f196999a6144bcdc7c8036152cab5b9d5613920dd5e3023e7d08383",
+    "shain-kashitsuke-kahi.json": "d915cca0c47d335edbb46636365254154ee962cdfb3a17fa83df61903abc0655"
+  },
+  "unable": {
+    "present": false,
+    "rules": [],
+    "sha256": null
+  },
+  "prompt": {
+    "path": "evaluation/v2/rule_cards/draft_prompt.md",
+    "sha256": "3fdc4150042ec792ff60b84790730c3ba7039fbd8ce28939d1c6d6b6ba102e9b"
+  },
+  "rule_cards_py": {
+    "path": "backend/app/services/rule_cards.py",
+    "sha256": "a804b7ba6b274a522b5419f99082ba4af0c9351c117a28d305cad69e4f0debc1"
+  }
+}
