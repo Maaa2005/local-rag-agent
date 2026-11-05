@@ -1310,3 +1310,18 @@ def test_yearless_date_written_with_placeholder_year_is_accepted_in_equiv_only()
         assert not p and (v["日"].month, v["日"].day) == (7, 1)
         _, p2 = validate_extraction(c, q, raw)
         assert p2
+
+
+@pytest.mark.parametrize("quote,ok", [("22時20分から22時40分の間だった", False), ("22時ごろ退社", False), ("22時20分に退社", True)])
+def test_hedged_quote_gives_no_exact_value(quote, ok):
+    c = rule_cards.parse_card({
+        "format": "rule-card@1", "id": "t", "status": "draft", "drafted_by": "x", "confirmed_by": None,
+        "doc": {"source": "s", "section": "1", "quote": "q"}, "target": "t",
+        "match": {"conclusions": ["出る", "出ない"], "keywords": ["代"]},
+        "slots": {"時刻": {"type": "time", "describe": "時刻"}},
+        "conditions": [{"name": "c", "left": "時刻", "op": ">=", "right": {"time": "22:00"}}],
+        "combine": "all", "conclusion": {"then": "出る", "else": "出ない"}})
+    hh = "22:20" if "20分" in quote else "22:00"
+    q = f"{quote}。\n最後の行は「結論: 出る」または「結論: 出ない」とする。"
+    _, p = validate_extraction(c, q, {"時刻": {"quote": quote, "value": hh}}, verify="equiv")
+    assert (not p) is ok

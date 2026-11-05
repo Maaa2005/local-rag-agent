@@ -72,6 +72,8 @@ _KM_UNITS = ("キロメートル", "キロ", "km")
 _M_UNITS = ("メートル", "m")
 _LOOSE_MD = re.compile(r"^(?:YYYY-|\d{4}-)?(\d{1,2})-(\d{1,2})$|^(?:\d{4}年)?(\d{1,2})月(\d{1,2})日$")
 # 問が「知らない」と明言している時は、話題が無いとは言えない。既定の値を使わず保留の側へ倒す
+# 引用の値が確かでない言い方。範囲や「ごろ」の値を 1 つに決めない（保留の側へ倒す）
+_HEDGE = re.compile(r"ごろ|頃|くらい|ぐらい|たぶん|多分|はず|およそ|約\d|から.{0,12}の間|前後|あたり")
 UNKNOWN_WORDS = ("聞いていません", "聞いてません", "聞きそびれ", "分かりません", "わかりません", "不明", "未定",
                  "確認していません", "覚えていません", "知りません", "決まっていません")
 ZERO_WORDS = ("ない", "なし", "ありません", "持っていない", "無い")  # 数の枠の 0 は、引用にこの語がある時だけ通す
@@ -402,6 +404,7 @@ def extraction_messages(card: Card, question: str, *, reverse: bool = False) -> 
               "quote には質問の文を言い換えずにそのまま入れます。value は quote に書かれている通りに決めます。\n"
               "質問に書かれていない項目は quote と value を null にします。計算・推測・換算はしません。"
               "ただし、数の単位が 分 や 時間 で quote が「6時間10分」「3時間半」のような時間の長さの時だけは、その単位の数に直します。\n"
+              + ("項目は質問者本人（同僚の話なら同僚）の事です。家族など別の人の事を当てはめません。" if V2 else "")
               + "\n".join(lines))
     return [{"role": "system", "content": system}, {"role": "user", "content": question_body(question).strip()}]
 
@@ -614,6 +617,9 @@ def validate_extraction(card: Card, question: str, raw: Any, *, verify: str = "s
         nq = _norm(q).strip()
         if nq not in body:
             problems.append(f"{name}: quote is not in the question")
+            continue
+        if verify == "equiv" and s.type in ("number", "date", "time") and _HEDGE.search(nq):
+            problems.append(f"{name}: the quote gives no exact value")
             continue
         if s.type == "number":
             if isinstance(v, bool) or not isinstance(v, (int, float)):
