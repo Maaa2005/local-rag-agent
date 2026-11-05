@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-25",
+  "commit": "65d2723",
+  "code_identity": "cd0c8b64d269706375e4038f6e517070298b3d5ed3a1a30b30440b57d186330a",
+  "verified_sha256": "f98945e8a29a38371c5eaadcce8287a67494f86fa757e44b9a267229cb86b9ba",
+  "grade_report_sha256": "f8fc2c78c4f1c0fe47d67cb2d4f03ae8a6c1910d06f3c82457e1e1a0b9e3f30d",
+  "runs": "別々に起動した 2 回（1回目・2回目）。問ごとの記録（rows.jsonl）はバイト単位で同一。リポジトリの外に保存",
+  "records": {
+    "written": 19,
+    "grade_round1": {
+      "ok": 0,
+      "ng": 19
+    },
+    "fix_rounds": 1,
+    "grade_round2": {
+      "ok": 10,
+      "ng": 9
+    },
+    "ng_moved_aside": [
+      "R-assess-joint-research",
+      "R-expense-venue",
+      "R-facility-box",
+      "R-facility-meeting-room",
+      "R-filing-book-deadline",
+      "R-filing-damage-report",
+      "R-parallel-book-deadline",
+      "R-training-reexam",
+      "R-training-register"
+    ],
+    "ng_reason_kind": {
+      "対応範囲内の書き方を記録で対応外にした（計画1節の範囲をコードが扱えない）": 7,
+      "対象の取り方が広い": 2
+    },
+    "specs_with_verified_record": "16 規程中 8（R01 R02 R04 R05 R06 R13 R14 R15）＋食い違い 2（RC01 RC03）"
+  },
+  "blind_recheck": {
+    "judged": 96,
+    "conclusion_mismatch": 0,
+    "not_derivable": 24,
+    "not_derivable_equals_hold_block": true,
+    "revised_to_hold": 0,
+    "removed": 0
+  },
+  "breakdown_run1": {
+    "decided": {
+      "total": 16,
+      "correct": 16
+    },
+    "held": {
+      "total": 22,
+      "correct": 11,
+      "wrong_by_cause": {
+        "other_requirements:unstated (R04 R05 各3)": 6,
+        "outcome:option_mismatch (R02)": 3,
+        "facts:role_undecided (R06)": 1,
+        "facts:conflict (R14)": 1
+      }
+    },
+    "no_record": {
+      "total": 58,
+      "correct": 0,
+      "rule_without_verified_record": 52,
+      "subject_miss_on_verified_rule_variation": 6
+    }
+  },
+  "not_claimed": [
+    "F7 の合格（逆・違う数・違う版を入れる試験は別）",
+    "既存の線（N・M6・M7・M8・P・V・G0）: この回では流していない",
+    "M4/M4-S: 規則により計算しない"
+  ],
+  "unmeasured": [
+    "取り出し（検索）",
+    "閲覧レベル",
+    "実際の経路（C1・検索・モデルの生成）"
+  ],
+  "note": "結果を開けたので、この 96 問と 7 文書は以後開発用。問の文・正解・答えの文はリポジトリに入れない"
+}

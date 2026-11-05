@@ -1,0 +1,74 @@
+{
+  "rule_id": "R-welfare-childcare",
+  "doc_path": "/watched/general/福利厚生規程.md",
+  "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
+  "description": "育児支援金は子の誕生日の翌日から数えて60日以内の申請に限り受け付ける",
+  "supported": true,
+  "relation": "only_if",
+  "subject": {
+    "groups": [
+      [
+        "育児支援金"
+      ],
+      [
+        "申請",
+        "受け付け"
+      ]
+    ]
+  },
+  "facts": [
+    {
+      "role": "birth_date",
+      "label": "子の誕生日",
+      "kind": "date",
+      "cues": [
+        "誕生",
+        "生まれ",
+        "出産"
+      ]
+    },
+    {
+      "role": "submit_date",
+      "label": "申請日",
+      "kind": "date",
+      "cues": [
+        "申請",
+        "提出"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "submit_date",
+      "op": "<=",
+      "threshold": {
+        "type": "offset_days",
+        "base": "birth_date",
+        "days": 60,
+        "count_from": "next_day"
+      },
+      "evidence": {
+        "quote": "育児支援金の申請は、子の誕生日の翌日から数えて60日以内に行ったものに限り受け付ける",
+        "line": 27
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "unknown",
+      "basis": "unknown"
+    },
+    "any_false": {
+      "value": "受け付けられない",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "育児支援金の申請は、子の誕生日の翌日から数えて60日以内に行ったものに限り受け付ける",
+        "line": 27
+      }
+    }
+  },
+  "options": [
+    "受け付けられる",
+    "受け付けられない"
+  ]
+}

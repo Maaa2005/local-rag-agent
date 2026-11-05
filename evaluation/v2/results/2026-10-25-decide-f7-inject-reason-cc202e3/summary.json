@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-25",
+  "commit": "cc202e3",
+  "what": "前回（8a80b9a）の壊す試験に、止まった理由の文言の確認と、7.2 (e) の壊し方を足して流し直した",
+  "script": "evaluation/v2/f7_inject_sealed.py",
+  "cases": {
+    "reverse": {"desc": "成り立つ時と成り立たない時の結論を入れ替え", "total": 10, "stopped_for_expected_reason": 10, "expected": "中身が確認済みの表と違う"},
+    "number": {"desc": "最初の条件の境目の数を +1", "total": 10, "stopped_for_expected_reason": 10, "expected": "中身が確認済みの表と違う"},
+    "version": {"desc": "文書の版（ハッシュ）を1文字変更", "total": 10, "stopped_for_expected_reason": 10, "expected": "中身が確認済みの表と違う"},
+    "add": {"desc": "表に無い記録を1件足す", "total": 1, "stopped_for_expected_reason": 1, "expected": "確認済みの表に無い"},
+    "relation": {"desc": "成り立たない側に結論を持ったまま relation を if_else から if_then にし、表のハッシュも付け直す（採点役が見逃した場合の代わり）", "total": 10, "stopped_for_expected_reason": 10, "expected": "relation if_then はこの側に結論を持てない"}
+  },
+  "stopped_means": "終了コードが 0 以外・答えの記録と要約を書かない・出力に期待した理由の文言がある",
+  "not_covered": [
+    "日数・翌月の日を変える壊し方: 封の確認済みの記録 10 件に期限の型が無いので、本物の記録では試せない",
+    "relation の壊し方は if_else から if_then の 1 通りだけ",
+    "最初から逆・違う数・違う版で書かれ、型にも合い、採点役も可にした記録（計画 7.2）"
+  ],
+  "not_claimed": "F7 の合格。既存の線（N・M6・M7・M8・P・V・G0）は流していない"
+}

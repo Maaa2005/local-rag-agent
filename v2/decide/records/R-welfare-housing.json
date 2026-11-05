@@ -1,0 +1,62 @@
+{
+  "rule_id": "R-welfare-housing",
+  "doc_path": "/watched/general/福利厚生規程.md",
+  "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
+  "description": "勤続年数が3年以上の社員は住宅手当の対象",
+  "supported": true,
+  "relation": "if_then",
+  "subject": {
+    "groups": [
+      [
+        "住宅手当"
+      ],
+      [
+        "対象",
+        "支給"
+      ]
+    ]
+  },
+  "facts": [
+    {
+      "role": "tenure",
+      "label": "勤続年数",
+      "kind": "quantity",
+      "unit": "年",
+      "cues": [
+        "勤続"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "tenure",
+      "op": ">=",
+      "threshold": {
+        "type": "number",
+        "value": 3
+      },
+      "evidence": {
+        "quote": "勤続年数が3年以上の社員は、住宅手当の対象とする",
+        "line": 5
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "対象になる",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "勤続年数が3年以上の社員は、住宅手当の対象とする",
+        "line": 5
+      }
+    },
+    "any_false": {
+      "value": "unknown",
+      "basis": "unknown"
+    }
+  },
+  "options": [
+    "対象になる",
+    "対象にならない"
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "rule_id": "R-supply-approval",
+  "doc_path": "/watched/general/備品購入規程.md",
+  "doc_version": "aad877806fd36411fa9f4f6fb5a94eed0f2347d8957ed51066917f7331d73237",
+  "description": "1件あたり5万円を超える備品の購入は総務部長の承認を要する。それ以外は所属長の承認",
+  "supported": true,
+  "relation": "if_else",
+  "subject": {
+    "groups": [
+      [
+        "備品"
+      ],
+      [
+        "承認",
+        "総務部長"
+      ]
+    ]
+  },
+  "facts": [
+    {
+      "role": "amount",
+      "label": "1件あたりの金額",
+      "kind": "money",
+      "cues": [
+        "備品",
+        "購入",
+        "金額"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "amount",
+      "op": ">",
+      "threshold": {
+        "type": "number",
+        "value": 50000
+      },
+      "evidence": {
+        "quote": "1件あたり5万円を超える備品の購入は、総務部長の承認を要する",
+        "line": 9
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "必要",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "1件あたり5万円を超える備品の購入は、総務部長の承認を要する",
+        "line": 9
+      }
+    },
+    "any_false": {
+      "value": "不要",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "上記以外の備品は、所属長の承認で購入できる",
+        "line": 11
+      }
+    }
+  },
+  "options": [
+    "必要",
+    "不要"
+  ],
+  "other_requirements": [
+    {
+      "description": "購入日の翌日から数えて14日以内の申請",
+      "cues": [
+        "申請期限",
+        "14日",
+        "期限"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "both",
+      "evidence": {
+        "quote": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない",
+        "line": 15
+      }
+    },
+    {
+      "description": "領収書の写しの添付",
+      "cues": [
+        "領収書"
+      ],
+      "assume_met_if_unstated": true,
+      "matters_for": "both",
+      "evidence": {
+        "quote": "申請には領収書の写しを添える",
+        "line": 17
+      }
+    }
+  ]
+}

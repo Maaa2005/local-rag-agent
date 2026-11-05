@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-26",
+  "commit": "738833b",
+  "code_identity": "9586afff24e9c3a9ea769a55957fd4d71108ab0a435afa12a09f32837945cf4e",
+  "code_frozen_at": "6b289ff（乙 (c) の後。以後 .py は変えていない）",
+  "verified_sha256": "5e14971ad682a574c29bc721925d7ec43eaf0e6099f23e1c02e9d30e3744e764",
+  "grade_report_sha256": "23e9eb432927be4fe8041f25685e3800c1432d97a69606f4ae78039af6586bdd",
+  "runs": "別々に起動した 2 回（1回目・2回目）。問ごとの記録（rows.jsonl）はバイト単位で同一。リポジトリの外に保存",
+  "records": {
+    "written": 16,
+    "writer_saw": "文書と規程の目印（規程の名前・文書・主な文の行）だけ。問と正解は見ていない",
+    "stale": 0,
+    "supported_false": 3,
+    "grade_round1": {
+      "ok": 6,
+      "ng": 10
+    },
+    "fix_rounds": 0,
+    "ng_moved_aside": ["R01", "R02", "R03", "R04", "R06", "R08", "R09", "R10", "R11", "R13"],
+    "ng_reason_kind": {
+      "対象の語が広い（規程の対象に限定されていない）": 8,
+      "対応外（supported:false）の記録に、規程が求める別の要件と書かれていない時の保留が無い": 2
+    },
+    "specs_with_verified_record": "16 規程中 6（R05 R07 R12 R14 R15 R16。R07 は supported:false）。足した文書の 2 規程は登録しない"
+  },
+  "blind_recheck": {
+    "judged": 96,
+    "conclusion_mismatch": 0,
+    "revised_to_hold": 0,
+    "removed": 0
+  },
+  "breakdown_run1": {
+    "decided": {
+      "total": 10,
+      "correct": 10
+    },
+    "held": {
+      "total": 19,
+      "correct": 4,
+      "wrong_by_cause": {
+        "outcome:option_mismatch (R12 5・R16 3。書き手が選択肢を言い換えた)": 8,
+        "scope:unsupported (R07)": 4,
+        "facts:conflict (R05 R14 R16 各1)": 3
+      }
+    },
+    "no_record": {
+      "total": 67,
+      "correct": 0,
+      "rule_not_registered": 65,
+      "subject_miss_on_registered_rule": 2
+    }
+  },
+  "by_registration": {
+    "registered": "14/31",
+    "unregistered": "0/65",
+    "n_rules_in_questions": 18,
+    "n_rules_in_questions_registered": 6
+  },
+  "stop_conditions_plan_6": "どれにも当たらない（決めた 10 問はすべて正しい・逆の断定なし）",
+  "not_claimed": [
+    "F7 の合格",
+    "既存の線（N・M6・M7・M8・P・V・G0）: この回では流していない",
+    "M4/M4-S: 規則により計算しない"
+  ],
+  "unmeasured": [
+    "取り出し（検索）",
+    "閲覧レベル",
+    "実際の経路（C1・検索・モデルの生成）"
+  ],
+  "note": "結果を開けたので、この 96 問と 7 文書は以後開発用。問の文・正解・答えの文はリポジトリに入れない"
+}

@@ -1,0 +1,81 @@
+{
+  "rule_id": "R-welfare-dock",
+  "doc_path": "/watched/general/福利厚生規程.md",
+  "doc_version": "219eaa4c54f8123acd4e93493f62b80d988c2a12c554315be32897e66b27e642",
+  "description": "人間ドックの補助は2026年12月1日より前に受診した分が対象",
+  "supported": true,
+  "relation": "if_then",
+  "subject": {
+    "groups": [
+      [
+        "人間ドック"
+      ],
+      [
+        "補助",
+        "対象",
+        "受診"
+      ]
+    ]
+  },
+  "facts": [
+    {
+      "role": "exam_date",
+      "label": "受診日",
+      "kind": "date",
+      "cues": [
+        "受診"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "fact": "exam_date",
+      "op": "<",
+      "threshold": {
+        "type": "date",
+        "value": "2026-12-01"
+      },
+      "evidence": {
+        "quote": "人間ドックの補助は、2026年12月1日より前に受診した分を対象とする",
+        "line": 21
+      }
+    }
+  ],
+  "outcomes": {
+    "all_true": {
+      "value": "対象になる",
+      "basis": "explicit",
+      "evidence": {
+        "quote": "人間ドックの補助は、2026年12月1日より前に受診した分を対象とする",
+        "line": 21
+      }
+    },
+    "any_false": {
+      "value": "unknown",
+      "basis": "unknown"
+    }
+  },
+  "options": [
+    "対象になる",
+    "対象にならない"
+  ],
+  "exceptions": [
+    {
+      "description": "補助は1人あたり年1回まで。回数を述べた質問は保留する",
+      "cues": [
+        "何回",
+        "回数",
+        "2回目",
+        "二回目",
+        "年1回",
+        "年に1回",
+        "複数回",
+        "もう一度"
+      ],
+      "evidence": {
+        "quote": "補助額は1人あたり年1回までとする",
+        "line": 23
+      }
+    }
+  ]
+}

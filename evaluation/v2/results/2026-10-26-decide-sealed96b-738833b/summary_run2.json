@@ -1,0 +1,93 @@
+{
+  "label": "2回目",
+  "total": 96,
+  "by_kind": {
+    "no_record": 67,
+    "decided": 10,
+    "held": 19
+  },
+  "by_hold_code_or_stage": {
+    "subject": 67,
+    "decided": 10,
+    "scope:unsupported": 5,
+    "outcome:option_mismatch": 8,
+    "facts:conflict": 3,
+    "facts:missing": 1,
+    "other_requirements:unstated": 1,
+    "facts:denominator_zero": 1
+  },
+  "correct": 14,
+  "by_set": {
+    "boundary": {
+      "correct": 9,
+      "total": 48
+    },
+    "hold": {
+      "correct": 4,
+      "total": 24
+    },
+    "variation": {
+      "correct": 1,
+      "total": 24
+    }
+  },
+  "by_question_kind": {
+    "condition_combo": {
+      "correct": 0,
+      "total": 6
+    },
+    "conflict": {
+      "correct": 0,
+      "total": 6
+    },
+    "exception_unclear": {
+      "correct": 0,
+      "total": 6
+    },
+    "irrelevant_numbers": {
+      "correct": 1,
+      "total": 6
+    },
+    "missing_info": {
+      "correct": 2,
+      "total": 6
+    },
+    "multiple_subjects": {
+      "correct": 0,
+      "total": 6
+    },
+    "out_of_scope": {
+      "correct": 2,
+      "total": 6
+    },
+    "paraphrase": {
+      "correct": 0,
+      "total": 6
+    }
+  },
+  "revised_to_hold": {
+    "total": 0,
+    "correct": 0
+  },
+  "by_registration": {
+    "registered": {
+      "correct": 14,
+      "total": 31
+    },
+    "unregistered": {
+      "correct": 0,
+      "total": 65
+    }
+  },
+  "n_rules_in_questions": 18,
+  "n_rules_in_questions_registered": 6,
+  "missing_expected": 0,
+  "code_identity": "9586afff24e9c3a9ea769a55957fd4d71108ab0a435afa12a09f32837945cf4e",
+  "verified_sha256": "5e14971ad682a574c29bc721925d7ec43eaf0e6099f23e1c02e9d30e3744e764",
+  "n_records": 6,
+  "unmeasured": [
+    "取り出し（検索）",
+    "閲覧レベル",
+    "実際の経路（C1・検索・モデルの生成）"
+  ]
+}
