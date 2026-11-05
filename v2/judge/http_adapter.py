@@ -26,7 +26,7 @@ question_version（版ラベル＋質問定義のハッシュ）を計算し、�
 2026-11-04 に足した決まり（公式の仕様・実装との対照は docs/redesign-v2.md「判断モデルの HTTP I/F」）:
   - 要求ごとに番号（X-Request-Id・uuid4 の 16 進 32 字）を付けて送る。サーバが返すなら同じ値でなければ不正。
     番号は判定の結果（judge_request_id）と監査 DB に残し、判断サーバのログと 1 件ずつ突き合わせられるようにする。
-    guard が止めた判定（応答が不正・時間切れなど）にも、送った番号を残す
+    guard が止めた判定（応答が不正・時間切れなど）にも、送った番号を残す。時間切れの後は次の要求を送らない
   - expected_revision を渡すと、その版の応答だけを受ける（違えば不正）
   - 応答は MAX_RESPONSE_BYTES まで読む（超えたら不正）。圧縮された応答は展開しながら数えて止める
   - GET /healthz で、今載っているモデルと版を起動時に確かめられる（ready）。全体で timeout_s まで
@@ -242,7 +242,8 @@ class _SystemOneClient:
     def ask(self, context: str, questions: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, tuple[str, dict[str, float]]], str]:
         """質問を送り、(応答本体, {質問 id: (answer, probs)}, 要求の番号) を返す。質問にない id の答えは使わない。"""
         request_id = uuid.uuid4().hex
-        # 応答を待つ前に知らせる。不正な応答・時間切れで止めた判定にも、送った番号を残す
+        # 送る前に知らせる。不正な応答・時間切れで止めた判定にも、送った番号を残す。
+        # guard が時間切れで打ち切った後なら RequestAfterStop が出て、この要求は送らない
         note_request_id(request_id)
         with self._client.stream("POST", "/v1/systemone", headers={REQUEST_ID_HEADER: request_id},
                                  json={"model": self.model, "context": context, "questions": questions}) as r:

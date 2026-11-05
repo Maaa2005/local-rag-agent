@@ -1,6 +1,6 @@
 """PR #26 のレビューで足した決まりの試験（docs/redesign-v2.md「判断モデルの HTTP I/F」検証規則 6〜8）。
 
-- 止めた判定にも、送った番号を残す（判定の結果と監査 DB）
+- 止めた判定にも、送った番号を残す（判定の結果と監査 DB）。時間切れの後は次の要求を送らない
 - FT の部品 F・T の番号を components と結果に残す
 - 評価ハーネスが expected_revision を渡し、ready() を呼び、記録に番号を入れる
 - 圧縮された応答は展開しながら上限で止める。ready() は全体の期限を守る
@@ -11,6 +11,7 @@ from __future__ import annotations
 import gzip
 import io
 import json
+import threading
 import time
 import tracemalloc
 import zlib
@@ -337,6 +338,128 @@ def test_ft_through_guard_and_budget_timeout_keeps_the_ids():
     v = guarded_c2(Bound(ft(slow), c.rendered), c.payload, 0.4, 4000)
     assert v.decision == "hold" and v.reason.startswith("C2 timeout")
     assert v.judge_request_id == seen[1] and v.reason.endswith(f"; first req={seen[0]}")
+
+
+# ---- guard の時間切れの後に送られる要求（前段で期限を超え、見捨てたスレッドが後段を送る） ----
+
+class Finished:
+    """包んだ判定のスレッドが終わるのを待てるようにする（見捨てられたスレッドの動きを最後まで見届ける）。"""
+
+    def __init__(self, inner):
+        self.inner, self.done = inner, threading.Event()
+
+    def check(self, payload):
+        try:
+            return self.inner.check(payload)
+        finally:
+            self.done.set()
+
+    def route(self, user, request, input):  # noqa: A002
+        try:
+            return self.inner.route(user, request, input)
+        finally:
+            self.done.set()
+
+
+def _held(handler, release: threading.Event):
+    """番号を受けたあと、release まで応答を返さない（guard が先に時間切れになる）。"""
+
+    def h(req):
+        out = handler(req)
+        assert release.wait(10)
+        return out
+
+    return h
+
+
+def _see_it_through(wrapped: Finished, release: threading.Event) -> None:
+    release.set()
+    assert wrapped.done.wait(10)
+
+
+def test_ft_sends_no_later_part_after_the_guard_timed_out():
+    c = cand_b()
+    srv, release = FTServer(0.02, 0.03), threading.Event()
+    wrapped = Finished(Bound(ft(lambda req: _held(srv, release)(req) if not srv.seen else srv(req)), c.rendered))
+    v = guarded_c2(wrapped, c.payload, 0.1, 4000)
+    assert v.decision == "hold" and v.reason.startswith("C2 timeout") and v.judge_request_id == srv.seen[0]
+    _see_it_through(wrapped, release)
+    # 結果を返した後に T を送ると、その番号はどこにも残らない
+    assert len(srv.seen) == 1
+
+
+def test_c2_cascade_sends_no_second_stage_after_the_guard_timed_out():
+    j1, j2, release = Judge(c2_body(0.3)), Judge(c2_body(0.01)), threading.Event()
+    wrapped = Finished(CascadeC2Gate(gate(_held(j1, release)), gate(j2)))
+    v = guarded_c2(wrapped, payload(), 0.1, 10_000)
+    assert v.decision == "hold" and v.judge_request_id == j1.seen[0]
+    _see_it_through(wrapped, release)
+    assert j2.seen == []
+
+
+def test_call_c2_sends_no_second_stage_after_the_guard_timed_out():
+    j1, j2, release = Judge(c2_body(0.3)), Judge(c2_body(0.01)), threading.Event()
+    wrapped = Finished(CascadeC2Gate(gate(_held(j1, release)), gate(j2)))
+    v = call_c2(wrapped, payload(), 0.1)
+    assert v.decision == "hold" and v.judge_request_id == j1.seen[0]
+    _see_it_through(wrapped, release)
+    assert j2.seen == []
+
+
+def test_c1_cascade_sends_no_second_stage_after_the_guard_timed_out():
+    j1, j2, release = Judge(c1_body("local", 0.4)), Judge(c1_body("code", 0.9)), threading.Event()
+    wrapped = Finished(CascadeC1Router(router(_held(j1, release)), router(j2), escalate_below=0.6))
+    d = guarded_c1(wrapped, "u", "r", None, 0.1, 10_000)
+    assert d.route == "human" and d.judge_request_id == j1.seen[0]
+    _see_it_through(wrapped, release)
+    assert j2.seen == []
+
+
+def test_audit_db_has_every_id_the_server_saw_after_a_c2_timeout(tmp_path):
+    j1, j2, release = Judge(c2_body(0.3)), Judge(c2_body(0.01)), threading.Event()
+    wrapped = Finished(CascadeC2Gate(gate(_held(j1, release)), gate(j2)))
+    row = _audit_row(tmp_path, c1=_StubC1(), c2=wrapped, c2_timeout_s=0.1)
+    _see_it_through(wrapped, release)
+    assert row["stopped_at"] == "C2" and row["c2_judge_request_id"] == j1.seen[0] and j2.seen == []
+
+
+def test_audit_db_has_every_id_the_server_saw_after_a_c1_timeout(tmp_path):
+    j1, j2, release = Judge(c1_body("local", 0.4)), Judge(c1_body("code", 0.9)), threading.Event()
+    wrapped = Finished(CascadeC1Router(router(_held(j1, release)), router(j2), escalate_below=0.6))
+    row = _audit_row(tmp_path, c1=wrapped, c2=gate(Judge()), c1_timeout_s=0.1)
+    _see_it_through(wrapped, release)
+    assert row["stopped_at"] == "C1" and row["c1_judge_request_id"] == j1.seen[0] and j2.seen == []
+
+
+def test_every_id_sent_while_racing_the_timeout_is_recorded():
+    # 時間切れと次の要求が競っても、サーバが受けた番号はすべて結果に載る
+    c = cand_b()
+    timed_out = 0
+    for timeout in (0.001, 0.003, 0.005, 0.007, 0.01) * 4:
+        srv = FTServer(0.02, 0.03)
+
+        def slow(req, srv=srv):
+            out = srv(req)
+            time.sleep(0.005)  # 時間切れが F の途中にも、T を送る前後にも当たるように
+            return out
+
+        wrapped = Finished(Bound(ft(slow), c.rendered))
+        v = guarded_c2(wrapped, c.payload, timeout, 4000)
+        assert wrapped.done.wait(10)
+        if v.reason.startswith("C2 timeout"):
+            timed_out += 1
+            assert srv.seen and all(s in f"{v.judge_request_id} {v.reason}" for s in srv.seen)
+    assert timed_out  # 1 回も時間切れにならなければ、この試験は何も確かめていない
+
+
+def test_a_timeout_does_not_stop_requests_of_a_later_judgement():
+    j1, release = Judge(c2_body(0.01)), threading.Event()
+    g = gate(_held(j1, release))
+    wrapped = Finished(g)
+    assert guarded_c2(wrapped, payload(), 0.1, 10_000).decision == "hold"
+    _see_it_through(wrapped, release)
+    # 同じゲートを次の判定で使える（止めるのは見捨てた判定の要求だけ）
+    assert guarded_c2(g, payload(), 5.0, 10_000).decision == "allow" and len(j1.seen) == 2
 
 
 def test_spec_gate_keeps_the_id():

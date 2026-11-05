@@ -17,6 +17,7 @@ import concurrent.futures as cf
 import contextvars
 import hashlib
 import json
+import threading
 from typing import Any, Callable, Protocol, Sequence, runtime_checkable
 
 from pydantic import BaseModel, Field, ValidationError
@@ -56,8 +57,37 @@ _SENT_REQUEST_IDS: contextvars.ContextVar[tuple[list[str], ...]] = contextvars.C
     "judge_sent_request_ids", default=())
 
 
+class RequestAfterStop(RuntimeError):
+    """guard が判定を打ち切った後の要求。送らずに、見捨てられたスレッドの判定を終わらせる。"""
+
+
+class _GuardSent(list):
+    """guard の受け皿。時間切れで閉じたら番号を受けない。
+
+    時間切れでもスレッドは止められないので、FT の次の部品や 2 段構えの後段へ進もうとする。結果を返した後に
+    送った要求の番号はどこにも残せないため、送る前に断る。番号の記録と閉じる操作を同じ錠で分けるので、
+    送った要求の番号は必ず閉じる時の中身に入っている（閉じる直前に記録して送った要求は、応答を待たず番号だけ残る）。
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._lock = threading.Lock()
+        self._closed = False
+
+    def append(self, request_id: str) -> None:
+        with self._lock:
+            if self._closed:
+                raise RequestAfterStop("the guard already stopped this judgement")
+            super().append(request_id)
+
+    def close(self) -> None:
+        with self._lock:
+            self._closed = True
+
+
 def note_request_id(request_id: str) -> None:
-    for sink in _SENT_REQUEST_IDS.get():
+    """送る前に呼ぶ。guard が打ち切った後なら RequestAfterStop（送らない）。"""
+    for sink in _SENT_REQUEST_IDS.get():  # 外側から順。guard が断れば内側の受け皿にも残らない
         sink.append(request_id)
 
 
@@ -151,10 +181,11 @@ def check_c2_verdict(raw: Any, *, sent: Sequence[str] = ()) -> C2Verdict:
 
 def call_c2(gate: C2Gate, payload: SendPayload, timeout_s: float | None) -> C2Verdict:
     """C2 を呼び、例外・タイムアウト・形式不正・切り捨てを hold に倒す（入力長の上限は掛けない）。"""
-    sent: list[str] = []
+    sent = _GuardSent()
     try:
         raw = _call(lambda: collecting_request_ids(sent, lambda: gate.check(payload)), timeout_s)
     except cf.TimeoutError:
+        sent.close()  # 番号を読む前に閉じる。これより後の要求は送られない
         return _hold(f"C2 timeout after {timeout_s}s", sent=sent)
     except Exception as e:  # noqa: BLE001  判定の失敗はすべて hold
         return _hold(f"C2 error: {type(e).__name__}: {e}", sent=sent)
@@ -198,10 +229,11 @@ def guarded_c1(
     n = len(request) + (len(str(input)) if input else 0)
     if n > max_input_chars:
         return _human(f"input too long: {n} > {max_input_chars} chars", truncated=True)
-    sent: list[str] = []
+    sent = _GuardSent()
     try:
         raw = _run_with_timeout(lambda: collecting_request_ids(sent, lambda: router.route(user, request, input)), timeout_s)
     except cf.TimeoutError:
+        sent.close()  # 番号を読む前に閉じる。これより後の要求は送られない
         return _human(f"C1 timeout after {timeout_s}s", sent=sent)
     except Exception as e:  # noqa: BLE001
         return _human(f"C1 error: {type(e).__name__}: {e}", sent=sent)
