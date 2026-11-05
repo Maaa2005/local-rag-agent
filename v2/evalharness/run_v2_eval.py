@@ -11,11 +11,17 @@ evaluation/v2/cases.jsonl を読み、指定した C1 / C2 実装を guarded_c1 
 使い方:
   python -m evalharness.run_v2_eval --c1 rules --c2 rules --out out/rules
   python -m evalharness.run_v2_eval --merge out/rules/results.json out/laya/results.json --out out/compare
+  python -m evalharness.run_v2_eval --c1 http --c2 http --base-url http://127.0.0.1:8080 \\
+      --c1-expected-revision <版> --c2-expected-revision <版> --out out/laya
+
+判断モデルを測るときは --c1-expected-revision / --c2-expected-revision で版を決める（docs/redesign-v2.md 検証規則 7）。
+渡すと始める前に ready() で確かめ、違う版の応答は不正として止める側に倒す。結果にはケースごとの要求の番号を残す。
 """
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -97,7 +103,9 @@ class DelayedGate:
 
 
 def make_impls(c1: str, c2: str, base_url: str | None, c1_model: str, c2_model: str,
-               timeout_s: float = 10.0) -> tuple[C1Router, C2Gate]:
+               timeout_s: float = 10.0, *, c1_expected_revision: str | None = None,
+               c2_expected_revision: str | None = None, **http_kw: Any) -> tuple[C1Router, C2Gate]:
+    """*_expected_revision: 決めた版だけを受ける（http のとき）。http_kw はアダプタにそのまま渡す。"""
     from judge.rules import RuleC1Router, RuleC2Gate
 
     def need_url() -> str:
@@ -110,13 +118,22 @@ def make_impls(c1: str, c2: str, base_url: str | None, c1_model: str, c2_model: 
     else:
         from judge.http_adapter import HttpC1Router
         # 通信の待ち時間も guard と同じにする（guard が先に止めても裏で通信が残らないように）
-        r1 = HttpC1Router(need_url(), c1_model, timeout_s=timeout_s)
+        r1 = HttpC1Router(need_url(), c1_model, timeout_s=timeout_s, expected_revision=c1_expected_revision, **http_kw)
     if c2 == "rules":
         g2: C2Gate = RuleC2Gate()
     else:
         from judge.http_adapter import HttpC2Gate
-        g2 = HttpC2Gate(need_url(), c2_model, timeout_s=timeout_s)
+        g2 = HttpC2Gate(need_url(), c2_model, timeout_s=timeout_s, expected_revision=c2_expected_revision, **http_kw)
     return r1, g2
+
+
+def confirm_ready(router: C1Router, gate: C2Gate, c1_expected_revision: str | None,
+                  c2_expected_revision: str | None) -> dict[str, dict[str, str] | None]:
+    """版を決めた実装だけ、始める前に確かめる。版を決めない今までの呼び方では何も聞かない。"""
+    from judge.http_adapter import ready_or_exit
+
+    return {"c1": ready_or_exit("C1", router) if c1_expected_revision else None,
+            "c2": ready_or_exit("C2", gate) if c2_expected_revision else None}
 
 
 def evaluate(cases: list[dict[str, Any]], router: C1Router, gate: C2Gate, *, timeout_s: float = 2.0,
@@ -151,11 +168,13 @@ def evaluate(cases: list[dict[str, Any]], router: C1Router, gate: C2Gate, *, tim
             "data_class": case["data_class"], "condition": cond or None,
             "c1_model": dec.model, "c1_revision": dec.revision, "c1_reason": dec.reason,
             "c1_question_version": dec.question_version, "c1_truncated": dec.truncated, "c1_probs": dec.probs or None,
+            "c1_judge_request_id": dec.judge_request_id,
             "c2": verdict.decision if verdict else None, "c2_reason": verdict.reason if verdict else None,
             "c2_model": verdict.model if verdict else None, "c2_revision": verdict.revision if verdict else None,
             "c2_truncated": verdict.truncated if verdict else None,
             "c2_question_version": verdict.question_version if verdict else None,
             "c2_prob_block": verdict.prob_block if verdict else None,
+            "c2_judge_request_id": verdict.judge_request_id if verdict else None,
             "judge_sent": sent, "c1_sec": round(t_c1, 4), "c2_sec": round(t_c2, 4) if t_c2 is not None else None,
         })
     return {"summary": summarize(rows), "cases": rows}
@@ -227,12 +246,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--base-url", help="判断モデルサーバ（社内）の URL。http のとき必須")
     ap.add_argument("--c1-model", default="laya-multilingual")
     ap.add_argument("--c2-model", default="laya-multilingual")
+    ap.add_argument("--c1-expected-revision", help="C1 が http のとき、この版の応答だけを受ける（始める前に ready で確かめる）")
+    ap.add_argument("--c2-expected-revision", help="C2 が http のとき、この版の応答だけを受ける（始める前に ready で確かめる）")
     ap.add_argument("--cases", type=Path, default=DEFAULT_CASES)
     ap.add_argument("--timeout", type=float, default=2.0)
     ap.add_argument("--max-input-chars", type=int, default=4000)
     ap.add_argument("--merge", nargs="+", type=Path, help="複数の results.json を 1 つの比較表にまとめる（C6）")
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args(argv)
+    for name, impl, revision in (("c1", a.c1, a.c1_expected_revision), ("c2", a.c2, a.c2_expected_revision)):
+        if revision and impl != "http":
+            ap.error(f"--{name}-expected-revision is only for --{name} http")
+        if impl == "http" and not revision:
+            print(f"warning: --{name}-expected-revision is not set; any revision is accepted", file=sys.stderr)
     a.out.mkdir(parents=True, exist_ok=True)
 
     if a.merge:
@@ -244,8 +270,12 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(lines))
         return 0
 
-    router, gate = make_impls(a.c1, a.c2, a.base_url, a.c1_model, a.c2_model, timeout_s=a.timeout)
+    router, gate = make_impls(a.c1, a.c2, a.base_url, a.c1_model, a.c2_model, timeout_s=a.timeout,
+                              c1_expected_revision=a.c1_expected_revision, c2_expected_revision=a.c2_expected_revision)
+    ready = confirm_ready(router, gate, a.c1_expected_revision, a.c2_expected_revision)
     res = evaluate(load_cases(a.cases), router, gate, timeout_s=a.timeout, max_input_chars=a.max_input_chars)
+    res["expected_revision"] = {"c1": a.c1_expected_revision, "c2": a.c2_expected_revision}
+    res["ready"] = ready
     l1 = a.c1 if a.c1 == "rules" else f"{a.c1}:{a.c1_model}"
     l2 = a.c2 if a.c2 == "rules" else f"{a.c2}:{a.c2_model}"
     res["label"] = {"c1": l1, "c2": l2}

@@ -42,7 +42,7 @@ from pydantic import BaseModel, ConfigDict, Field
 SHIM_VERSION = "laya-shim@1"
 # 要求の番号（X-Request-Id）。アダプタが付けた値を応答のヘッダに返し、ログにも残す（docs/redesign-v2.md 検証規則 6）。
 # 形の違う値は返さない・残さない（ヘッダからログへ任意の文字列を流さない）
-REQUEST_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+REQUEST_ID_RE = re.compile(r"[0-9a-f]{32}")  # fullmatch で使う（`$` は末尾の改行を通す）
 
 # 受け付ける大きさの上限。判定対象の長さは guard（max_input_chars）が先に切るので、ここは壊れた要求を止める柵
 MAX_CONTEXT_CHARS = 50_000
@@ -156,7 +156,7 @@ def create_app(agent: LayaAgent, *, model_name: str, revision: str, max_len: int
     @app.post("/v1/systemone")
     def systemone(req: SystemOneRequest, request: Request, response: Response) -> dict[str, Any]:
         rid = request.headers.get("x-request-id", "")
-        rid = rid if REQUEST_ID_RE.match(rid) else None
+        rid = rid if REQUEST_ID_RE.fullmatch(rid) else None
         if rid:
             response.headers["X-Request-Id"] = rid
         if req.model != model_name:

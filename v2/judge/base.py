@@ -14,9 +14,10 @@ pipeline 側の型注釈は common.schemas のままで、こちらのインス�
 from __future__ import annotations
 
 import concurrent.futures as cf
+import contextvars
 import hashlib
 import json
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, Sequence, runtime_checkable
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -34,7 +35,8 @@ class C1Decision(schemas.C1Decision):
     question_version: str = Field(min_length=1)
     # 判断モデルが入力を切り捨てて判定したか。True の判定は guarded_c1 が human に倒す
     truncated: bool = False
-    # 判断サーバへの要求の番号（X-Request-Id）。判断サーバのログと突き合わせる。モデルに聞いていない判定は None
+    # 判断サーバへの要求の番号（X-Request-Id）。判断サーバのログと突き合わせる。guard が止めた判定でも、
+    # 要求を送っていれば残す。モデルに聞いていない判定だけ None
     judge_request_id: str | None = None
 
 
@@ -42,8 +44,36 @@ class C2Verdict(schemas.C2Verdict):
     question_version: str = Field(min_length=1)
     # 判断モデルに送った context の sha256（docs/v2-c2-eval-plan.md 6 章）。モデルに送っていない判定は None
     context_sha256: str | None = None
-    # 判断サーバへの要求の番号（X-Request-Id）。モデルに聞いていない判定は None
+    # 判断サーバへの要求の番号（X-Request-Id）。guard が止めた判定でも、要求を送っていれば残す。
+    # モデルに聞いていない判定だけ None。C2-FT は部品の番号を送った順にカンマで並べる（judge.ft_gate）
     judge_request_id: str | None = None
+
+
+# 判定の呼び出しの間に送った要求の番号の受け皿。例外・時間切れでは応答が手元に無いので、番号はアダプタが
+# 送る前にここへ入れる（送った要求はサーバのログに残るので、止めた判定からも突き合わせられるようにする）。
+# 重ねて張れる（guard の中で FT が部品ごとに張る）。別スレッドへは引き継がれないので、判定を動かすスレッドの中で張る
+_SENT_REQUEST_IDS: contextvars.ContextVar[tuple[list[str], ...]] = contextvars.ContextVar(
+    "judge_sent_request_ids", default=())
+
+
+def note_request_id(request_id: str) -> None:
+    for sink in _SENT_REQUEST_IDS.get():
+        sink.append(request_id)
+
+
+def collecting_request_ids(sent: list[str], fn: Callable[[], Any]) -> Any:
+    """fn の間に送った要求の番号を sent に集める。"""
+    token = _SENT_REQUEST_IDS.set((*_SENT_REQUEST_IDS.get(), sent))
+    try:
+        return fn()
+    finally:
+        _SENT_REQUEST_IDS.reset(token)
+
+
+def _stop_request_id(sent: Sequence[str], answered: str | None) -> tuple[str | None, str]:
+    """止めた判定に残す (番号, 理由欄の末尾)。2 段構えと同じく後の番号を残し、前の番号は `; first req=` にする。"""
+    rid = answered or (sent[-1] if sent else None)
+    return rid, "".join(f"; first req={s}" for s in sent if rid is not None and s not in rid)
 
 
 def question_version(label: str, spec: Any) -> str:
@@ -80,9 +110,11 @@ def payload_chars(payload: SendPayload) -> int:
 
 
 def _hold(reason: str, *, truncated: bool = False, model: str = GUARD_MODEL, revision: str = GUARD_REVISION,
-          question_version: str = GUARD_QUESTION_VERSION) -> C2Verdict:
-    return C2Verdict(decision="hold", reason=reason, model=model, revision=revision, truncated=truncated,
-                     question_version=question_version)
+          question_version: str = GUARD_QUESTION_VERSION, sent: Sequence[str] = (),
+          answered: str | None = None) -> C2Verdict:
+    rid, tail = _stop_request_id(sent, answered)
+    return C2Verdict(decision="hold", reason=reason + tail, model=model, revision=revision, truncated=truncated,
+                     question_version=question_version, judge_request_id=rid)
 
 
 def _run_with_timeout(fn, timeout_s: float):
@@ -100,31 +132,33 @@ def _call(fn, timeout_s: float | None):
     return fn() if timeout_s is None else _run_with_timeout(fn, timeout_s)
 
 
-def check_c2_verdict(raw: Any) -> C2Verdict:
+def check_c2_verdict(raw: Any, *, sent: Sequence[str] = ()) -> C2Verdict:
     """C2 実装の応答を判断モデル層の C2Verdict に揃え、使えない応答は hold に倒す。
 
     形式不正（dict の不足・None・文字列・質問の版の欠落など）と、全文を見ずに出した allow は hold。
+    sent は判定の間に送った要求の番号（止めた判定にも残す）。
     """
     try:
         verdict = _coerce(C2Verdict, raw)
     except (ValidationError, TypeError) as e:
-        return _hold(f"C2 malformed verdict: {type(e).__name__}")
+        return _hold(f"C2 malformed verdict: {type(e).__name__}", sent=sent)
     if verdict.truncated and verdict.decision == "allow":
         # 判定したモデル・revision・質問の版はそのまま残す（どの質問で切り捨てが起きたか分かるように）
         return _hold("C2 reported truncated input", truncated=True, model=verdict.model, revision=verdict.revision,
-                     question_version=verdict.question_version)
+                     question_version=verdict.question_version, sent=sent, answered=verdict.judge_request_id)
     return verdict
 
 
 def call_c2(gate: C2Gate, payload: SendPayload, timeout_s: float | None) -> C2Verdict:
     """C2 を呼び、例外・タイムアウト・形式不正・切り捨てを hold に倒す（入力長の上限は掛けない）。"""
+    sent: list[str] = []
     try:
-        raw = _call(lambda: gate.check(payload), timeout_s)
+        raw = _call(lambda: collecting_request_ids(sent, lambda: gate.check(payload)), timeout_s)
     except cf.TimeoutError:
-        return _hold(f"C2 timeout after {timeout_s}s")
+        return _hold(f"C2 timeout after {timeout_s}s", sent=sent)
     except Exception as e:  # noqa: BLE001  判定の失敗はすべて hold
-        return _hold(f"C2 error: {type(e).__name__}: {e}")
-    return check_c2_verdict(raw)
+        return _hold(f"C2 error: {type(e).__name__}: {e}", sent=sent)
+    return check_c2_verdict(raw, sent=sent)
 
 
 def guarded_c2(gate: C2Gate, payload: SendPayload, timeout_s: float, max_input_chars: int) -> C2Verdict:
@@ -136,9 +170,10 @@ def guarded_c2(gate: C2Gate, payload: SendPayload, timeout_s: float, max_input_c
     return call_c2(gate, payload, timeout_s)
 
 
-def _human(reason: str, *, truncated: bool = False) -> C1Decision:
-    return C1Decision(route="human", destination=None, reason=reason, model=GUARD_MODEL, revision=GUARD_REVISION,
-                      question_version=GUARD_QUESTION_VERSION, truncated=truncated)
+def _human(reason: str, *, truncated: bool = False, sent: Sequence[str] = (), answered: str | None = None) -> C1Decision:
+    rid, tail = _stop_request_id(sent, answered)
+    return C1Decision(route="human", destination=None, reason=reason + tail, model=GUARD_MODEL, revision=GUARD_REVISION,
+                      question_version=GUARD_QUESTION_VERSION, truncated=truncated, judge_request_id=rid)
 
 
 def is_guard_stop(decision: Any) -> bool:
@@ -163,38 +198,43 @@ def guarded_c1(
     n = len(request) + (len(str(input)) if input else 0)
     if n > max_input_chars:
         return _human(f"input too long: {n} > {max_input_chars} chars", truncated=True)
+    sent: list[str] = []
     try:
-        raw = _run_with_timeout(lambda: router.route(user, request, input), timeout_s)
+        raw = _run_with_timeout(lambda: collecting_request_ids(sent, lambda: router.route(user, request, input)), timeout_s)
     except cf.TimeoutError:
-        return _human(f"C1 timeout after {timeout_s}s")
+        return _human(f"C1 timeout after {timeout_s}s", sent=sent)
     except Exception as e:  # noqa: BLE001
-        return _human(f"C1 error: {type(e).__name__}: {e}")
+        return _human(f"C1 error: {type(e).__name__}: {e}", sent=sent)
     try:
         dec = _coerce(C1Decision, raw)
     except (ValidationError, TypeError) as e:
-        return _human(f"C1 malformed decision: {type(e).__name__}")
+        return _human(f"C1 malformed decision: {type(e).__name__}", sent=sent)
+
+    def stop(reason: str, *, truncated: bool = False) -> C1Decision:
+        return _human(reason, truncated=truncated, sent=sent, answered=dec.judge_request_id)
+
     # guard が止めた判定は model=guard で返す（呼び出し側が「保留」と「モデルが他経路を選んだ」を
     # 区別できるように）。元の判定のモデル・版・質問の版は理由欄に残す
     judged = f" [judge {dec.model} rev={dec.revision} q={dec.question_version} route={dec.route} dest={dec.destination}]"
     if dec.truncated:
         # 全文を見ずに出した判定は使わない（判定したモデル・版は残す）
-        return _human("C1 reported truncated input" + judged, truncated=True)
+        return stop("C1 reported truncated input" + judged, truncated=True)
     if dec.route in ("A", "B"):
         if dec.destination is None:
             # 外部経路なのに宛先が無いのは形式不正扱い
-            return _human("C1 external route without destination" + judged)
+            return stop("C1 external route without destination" + judged)
         key = (input or {}).get("contract")
         expected, why = resolve_destination(dec.route, key, contracts_path or CONTRACTS_PATH)
         if expected is None:
-            return _human(f"C1 external route not backed by contract: {why}" + judged)
+            return stop(f"C1 external route not backed by contract: {why}" + judged)
         if dec.destination != expected:
-            return _human(f"C1 destination {dec.destination} is not the sole destination {expected} of {key}" + judged)
+            return stop(f"C1 destination {dec.destination} is not the sole destination {expected} of {key}" + judged)
         # 契約入力の中身も判定モデルと独立に照合する。許容外キー（元資料 source を含む）や入力種別の
         # 欠落・空・非文字列があれば、判定モデルが外部経路を選んでも通さない
         contract, why = lookup_contract(key, contracts_path or CONTRACTS_PATH)
         if contract is None:
-            return _human(f"C1 external route not backed by contract: {why}" + judged)
+            return stop(f"C1 external route not backed by contract: {why}" + judged)
         problem = contract_input_problem(contract, input)
         if problem is not None:
-            return _human(f"C1 external route with unusable contract input: {problem}" + judged)
+            return stop(f"C1 external route with unusable contract input: {problem}" + judged)
     return dec

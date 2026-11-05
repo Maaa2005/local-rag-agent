@@ -37,6 +37,9 @@ class SpecC2Gate:
         self.block_at, self.allow_at = th["block_at"], th["allow_at"]
         self._c = _SystemOneClient(base_url, model, **kw)
 
+    def ready(self) -> dict[str, str]:
+        return self._c.ready()
+
     def _hold(self, why: str) -> C2Verdict:
         return _hold(f"{self.label} {why}", question_version=self.question_version)
 

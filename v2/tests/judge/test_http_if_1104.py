@@ -80,7 +80,7 @@ def test_each_call_sends_a_fresh_request_id_and_records_it():
     rec = Recorder()
     gate = c2_gate(rec)
     v1, v2 = gate.check(payload()), gate.check(payload())
-    assert all(REQUEST_ID_RE.match(r or "") for r in rec.seen)
+    assert all(REQUEST_ID_RE.fullmatch(r or "") for r in rec.seen)
     assert rec.seen[0] != rec.seen[1]
     assert (v1.judge_request_id, v2.judge_request_id) == tuple(rec.seen)
 
