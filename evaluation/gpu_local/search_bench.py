@@ -29,9 +29,15 @@ from evaluation import metrics
 ROOT = Path(__file__).resolve().parents[2]
 QUESTION_FILES = ("evaluation/dataset.jsonl", "evaluation/v2/numeric_boundary.jsonl")
 QDRANT_URL = "http://127.0.0.1:6333"
+# 無認証で起動するので待受を手元に限る。Qdrant 1.12.6 の service.host を環境変数で上書きする
+# （config/config.yaml の既定は 0.0.0.0。REST も gRPC もこの値で待ち受け、環境変数は設定ファイルより強い）
+QDRANT_HOST = "127.0.0.1"
 # Issue #14 E4 の線（測る前に固定・docs/research/2026-11-02/low-memory.md §4 の 3）
+E4_N = 300
 E4_P95 = 1.0
 E4_P99 = 3.0
+# 絞る道具の記録の抜けの上限（秒）。mem_pressure.py は既定 1 秒ごとに書く。測定の始まり・終わりとの間も数える
+PRESSURE_MAX_GAP_S = 10.0
 
 
 def load_questions(repo: Path) -> list[dict]:
@@ -82,24 +88,32 @@ def summarize(rows: list[dict], retry_count: int | None) -> dict:
     }
 
 
-def pressure_window(rows: list[dict], start: float, end: float, target_mib: int, band_mib: int) -> dict:
-    """絞る道具の記録（1 行 = {"t", "free_mib", "action", ...}）から、区間の空きと有効かどうかを出す。"""
+def pressure_window(rows: list[dict], start: float, end: float, target_mib: int, band_mib: int,
+                    max_gap_s: float = PRESSURE_MAX_GAP_S, tool_alive: bool = True) -> dict:
+    """絞る道具の記録（1 行 = {"t", "free_mib", "action", ...}）から、区間の空きと有効かどうかを出す。
+
+    有効は、空きの中央値が帯の中・全部放し 0 回に加えて、記録が区間の始めから終わりまで max_gap_s より長く
+    抜けず、区間の終わりに道具が動いていた回だけ（途中で落ちた回は、前半の中央値が帯の中でも有効にしない）。
+    """
     inside = [r for r in rows if start <= r.get("t", -1) <= end and r.get("free_mib") is not None]
     if not inside:
         return {"n": 0, "valid": False}
     free = [r["free_mib"] for r in inside]
     med = statistics.median(free)
     floors = sum(1 for r in inside if r.get("action") == "floor")
+    edges = [start, *sorted(r["t"] for r in inside), end]
+    gap = max(b - a for a, b in zip(edges, edges[1:]))
     return {"n": len(inside), "target_mib": target_mib, "band_mib": band_mib, "free_min": min(free),
             "free_median": med, "free_max": max(free), "floor_releases": floors,
-            "valid": abs(med - target_mib) <= band_mib and floors == 0}
+            "max_gap_s": round(gap, 3), "tool_alive": tool_alive,
+            "valid": abs(med - target_mib) <= band_mib and floors == 0 and gap <= max_gap_s and tool_alive}
 
 
-def e4_line_checks(summary: dict, pressure: dict | None, n_expected: int) -> dict:
-    """E4 の 1 回分を線と比べる。絞る条件が守れなかった回は合否を出さない（無効）。"""
+def e4_line_checks(summary: dict, pressure: dict | None) -> dict:
+    """E4 の 1 回分を線と比べる。絞る条件が守れなかった回は合否を出さない（無効）。回数は固定の E4_N と比べる。"""
     valid = pressure is not None and pressure.get("valid") is True
     lines = {
-        "L1_no_failure": summary["n"] == n_expected and summary["failed"] == 0,
+        "L1_no_failure": summary["n"] == E4_N and summary["failed"] == 0,
         "L2_p95": summary["p95"] <= E4_P95,
         "L3_p99": summary["p99"] <= E4_P99,
     }
@@ -124,7 +138,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 def child_main(a: argparse.Namespace) -> int:
     # backend の app を import する（run_eval.py と同じく repo の backend をパスに足す）
     sys.path.insert(0, str(ROOT / "backend"))
-    from app.database import init_db
+    from app.database import close_db, init_db
     from app.services import qdrant as qmod
     from app.services.retriever import retrieve
 
@@ -133,7 +147,11 @@ def child_main(a: argparse.Namespace) -> int:
         try:
             return await run_queries(load_questions(Path(a.repo)), a.n, retrieve, qmod.is_timeout)
         finally:
-            await qmod.close_client()
+            # aiosqlite 0.20.0 の接続は非 daemon のスレッドなので、閉じないとプロセスが終わらず親が待ち続ける
+            try:
+                await qmod.close_client()
+            finally:
+                await close_db()
 
     rows = asyncio.run(go())
     with open(a.rows, "w", encoding="utf-8") as f:
@@ -156,9 +174,11 @@ def parent_main(a: argparse.Namespace) -> int:
     work = Path(a.work).resolve()
     py = str(work / "rag-env" / "bin" / "python")
     q_env = dict(os.environ, QDRANT__STORAGE__STORAGE_PATH=a.qdrant_storage or str(out / "qdrant_storage"),
-                 QDRANT__SERVICE__HTTP_PORT="6333", QDRANT__TELEMETRY_DISABLED="true")
+                 QDRANT__SERVICE__HOST=QDRANT_HOST, QDRANT__SERVICE__HTTP_PORT="6333",
+                 QDRANT__TELEMETRY_DISABLED="true")
     qdrant = launch([str(work / "qdrant" / "bin" / "qdrant")], out / "qdrant.log", q_env)
     pressure = None
+    pressure_alive = False
     summary: dict = {"issue": 14, "trial": "E4", "n": a.n, "qdrant_timeout_s": a.qdrant_timeout_s,
                      "qdrant_retries": a.qdrant_retries, "label": a.label}
     try:
@@ -186,6 +206,7 @@ def parent_main(a: argparse.Namespace) -> int:
                              "--n", str(a.n), "--rows", str(out / "rows.jsonl")], cwd=repo, env=env,
                             stdout=open(out / "child.log", "w"), stderr=subprocess.STDOUT).returncode
         t_end = time.time()
+        pressure_alive = pressure is not None and pressure.poll() is None  # 止める前に見る
     finally:
         if pressure is not None:
             pressure.terminate()
@@ -200,9 +221,9 @@ def parent_main(a: argparse.Namespace) -> int:
     summary.update(rc=rc, numbers=summarize(qrows, tail.get("retry_count")))
     if a.pressure_cmd:
         summary["pressure"] = pressure_window(_read_jsonl(plog), t_start, t_end, a.pressure_target_mib,
-                                              a.pressure_valid_band_mib)
+                                              a.pressure_valid_band_mib, tool_alive=pressure_alive)
         summary["pressure"]["before_free_mib"] = (_read_jsonl(plog) or [{}])[0].get("free_mib")
-    summary["lines"] = e4_line_checks(summary["numbers"], summary.get("pressure"), a.n)
+    summary["lines"] = e4_line_checks(summary["numbers"], summary.get("pressure"))
     (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2, default=str) + "\n")
     print(json.dumps({"numbers": summary["numbers"], "lines": summary["lines"]}, ensure_ascii=False, default=str))
     return 0
@@ -215,7 +236,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--rows", help=argparse.SUPPRESS)
     p.add_argument("--work", help="準備物の置き場 (.work)")
     p.add_argument("--out", help="結果の置き場 (空のディレクトリ)")
-    p.add_argument("--n", type=int, default=300, help="検索の回数 (E4 は 300)")
+    p.add_argument("--n", type=int, default=E4_N, help="検索の回数 (E4 は 300。ほかの回数は判定で落ちる)")
     p.add_argument("--label", default="")
     p.add_argument("--qdrant-timeout-s", type=int, default=0, help="QDRANT_TIMEOUT_S (0 は既定の 5 秒)")
     p.add_argument("--qdrant-retries", type=int, default=0, help="QDRANT_SEARCH_RETRIES")

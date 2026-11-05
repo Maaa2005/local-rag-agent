@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     # Qdrant への要求の時間切れ（秒・整数）。0 なら qdrant-client の既定のまま
     # （qdrant-client 1.12.1 は timeout を渡さないと httpx の既定 5 秒になる）。
     # 学校 PC で本体のメモリが尽きた回に検索が 5 秒で時間切れになった（Issue #1・#14）。
-    # 既定は今までと同じ。測るときだけ環境変数 QDRANT_TIMEOUT_S で変える。
+    # 既定は今までと同じ。測るときだけ環境変数 QDRANT_TIMEOUT_S で変える
+    # （compose で起動するときは docker-compose.yml の backend が QDRANT_TIMEOUT_S・QDRANT_SEARCH_RETRIES を渡す）。
     qdrant_timeout_s: int = 0
     # 読むだけの要求（検索の query_points・scroll）を、時間切れのときだけ送り直す回数。0 なら送り直さない
     # （今までと同じ）。書き込み（upsert・delete・set_payload）は送り直さない。環境変数 QDRANT_SEARCH_RETRIES
