@@ -61,6 +61,9 @@ _MIDDAY = "正午"
 # 引用の中の時間の長さ: 6時間10分・3時間半・8時間（枠の単位が 分 なら分に、時間なら時間にして照合する）
 _DURATION = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)時間(?:(\d+)分|(半))?")
 DURATION_UNITS = ("分", "時間")
+# 同じ量の別の言い方（verify="equiv" の時だけ見る）: 3年 = 36か月・1年1か月 = 13か月（2023年11月 のような年月は除く）・4千6百円
+_YEARS = re.compile(r"(?<![\d.,年])(\d{1,2})年(?!\d+月)(?:(\d+)(?:か月|ヶ月|カ月|箇月|ケ月))?")
+_SENN_HYAKU = re.compile(r"(?<![\d.,])(\d+)千(\d+)百")
 ZERO_WORDS = ("ない", "なし", "ありません", "持っていない", "無い")  # 数の枠の 0 は、引用にこの語がある時だけ通す
 # 年のない日付: 12月18日・1/30（直前が「年」や数字・斜線の物は年つきの日付の一部なので除く）
 _MD_KANJI = re.compile(r"(?<![年\d])(\d{1,2})月(\d{1,2})日")
@@ -415,7 +418,23 @@ def _numbers_with_unit(text: str, unit: str | None) -> list[Decimal]:
     return out
 
 
-def _number_in_quote(dv: Decimal, quote: str, unit: str | None) -> bool:
+def _equiv_numbers(quote: str, unit: str | None) -> list[Decimal]:
+    """引用の数と同じ量だとコードで確かめられる別の値。年→か月・千百の混じり・単位の合う数が 2 つ以上ある時の合計。"""
+    out: list[Decimal] = []
+    if unit == "か月":
+        out += [Decimal(m[1]) * 12 + Decimal(m[2] or 0) for m in _YEARS.finditer(quote)]
+    aliases = UNIT_ALIASES.get(unit or "", (unit,)) if unit else ()
+    mixed = [(m, Decimal(m[1]) * 1000 + Decimal(m[2]) * 100) for m in _SENN_HYAKU.finditer(quote)]
+    out += [v for m, v in mixed if not aliases or any(quote[m.end():].lstrip().startswith(a) for a in aliases)]
+    same = _numbers_with_unit(quote, unit) if unit else []
+    if len(same) >= 2:
+        out.append(sum(same, Decimal(0)))
+    return out
+
+
+def _number_in_quote(dv: Decimal, quote: str, unit: str | None, *, equiv: bool = False) -> bool:
+    if equiv and dv in _equiv_numbers(quote, unit):
+        return True
     cands = _numbers_with_unit(quote, unit)
     if unit == "時間":  # 6時間10分 = 6.1666… に対して 6.17 を通す（±0.01）
         return any(abs(dv - c) <= Decimal("0.01") for c in cands if c != c.to_integral_value()) or dv in cands
@@ -531,11 +550,14 @@ def _unused_slots(card: Card, values: Mapping[str, Any]) -> set[str]:
     return {n for n in card.slots if n not in used and n not in card.derive}
 
 
-def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, Any], list[str]]:
+def validate_extraction(card: Card, question: str, raw: Any, *, verify: str = "strict",
+                        problem_as_unknown: bool = False) -> tuple[dict[str, Any], list[str]]:
     """抽出の結果を確かめ、(値, 問題の一覧) を返す。問題が 1 つでもあれば保留にする。
 
     値は 数=Decimal・日付=date・bool=「あり」/「なし」・不明=None。
     判定に使わない枠の問題だけは保留の理由にしない（検査に通らない値は使わず、不明として扱う）。
+    verify="equiv" は同じ量の別の言い方も照合で通す。problem_as_unknown は問題のある枠を不明にして残りの枠で判定に進む
+    （結論に効かない枠の読み落としで保留にしない。結論に効けば decide が保留にする）。どちらも既定は今の動き。
     """
     problems: list[str] = []
     values: dict[str, Any] = {}
@@ -570,7 +592,7 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
             if dv == 0 and _zero_in_quote(nq):  # 「ない」「ありません」など。0 という数字は引用に無くてよい
                 values[name] = dv
                 continue
-            if not _number_in_quote(dv, nq, s.unit):
+            if not _number_in_quote(dv, nq, s.unit, equiv=verify == "equiv"):
                 problems.append(f"{name}: value {dv} is not the number in its quote")
                 continue
             values[name] = dv
@@ -623,6 +645,10 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
     problems = [p for p in problems if p.split(":", 1)[0] not in unused]
     for name in unused:
         values.setdefault(name, None)
+    if problem_as_unknown:
+        for p in problems:
+            values[p.split(":", 1)[0]] = None
+        problems = []
     return values, problems
 
 

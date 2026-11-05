@@ -1107,3 +1107,46 @@ def test_sealed_record_has_first_and_second_conclusions_without_breaking_the_old
     rec = ns.make_record(item, 0, 1, c, d, d.pass_stats[0], 0.5)
     assert (rec["outcome"], rec["stop_reason"], rec["conclusion"]) == ("held", ns.CONFIRM_MISMATCH, None)
     assert (rec["first_conclusion"], rec["second_conclusion"]) == ("対象", "対象外")
+
+# ---- 同じ量の別の言い方と、問題の枠を不明にする検査 (verify="equiv"・problem_as_unknown)
+
+
+@pytest.mark.parametrize("value,quote,unit,ok", [
+    (36, "勤続3年の正社員です", "か月", True),
+    (13, "勤続は1年1か月です", "か月", True),
+    (35, "勤続3年の正社員です", "か月", False),
+    (11, "入社は2023年11月です", "か月", False),  # 年月は年の長さではない
+    (4600, "合計は4千6百円です", "円", True),
+    (4700, "合計は4千6百円です", "円", False),
+    (85000, "5月に7万円、6月に1万5千円", "円", True),  # 単位の合う数の合計
+    (5, "会計は5日分です", "回", False),  # 単位が違う数は通さない
+])
+def test_equiv_numbers(value, quote, unit, ok):
+    quote = rule_cards._norm(quote)
+    assert rule_cards._number_in_quote(Decimal(value), quote, unit, equiv=True) is ok
+
+
+def test_equiv_is_off_by_default():
+    assert rule_cards._number_in_quote(Decimal(36), "勤続3年", "か月") is False
+
+
+def test_problem_as_unknown_decides_only_when_conclusion_does_not_depend():
+    card = parse_card({
+        "format": "rule-card@1", "id": "t", "status": "draft", "target": "t",
+        "doc": {"source": "a.md", "quote": "q"}, "match": {"conclusions": ["可", "不可"], "keywords": ["t"]},
+        "slots": {"日数": {"type": "number", "unit": "日", "describe": "d"},
+                  "額": {"type": "number", "unit": "円", "describe": "a"}},
+        "conditions": [{"name": "日数", "left": "日数", "op": ">=", "right": 5},
+                       {"name": "額", "left": "額", "op": ">=", "right": 100}],
+        "combine": "all", "conclusion": {"then": "可", "else": "不可"}})
+    q = "日数は3日です。額は200円です。"
+    raw = {"日数": {"quote": "日数は3日", "value": 3}, "額": {"quote": "額は200円", "value": 999}}
+    _, problems = validate_extraction(card, q, raw)
+    assert problems
+    values, problems = validate_extraction(card, q, raw, problem_as_unknown=True)
+    assert not problems and values["額"] is None
+    assert decide(card, values).conclusion == "不可"  # 1 つ偽なら all は決まる
+    raw["日数"]["value"] = 5
+    raw["日数"]["quote"] = "額は200円"  # 日数の読みも落ちる → 両方不明で保留
+    values, _ = validate_extraction(card, q, raw, problem_as_unknown=True)
+    assert decide(card, values).conclusion is None
