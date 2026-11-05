@@ -1,0 +1,152 @@
+{
+  "issue": 16,
+  "ctx": 3072,
+  "measure": [
+    {
+      "max_prompt_tokens": 1967,
+      "max_id": "N05",
+      "n": 12
+    },
+    {
+      "max_prompt_tokens": 829,
+      "max_id": "D13",
+      "n": 24
+    }
+  ],
+  "server_extra": [
+    "--cache-ram",
+    "1024"
+  ],
+  "arms": {
+    "cards": {
+      "arm": "cards",
+      "env": {
+        "RULE_CARDS_ENABLED": "true",
+        "RULE_CARDS_DIR": "evaluation/v2/rule_cards",
+        "RULE_CARDS_ALLOW_DRAFT": "true",
+        "RULE_CARDS_EXTRACT_MODEL": "local-llm"
+      },
+      "ctx": 3072,
+      "baseline_mib": 1476,
+      "rounds": {
+        "n1": {
+          "rc": 0,
+          "available_before_mib": 3909,
+          "launch_seconds": 19.9,
+          "eval_seconds": 176.7,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4734,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N10",
+              "N11"
+            ],
+            "held": [
+              "N10",
+              "N11"
+            ],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 6.147,
+            "total_p95": 17.035,
+            "total_max": 24.733,
+            "ftl_p50": 6.147,
+            "after_retrieval_p50": 4.991,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 27,
+            "slots_all": 27,
+            "whole_ok": 12,
+            "whole_all": 12,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": []
+          }
+        },
+        "n2": {
+          "rc": 0,
+          "available_before_mib": 5629,
+          "launch_seconds": 11.5,
+          "eval_seconds": 162.2,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4713,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N10",
+              "N11"
+            ],
+            "held": [
+              "N10",
+              "N11"
+            ],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 5.857,
+            "total_p95": 16.06,
+            "total_max": 26.103,
+            "ftl_p50": 5.857,
+            "after_retrieval_p50": 4.836,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 27,
+            "slots_all": 27,
+            "whole_ok": 12,
+            "whole_all": 12,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": []
+          }
+        },
+        "dev": {
+          "rc": 0,
+          "available_before_mib": 6333,
+          "launch_seconds": 9.0,
+          "eval_seconds": 186.5,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4838,
+          "numbers": {
+            "ok": 24,
+            "n": 24,
+            "wrong": [],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 3.659,
+            "total_p95": 7.056,
+            "total_max": 19.225,
+            "ftl_p50": 3.659,
+            "after_retrieval_p50": 2.718,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 30,
+            "slots_all": 30,
+            "whole_ok": 24,
+            "whole_all": 24,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": []
+          }
+        }
+      },
+      "min_available_mib": 88,
+      "peak_rss_mib": {
+        "llama": 3734,
+        "qdrant": 106,
+        "eval": 1827
+      }
+    }
+  }
+}

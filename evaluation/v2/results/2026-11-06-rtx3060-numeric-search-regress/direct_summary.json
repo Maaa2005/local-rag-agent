@@ -1,0 +1,134 @@
+{
+  "issue": 16,
+  "ctx": null,
+  "measure": null,
+  "server_extra": [
+    "--cache-ram",
+    "1024"
+  ],
+  "arms": {
+    "cards_direct": {
+      "arm": "cards_direct",
+      "env": "検索なし・カードの抽出だけ",
+      "ctx": 4096,
+      "baseline_mib": 1807,
+      "rounds": {
+        "n1": {
+          "rc": 0,
+          "available_before_mib": 3354,
+          "launch_seconds": 20.8,
+          "eval_seconds": 58.8,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 5129,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N10",
+              "N11"
+            ],
+            "held": [
+              "N10",
+              "N11"
+            ],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 4.518,
+            "total_p95": 6.833,
+            "total_max": 7.451,
+            "ftl_p50": 4.518,
+            "after_retrieval_p50": 4.518,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 27,
+            "slots_all": 27,
+            "whole_ok": 12,
+            "whole_all": 12,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": []
+          }
+        },
+        "n2": {
+          "rc": 0,
+          "available_before_mib": 4815,
+          "launch_seconds": 14.2,
+          "eval_seconds": 52.4,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 5081,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N10",
+              "N11"
+            ],
+            "held": [
+              "N10",
+              "N11"
+            ],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 4.239,
+            "total_p95": 6.177,
+            "total_max": 6.188,
+            "ftl_p50": 4.239,
+            "after_retrieval_p50": 4.239,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 27,
+            "slots_all": 27,
+            "whole_ok": 12,
+            "whole_all": 12,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": []
+          }
+        },
+        "dev": {
+          "rc": 0,
+          "available_before_mib": 5401,
+          "launch_seconds": 8.1,
+          "eval_seconds": 70.1,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 5083,
+          "numbers": {
+            "ok": 24,
+            "n": 24,
+            "wrong": [],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 2.352,
+            "total_p95": 4.933,
+            "total_max": 4.962,
+            "ftl_p50": 2.352,
+            "after_retrieval_p50": 2.352,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 30,
+            "slots_all": 30,
+            "whole_ok": 24,
+            "whole_all": 24,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": []
+          }
+        }
+      },
+      "min_available_mib": 25,
+      "peak_rss_mib": {
+        "llama": 4060
+      }
+    }
+  }
+}
