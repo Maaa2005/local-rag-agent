@@ -47,7 +47,7 @@ SLOT_TYPES = ("number", "date", "time", "bool")
 BOOL_VALUES = ("あり", "なし")
 # 数え方の語の言い換え（引用の数の直後にあるかを見る）
 UNIT_ALIASES = {"か月": ("か月", "ヶ月", "カ月", "箇月", "ケ月"), "%": ("%", "パーセント")}
-_EXPR_FUNCS = {"in_md_range", "add", "sub", "mul", "div", "add_days", "month_day", "date", "time", "min", "max", "month_end",
+_EXPR_FUNCS = {"in_md_range", "months_between", "year_start", "add", "sub", "mul", "div", "add_days", "month_day", "date", "time", "min", "max", "month_end",
                "add_months", "minutes_between"}
 _MAX_NEST = 5  # 条件の入れ子の深さの上限
 _OPTIONS = re.compile(r"「結論\s*[:：]\s*(.+?)」")
@@ -66,6 +66,14 @@ DURATION_UNITS = ("分", "時間")
 # 同じ量の別の言い方（verify="equiv" の時だけ見る）: 3年 = 36か月・1年1か月 = 13か月（2023年11月 のような年月は除く）・4千6百円
 _YEARS = re.compile(r"(?<![\d.,年])(\d{1,2})年(?!\d+月)(?:(\d+)(?:か月|ヶ月|カ月|箇月|ケ月))?")
 _SENN_HYAKU = re.compile(r"(?<![\d.,])(\d+)千(\d+)百")
+_SENN_MAN = re.compile(r"(?<![\d.,])(\d+)千万")
+_OKU = re.compile(r"(?<![\d.,])(\d+)億")
+_KM_UNITS = ("キロメートル", "キロ", "km")
+_M_UNITS = ("メートル", "m")
+_LOOSE_MD = re.compile(r"^(?:YYYY-|\d{4}-)?(\d{1,2})-(\d{1,2})$|^(?:\d{4}年)?(\d{1,2})月(\d{1,2})日$")
+# 問が「知らない」と明言している時は、話題が無いとは言えない。既定の値を使わず保留の側へ倒す
+UNKNOWN_WORDS = ("聞いていません", "聞いてません", "聞きそびれ", "分かりません", "わかりません", "不明", "未定",
+                 "確認していません", "覚えていません", "知りません", "決まっていません")
 ZERO_WORDS = ("ない", "なし", "ありません", "持っていない", "無い")  # 数の枠の 0 は、引用にこの語がある時だけ通す
 # 年のない日付: 12月18日・1/30（直前が「年」や数字・斜線の物は年つきの日付の一部なので除く）
 _MD_KANJI = re.compile(r"(?<![年\d])(\d{1,2})月(\d{1,2})日")
@@ -85,6 +93,8 @@ class Slot:
     unit: str | None
     describe: str
     same_units: tuple[str, ...] = ()  # 規程の定めで同じ量と言える別の単位（「1 日に 2 回でも 1 回と数える」の日分）
+    absent: str | None = None  # あり/なしの枠: 話題が質問に無い時の値
+    mention: tuple[str, ...] = ()  # absent を使わない語（話題が出た印）
 
 
 @dataclass(frozen=True, order=True)
@@ -154,7 +164,7 @@ def _check_expr(card_id: str, e: Any, slots: Mapping[str, Slot]) -> None:
             return
         if not isinstance(args, list) or not args:
             raise CardError(f"{card_id}: {fn} needs a list of arguments")
-        arity = {"sub": 2, "div": 2, "add_days": 2, "month_day": 3, "add_months": 2, "minutes_between": 2, "in_md_range": 5}.get(fn)
+        arity = {"sub": 2, "div": 2, "add_days": 2, "month_day": 3, "add_months": 2, "minutes_between": 2, "in_md_range": 5, "months_between": 2, "year_start": 3}.get(fn)
         if arity is not None and len(args) != arity:
             raise CardError(f"{card_id}: {fn} takes {arity} arguments")
         if fn in ("min", "max") and len(args) < 2:
@@ -216,7 +226,10 @@ def parse_card(doc: Mapping[str, Any]) -> Card:
     for name, s in (doc.get("slots") or {}).items():
         if not isinstance(s, dict) or s.get("type") not in SLOT_TYPES or not s.get("describe"):
             raise CardError(f"{cid}: slot {name} needs type ({'/'.join(SLOT_TYPES)}) and describe")
-        slots[name] = Slot(name, s["type"], s.get("unit"), s["describe"], tuple(s.get("same_units") or ()))
+        if ("absent" in s) != ("mention" in s) or ("absent" in s and (s["type"] != "bool" or s["absent"] not in BOOL_VALUES or not s["mention"])):
+            raise CardError(f"{cid}: slot {name}: absent and mention go together on a bool slot")
+        slots[name] = Slot(name, s["type"], s.get("unit"), s["describe"], tuple(s.get("same_units") or ()),
+                           s.get("absent"), tuple(s.get("mention") or ()))
     if not slots:
         raise CardError(f"{cid}: no slots")
     derive = doc.get("derive") or {}
@@ -297,7 +310,7 @@ def conclusion_options(question: str) -> tuple[str, ...]:
 # （開発用 90 問・N 12 問・開発用 24 問。誤選択 0 の範囲で選択数が最大の点のうち、最も厳しい点）。変えたら数え直す
 SELECT_MIN_SCORE = 14  # 1 位の点の下限。語の組に合うカードが 1 枚だけの時も要る
 SELECT_MIN_MARGIN = 8  # 1 位と 2 位の点の差の下限（2 枚以上の時）
-SELECT_MIN_SCORE_V2 = 12  # RULE_CARDS_V2 の時の下限。14 では正しいカードが 9/90 問で選ばれなかった
+SELECT_MIN_SCORE_V2 = 8  # RULE_CARDS_V2 の時の下限。14 と 12 では正しいカードが選ばれない問があった（1 位は全て正しい規程）
 SELECT_MIN_MARGIN_V2 = 4  # 同じく差の下限
 SELECT_KEYWORD_WEIGHT = 3  # keywords の文字 2-gram の重み（他は 1）
 _NOT_GRAM = re.compile(r"[\s、。，．,.!?！？「」『』（）()・:：;；/／]")
@@ -434,6 +447,13 @@ def _equiv_numbers(quote: str, unit: str | None) -> list[Decimal]:
     out: list[Decimal] = []
     if unit == "か月":
         out += [Decimal(m[1]) * 12 + Decimal(m[2] or 0) for m in _YEARS.finditer(quote)]
+    if unit in _KM_UNITS or unit in _M_UNITS:  # 距離の言い方。「3キロ」は km の枠で 3、m の枠で 3000
+        for aliases_, scale in ((_KM_UNITS, Decimal(1) if unit in _KM_UNITS else Decimal(1000)),
+                                (_M_UNITS, Decimal("0.001") if unit in _KM_UNITS else Decimal(1))):
+            for m in _NUM.finditer(quote):
+                if any(quote[m.end():].lstrip().startswith(a) for a in aliases_):
+                    out.append(Decimal(m.group().replace(",", "")) * scale)
+    out += [Decimal(m[1]) * 10 ** 7 for m in _SENN_MAN.finditer(quote)] + [Decimal(m[1]) * 10 ** 8 for m in _OKU.finditer(quote)]
     aliases = UNIT_ALIASES.get(unit or "", (unit,)) if unit else ()
     mixed = [(m, Decimal(m[1]) * 1000 + Decimal(m[2]) * 100) for m in _SENN_HYAKU.finditer(quote)]
     out += [v for m, v in mixed if not aliases or any(quote[m.end():].lstrip().startswith(a) for a in aliases)]
@@ -615,6 +635,11 @@ def validate_extraction(card: Card, question: str, raw: Any, *, verify: str = "s
                 dd = date.fromisoformat(v) if isinstance(v, str) else None
             except ValueError:
                 dd = None
+            if dd is None and verify == "equiv" and isinstance(v, str) and (lm := _LOOSE_MD.match(v.strip())):
+                mo, da = int(lm[1] or lm[3]), int(lm[2] or lm[4])  # 年の無い問でモデルが YYYY-07-01 や 7月1日 と返す
+                if (mo, da) in _month_days(nq):
+                    yearless.append((name, mo, da))
+                    continue
             if dd is not None and dd in _dates(nq):
                 values[name] = dd
             elif dd is not None and (dd.month, dd.day) in _month_days(nq):
@@ -751,6 +776,20 @@ def _eval(e: Any, values: Mapping[str, Any]) -> Any:
             raise CardError("in_md_range needs a date and numbers")
         x, a, b = (d.month, d.day), (int(m1), int(d1)), (int(m2), int(d2))
         return "あり" if (a <= x <= b if a <= b else x >= a or x <= b) else "なし"
+    if fn == "months_between":  # 満の月数（1 か月未満は切り捨て）。始めより前なら負
+        a, b = xs
+        if type(a) is not date or type(b) is not date:
+            raise CardError("months_between needs two dates")
+        n = (b.year - a.year) * 12 + b.month - a.month
+        anniversary = date(a.year + (a.month - 1 + n) // 12, (a.month - 1 + n) % 12 + 1,
+                           min(a.day, _last_day(a.year + (a.month - 1 + n) // 12, (a.month - 1 + n) % 12 + 1)))
+        return Decimal(n - 1 if anniversary > b else n)
+    if fn == "year_start":  # 日付以前で最も近いその月日（4 月 1 日なら年度の始め）
+        d, mo, da = xs
+        if type(d) is not date or type(mo) is not Decimal or type(da) is not Decimal:
+            raise CardError("year_start needs a date and numbers")
+        s = date(d.year, int(mo), int(da))
+        return s if s <= d else date(d.year - 1, int(mo), int(da))
     if fn == "minutes_between":
         _need(fn, xs, Clock)
         a, b = xs
@@ -777,8 +816,20 @@ def _kleene(results: Sequence[bool | None], combine: str) -> bool | None:
     return False if all(r is False for r in results) else None
 
 
+def _says_unknown(body: str) -> bool:
+    return any(w in body for w in UNKNOWN_WORDS)
+
+
 def _mentioned(c: Mapping[str, Any], body: str) -> bool:
-    return any(_norm(w) in body for w in c.get("mention", ()))
+    return _says_unknown(body) or any(_norm(w) in body for w in c.get("mention", ()))
+
+
+def _absent_values(card: Card, values: Mapping[str, Any], body: str) -> dict[str, Any]:
+    """読めなかったあり/なしの枠のうち、話題が質問に無い物の既定の値。"""
+    if _says_unknown(body):
+        return {}
+    return {n: s.absent for n, s in card.slots.items()
+            if s.absent is not None and values.get(n) is None and not any(_norm(w) in body for w in s.mention)}
 
 
 def _eval_cond(c: Mapping[str, Any], vals: Mapping[str, Any], body: str | None = None) -> bool | None:
@@ -839,7 +890,7 @@ def decide_v2(card: Card, values: Mapping[str, Any], question: str) -> CardDecis
     used = {n for c in (*card.constraints, *card.conditions, *card.exceptions) for n in _cond_names(c, card.slots)}
     for e in card.derive.values():
         used |= _names(e, card.slots)
-    skip = _defaulted_names(card, body)
+    skip = _defaulted_names(card, body) | set(_absent_values(card, values, body))
     unknown = [n for n, s in card.slots.items() if s.type == "bool" and values.get(n) is None and n in used and n not in skip]
     if not unknown or len(unknown) > MAX_ENUMERATED_BOOLS:
         return base
@@ -852,6 +903,8 @@ def decide_v2(card: Card, values: Mapping[str, Any], question: str) -> CardDecis
 
 def decide(card: Card, values: Mapping[str, Any], *, body: str | None = None) -> CardDecision:
     vals = dict(values)
+    if body is not None:
+        vals.update(_absent_values(card, values, body))
     for name, e in card.derive.items():
         if vals.get(name) is None:
             try:
