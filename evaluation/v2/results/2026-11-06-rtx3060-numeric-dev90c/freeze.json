@@ -1,0 +1,77 @@
+{
+  "format": "numeric-sealed-freeze@1",
+  "allow_draft": true,
+  "cards_dir": "C:\\Users\\mtkzi\\.cache\\lr-gpu\\v2c\\cards",
+  "cards": [
+    {
+      "id": "hoyosho-riyo-kyoka",
+      "status": "draft"
+    },
+    {
+      "id": "hoyosho-riyo-tomareru",
+      "status": "draft"
+    },
+    {
+      "id": "mycar-tsukin-kyoka",
+      "status": "draft"
+    },
+    {
+      "id": "refresh-kyuka-shutoku",
+      "status": "draft"
+    },
+    {
+      "id": "shanai-circle-josei-kofu",
+      "status": "draft"
+    },
+    {
+      "id": "shanai-circle-josei",
+      "status": "draft"
+    },
+    {
+      "id": "shikaku-jukenryo-futan",
+      "status": "draft"
+    },
+    {
+      "id": "shikaku-jukenryo-josei",
+      "status": "draft"
+    },
+    {
+      "id": "shikaku-jukenryo-kofu",
+      "status": "draft"
+    },
+    {
+      "id": "shikaku-jukenryo-kyoka",
+      "status": "draft"
+    },
+    {
+      "id": "shinya-kitaku-taxi-futan",
+      "status": "draft"
+    }
+  ],
+  "files": {
+    "hoyosho-riyo-kyoka.json": "9c3d6592c512d7c0ea9acf43d4cd195cf01814e1654b7db853e16636fc273b81",
+    "hoyosho-riyo-tomareru.json": "9946774857021f7f528dd6d8f72fca7a61a753d53e6c054706641fcf7af539e1",
+    "mycar-tsukin-kyoka.json": "7ed59939d27fe8a5abfafb8934d5a9c3fab68068814c321472eabad0e1dbaa11",
+    "refresh-kyuka-shutoku.json": "1dceb2303a7d2008d622a85fcf680505bf58aa9b5828aa84512612e81531f07b",
+    "shanai-circle-josei-kofu.json": "1c7a8e7a5247aef87bac409155021c7bf814abd18a785008dee191c25843db99",
+    "shanai-circle-josei.json": "1ea049dbe2abcf53beb1717afaf586ae79011f47b8e1230bf958ef7599638f66",
+    "shikaku-jukenryo-futan.json": "d3be2102e1dd2271a0ea1a373ecbee9680effc173bb2622f56c6d9cc41c7e24f",
+    "shikaku-jukenryo-josei.json": "e988dea93abbf87729b8ccd599f8d28b0742373005486d457d021b2ce9faffa5",
+    "shikaku-jukenryo-kofu.json": "b31b92e012439a6bdbf5b540278e6e21b42f5cd56458a6ea9574524e2a65a75f",
+    "shikaku-jukenryo-kyoka.json": "8343d315058c494c3f2285f7b220200e2cde2e549c067ebd5a1269ca0a923a31",
+    "shinya-kitaku-taxi-futan.json": "ead73f9688e906c46141d628977a8fc9a712c95a47b543d54bc8a44bb179aced"
+  },
+  "unable": {
+    "present": false,
+    "rules": [],
+    "sha256": null
+  },
+  "prompt": {
+    "path": "evaluation/v2/rule_cards/draft_prompt.md",
+    "sha256": "9849916a39fb50ef43c0399ddb83e5a2e74e443dd9f369d502df502a2ba49c1e"
+  },
+  "rule_cards_py": {
+    "path": "backend/app/services/rule_cards.py",
+    "sha256": "d65250e621cae3c768df2a6c46afadcaa2ac0a040946d1a0539b04b84bbf2da7"
+  }
+}
