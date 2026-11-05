@@ -1,0 +1,72 @@
+{
+  "format": "numeric-sealed-freeze@1",
+  "allow_draft": true,
+  "cards_dir": "C:\\Users\\mtkzi\\.cache\\lr-gpu\\v3c2\\cards",
+  "cards": [
+    {
+      "id": "circle-josei-ari-nashi",
+      "status": "draft"
+    },
+    {
+      "id": "circle-josei-kofu-taishogai",
+      "status": "draft"
+    },
+    {
+      "id": "hoyosho-riyo-kyoka",
+      "status": "draft"
+    },
+    {
+      "id": "hoyosho-riyo-tomareru",
+      "status": "draft"
+    },
+    {
+      "id": "mycar-tsukin-kyoka",
+      "status": "draft"
+    },
+    {
+      "id": "refresh-kyuka-shutoku",
+      "status": "draft"
+    },
+    {
+      "id": "shikaku-jukenryo-futan",
+      "status": "draft"
+    },
+    {
+      "id": "shikaku-jukenryo-josei",
+      "status": "draft"
+    },
+    {
+      "id": "shikaku-jukenryo-kofu",
+      "status": "draft"
+    },
+    {
+      "id": "shinya-kitaku-taxi-futan",
+      "status": "draft"
+    }
+  ],
+  "files": {
+    "circle-josei-ari-nashi.json": "b23d21e95ef008850ab23cb95e2bbdbfdb3674684615c57e3d2b830ef2e2d469",
+    "circle-josei-kofu-taishogai.json": "689ca5445f41b30edb1127df7787f34a51a2b23da493285532925520c7fced2e",
+    "hoyosho-riyo-kyoka.json": "6b6df85b7efe21072cf3b97fd2f967d27bd57f88e3c6315bf81c4134b816f8c2",
+    "hoyosho-riyo-tomareru.json": "b34c2e86dd27fc3634ddca53738888a8ffbdfbbec4359a1d6f140d5bec153606",
+    "mycar-tsukin-kyoka.json": "bcc0343173b3f4327e6ea08cab49e6e286b0eee20d2c9992bc7065abd4718559",
+    "refresh-kyuka-shutoku.json": "45e4b7030388b256189b61ec0716fa65b4a14688f30a27492edc8d985ea0e490",
+    "shikaku-jukenryo-futan.json": "6c408119cff075df5539655ef2687e30a4cc8afd74987220b8109a57e6c5b344",
+    "shikaku-jukenryo-josei.json": "235be1848ab5a9416f77bae18b5681e22e6381148aeba6cdc9d90d31402e14a3",
+    "shikaku-jukenryo-kofu.json": "277f267b2029f0ef63215b2abc1917d30f81537271a320b6bbbd40099429dce5",
+    "shinya-kitaku-taxi-futan.json": "46842da56b534b7af9e95885da6768c946aa99cb70f12613163472beb25f0024"
+  },
+  "unable": {
+    "present": false,
+    "rules": [],
+    "sha256": null
+  },
+  "prompt": {
+    "path": "evaluation/v2/rule_cards/draft_prompt.md",
+    "sha256": "3fdc4150042ec792ff60b84790730c3ba7039fbd8ce28939d1c6d6b6ba102e9b"
+  },
+  "rule_cards_py": {
+    "path": "backend/app/services/rule_cards.py",
+    "sha256": "a804b7ba6b274a522b5419f99082ba4af0c9351c117a28d305cad69e4f0debc1"
+  }
+}

@@ -1107,3 +1107,221 @@ def test_sealed_record_has_first_and_second_conclusions_without_breaking_the_old
     rec = ns.make_record(item, 0, 1, c, d, d.pass_stats[0], 0.5)
     assert (rec["outcome"], rec["stop_reason"], rec["conclusion"]) == ("held", ns.CONFIRM_MISMATCH, None)
     assert (rec["first_conclusion"], rec["second_conclusion"]) == ("対象", "対象外")
+
+# ---- 同じ量の別の言い方と、問題の枠を不明にする検査 (verify="equiv"・problem_as_unknown)
+
+
+@pytest.mark.parametrize("value,quote,unit,ok", [
+    (36, "勤続3年の正社員です", "か月", True),
+    (13, "勤続は1年1か月です", "か月", True),
+    (35, "勤続3年の正社員です", "か月", False),
+    (11, "入社は2023年11月です", "か月", False),  # 年月は年の長さではない
+    (4600, "合計は4千6百円です", "円", True),
+    (4700, "合計は4千6百円です", "円", False),
+    (85000, "5月に7万円、6月に1万5千円", "円", True),  # 単位の合う数の合計
+    (5, "会計は5日分です", "回", False),  # 単位が違う数は通さない
+])
+def test_equiv_numbers(value, quote, unit, ok):
+    quote = rule_cards._norm(quote)
+    assert rule_cards._number_in_quote(Decimal(value), quote, unit, equiv=True) is ok
+
+
+def test_equiv_is_off_by_default():
+    assert rule_cards._number_in_quote(Decimal(36), "勤続3年", "か月") is False
+
+
+def test_problem_as_unknown_decides_only_when_conclusion_does_not_depend():
+    card = parse_card({
+        "format": "rule-card@1", "id": "t", "status": "draft", "target": "t",
+        "doc": {"source": "a.md", "quote": "q"}, "match": {"conclusions": ["可", "不可"], "keywords": ["t"]},
+        "slots": {"日数": {"type": "number", "unit": "日", "describe": "d"},
+                  "額": {"type": "number", "unit": "円", "describe": "a"}},
+        "conditions": [{"name": "日数", "left": "日数", "op": ">=", "right": 5},
+                       {"name": "額", "left": "額", "op": ">=", "right": 100}],
+        "combine": "all", "conclusion": {"then": "可", "else": "不可"}})
+    q = "日数は3日です。額は200円です。"
+    raw = {"日数": {"quote": "日数は3日", "value": 3}, "額": {"quote": "額は200円", "value": 999}}
+    _, problems = validate_extraction(card, q, raw)
+    assert problems
+    values, problems = validate_extraction(card, q, raw, problem_as_unknown=True)
+    assert not problems and values["額"] is None
+    assert decide(card, values).conclusion == "不可"  # 1 つ偽なら all は決まる
+    raw["日数"]["value"] = 5
+    raw["日数"]["quote"] = "額は200円"  # 日数の読みも落ちる → 両方不明で保留
+    values, _ = validate_extraction(card, q, raw, problem_as_unknown=True)
+    assert decide(card, values).conclusion is None
+
+
+# ---- 話題の無い条件の既定と、あり/なしの全値代入 (decide_v2)
+
+
+def _v2_card():
+    return parse_card({
+        "format": "rule-card@1", "id": "t", "status": "draft", "target": "t",
+        "doc": {"source": "a.md", "quote": "q"}, "match": {"conclusions": ["可", "不可"], "keywords": ["t"]},
+        "slots": {"時間": {"type": "number", "unit": "時間", "describe": "h"},
+                  "短時間勤務か": {"type": "bool", "describe": "s"},
+                  "再婚か": {"type": "bool", "describe": "r"}},
+        "conditions": [{"name": "時間", "any": [
+            {"name": "通常", "left": "時間", "op": ">=", "right": 4},
+            {"name": "短時間", "all": [{"name": "短", "left": "短時間勤務か", "op": "==", "right": "あり"},
+                                    {"name": "3h", "left": "時間", "op": ">=", "right": 3}]}]}],
+        "combine": "all",
+        "exceptions": [{"name": "再婚", "left": "再婚か", "op": "==", "right": "あり", "conclusion": "不可",
+                        "unless_mentioned": False, "mention": ["再婚"]}],
+        "conclusion": {"then": "可", "else": "不可"}})
+
+
+def test_v2_exception_ignored_only_when_topic_is_absent():
+    c = _v2_card()
+    v = {"時間": Decimal(5), "短時間勤務か": None, "再婚か": None}
+    assert rule_cards.decide_v2(c, v, "5時間です。").conclusion == "可"
+    assert rule_cards.decide_v2(c, v, "5時間です。再婚かは分かりません。").conclusion is None
+
+
+def test_v2_enumerates_bool_and_holds_when_split():
+    c = _v2_card()
+    assert rule_cards.decide_v2(c, {"時間": Decimal("2"), "短時間勤務か": None, "再婚か": None}, "2時間").conclusion == "不可"
+    assert rule_cards.decide_v2(c, {"時間": Decimal("3.5"), "短時間勤務か": None, "再婚か": None}, "3.5時間").conclusion is None
+    assert rule_cards.decide_v2(c, {"時間": None, "短時間勤務か": None, "再婚か": None}, "不明").conclusion is None
+
+
+def test_v2_mention_needs_unless_mentioned():
+    d = {"format": "rule-card@1", "id": "t", "status": "draft", "target": "t", "doc": {"source": "a.md", "quote": "q"},
+         "match": {"conclusions": ["可", "不可"], "keywords": ["t"]}, "slots": {"x": {"type": "bool", "describe": "x"}},
+         "conditions": [{"name": "x", "left": "x", "op": "==", "right": "あり", "mention": ["x"]}], "combine": "all",
+         "conclusion": {"then": "可", "else": "不可"}}
+    with pytest.raises(CardError):
+        parse_card(d)
+
+
+def test_v2_off_by_default():
+    assert rule_cards.V2 is False
+
+
+def test_in_md_range_handles_year_wrap_and_unknown():
+    e = {"in_md_range": ["d", 12, 1, 1, 10]}
+    for day, want in ((date(2026, 12, 1), "あり"), (date(2027, 1, 10), "あり"), (date(2026, 1, 11), "なし"), (date(2026, 11, 30), "なし")):
+        assert rule_cards._eval(e, {"d": day}) == want
+    assert rule_cards._eval({"in_md_range": ["d", 3, 1, 3, 31]}, {"d": date(2026, 3, 31)}) == "あり"
+    assert rule_cards._eval({"in_md_range": ["d", 3, 1, 3, 31]}, {"d": date(2026, 4, 1)}) == "なし"
+    assert rule_cards._eval(e, {"d": None}) is None
+
+
+def test_same_units_only_when_card_says_so():
+    q = "食堂の利用は5日分"
+    assert not rule_cards._number_in_quote(Decimal(5), q, "回", equiv=True)  # カードに無ければ通さない
+    assert rule_cards._number_in_quote(Decimal(5), q, "回", equiv=True, same_units=("日分",))
+    assert not rule_cards._number_in_quote(Decimal(6), q, "回", equiv=True, same_units=("日分",))
+    assert not rule_cards._number_in_quote(Decimal(5), q, "回", same_units=("日分",))  # 厳密の照合は今のまま
+
+
+def test_select_card_v2_thresholds_are_only_for_v2(monkeypatch):
+    calls = {"a": 23, "b": 19}
+    cards = [SimpleNamespace(id=k, conclusions=("x", "y")) for k in calls]
+    monkeypatch.setattr(rule_cards, "conclusion_options", lambda q: ("x", "y"))
+    monkeypatch.setattr(rule_cards, "select_score", lambda c, q: calls[c.id])
+    monkeypatch.setattr(rule_cards, "V2", False)
+    assert rule_cards.select_card(cards, "q") is None
+    monkeypatch.setattr(rule_cards, "V2", True)
+    assert rule_cards.select_card(cards, "q").id == "a"
+    calls["b"] = 20  # 差 3 は選ばない
+    assert rule_cards.select_card(cards, "q") is None
+    calls.update(a=7, b=0)  # 下限未満は選ばない
+    assert rule_cards.select_card(cards, "q") is None
+
+
+@pytest.mark.parametrize("value,quote,unit,ok", [
+    (3, "片道3キロの道のり", "キロメートル", True),
+    (3000, "片道3キロの道のり", "メートル", True),
+    (900, "片道900メートルで", "m", True),
+    (0.9, "片道900メートルで", "キロメートル", True),
+    (900, "片道900円で", "メートル", False),
+    (50000000, "対物は5千万円の保険", "円", True),
+    (200000000, "対物は2億円の保険", "円", True),
+    (5000000, "対物は5千万円の保険", "円", False),
+])
+def test_equiv_distance_and_large_numbers(value, quote, unit, ok):
+    assert rule_cards._number_in_quote(Decimal(str(value)), rule_cards._norm(quote), unit, equiv=True) is ok
+
+
+@pytest.mark.parametrize("a,b,want", [
+    (date(2016, 4, 2), date(2026, 4, 1), 119), (date(2016, 4, 1), date(2026, 4, 1), 120),
+    (date(2024, 1, 31), date(2024, 2, 28), 0), (date(2024, 1, 31), date(2024, 2, 29), 1),
+    (date(2026, 5, 1), date(2026, 4, 1), -1),
+])
+def test_months_between(a, b, want):
+    assert rule_cards._eval({"months_between": ["a", "b"]}, {"a": a, "b": b}) == Decimal(want)
+
+
+def test_year_start():
+    e = {"year_start": ["d", 4, 1]}
+    assert rule_cards._eval(e, {"d": date(2026, 3, 31)}) == date(2025, 4, 1)
+    assert rule_cards._eval(e, {"d": date(2026, 4, 1)}) == date(2026, 4, 1)
+
+
+def _absent_card():
+    return rule_cards.parse_card({
+        "format": "rule-card@1", "id": "t", "status": "draft", "drafted_by": "x", "confirmed_by": None,
+        "doc": {"source": "s", "section": "1", "quote": "q"}, "target": "t",
+        "match": {"conclusions": ["出る", "出ない"], "keywords": ["代"]},
+        "slots": {"時刻": {"type": "number", "unit": "時", "describe": "時刻"},
+                  "妊娠中": {"type": "bool", "absent": "なし", "mention": ["妊娠"], "describe": "妊娠中か"}},
+        "conditions": [{"name": "c", "any": [
+            {"name": "a", "left": "時刻", "op": ">=", "right": 22},
+            {"name": "b", "all": [{"name": "b1", "left": "妊娠中", "op": "==", "right": "あり"},
+                                  {"name": "b2", "left": "時刻", "op": ">=", "right": 21}]}]}],
+        "combine": "all", "conclusion": {"then": "出る", "else": "出ない"}})
+
+
+def test_absent_slot_default_and_explicit_unknown():
+    c = _absent_card()
+    q = "21時半に退社しました。出ますか。"
+    assert rule_cards.decide_v2(c, {"時刻": Decimal("21.5"), "妊娠中": None}, q).conclusion == "出ない"
+    q2 = "妊娠中かもしれません。21時半に退社しました。出ますか。"
+    assert rule_cards.decide_v2(c, {"時刻": Decimal("21.5"), "妊娠中": None}, q2).conclusion is None
+    q3 = "同僚の事情は聞いていません。21時半に退社しました。出ますか。"  # 知らないと明言 → 既定を使わない
+    assert rule_cards.decide_v2(c, {"時刻": Decimal("21.5"), "妊娠中": None}, q3).conclusion is None
+
+
+def test_absent_needs_mention_on_bool():
+    d = {"format": "rule-card@1", "id": "t", "status": "draft", "drafted_by": "x", "confirmed_by": None,
+         "doc": {"source": "s", "section": "1", "quote": "q"}, "target": "t",
+         "match": {"conclusions": ["出る", "出ない"], "keywords": ["代"]},
+         "slots": {"b": {"type": "bool", "absent": "なし", "describe": "b"}},
+         "conditions": [{"name": "c", "left": "b", "op": "==", "right": "あり"}],
+         "combine": "all", "conclusion": {"then": "出る", "else": "出ない"}}
+    with pytest.raises(CardError):
+        rule_cards.parse_card(d)
+
+
+def test_yearless_date_written_with_placeholder_year_is_accepted_in_equiv_only():
+    c = rule_cards.parse_card({
+        "format": "rule-card@1", "id": "t", "status": "draft", "drafted_by": "x", "confirmed_by": None,
+        "doc": {"source": "s", "section": "1", "quote": "q"}, "target": "t",
+        "match": {"conclusions": ["出る", "出ない"], "keywords": ["代"]},
+        "slots": {"日": {"type": "date", "describe": "日"}},
+        "conditions": [{"name": "c", "left": "日", "op": ">=", "right": {"date": "2000-01-01"}}],
+        "combine": "all", "conclusion": {"then": "出る", "else": "出ない"}})
+    q = "発表は7月1日です。\n最後の行は「結論: 出る」または「結論: 出ない」とする。"
+    for raw_v in ("YYYY-07-01", "7月1日"):
+        raw = {"日": {"quote": "発表は7月1日", "value": raw_v}}
+        v, p = validate_extraction(c, q, raw, verify="equiv")
+        assert not p and (v["日"].month, v["日"].day) == (7, 1)
+        _, p2 = validate_extraction(c, q, raw)
+        assert p2
+
+
+@pytest.mark.parametrize("quote,ok", [("22時20分から22時40分の間だった", False), ("22時ごろ退社", False), ("22時20分に退社", True)])
+def test_hedged_quote_gives_no_exact_value(quote, ok):
+    c = rule_cards.parse_card({
+        "format": "rule-card@1", "id": "t", "status": "draft", "drafted_by": "x", "confirmed_by": None,
+        "doc": {"source": "s", "section": "1", "quote": "q"}, "target": "t",
+        "match": {"conclusions": ["出る", "出ない"], "keywords": ["代"]},
+        "slots": {"時刻": {"type": "time", "describe": "時刻"}},
+        "conditions": [{"name": "c", "left": "時刻", "op": ">=", "right": {"time": "22:00"}}],
+        "combine": "all", "conclusion": {"then": "出る", "else": "出ない"}})
+    hh = "22:20" if "20分" in quote else "22:00"
+    q = f"{quote}。\n最後の行は「結論: 出る」または「結論: 出ない」とする。"
+    _, p = validate_extraction(c, q, {"時刻": {"quote": quote, "value": hh}}, verify="equiv")
+    assert (not p) is ok

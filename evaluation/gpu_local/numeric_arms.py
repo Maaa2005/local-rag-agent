@@ -191,7 +191,7 @@ def run_arm(out: Path, arm: str) -> int:
                 rec["stopped"] = f"{name} の前の空き {avail} MiB < {ARGS.min_available_mib} MiB"
                 log(rec["stopped"])
                 return 3
-            s5.wait_gpu_released(read_mib, baseline)
+            s5.wait_gpu_released(read_mib, baseline, tol_mib=ARGS.gpu_tol_mib)
             t0 = time.time()
             srv, _ = start_server(state["ctx"], arm_dir / f"llama_{name}.log")
             try:
@@ -233,7 +233,7 @@ async def _direct_round(dataset: str, cards: list) -> list[QuestionResult]:
             r.total_latency = r.first_token_latency = time.perf_counter() - t
             first = d.pass_stats[0] if d.pass_stats else extractor.last_stats  # last_stats は直前の 1 回（2 回目）の数
             r.rule_card = {"card_id": d.card_id, "conclusion": d.conclusion, "hold_reason": d.hold_reason, "raw": d.raw,
-                           "first_conclusion": d.first_conclusion, "second_conclusion": d.second_conclusion,
+                           "first_conclusion": d.first_conclusion, "second_conclusion": d.second_conclusion, "second_hold_reason": d.second_hold_reason, "second_raw": d.second_raw,
                            **first}
             tokens = [x.get("completion_tokens") for x in (d.pass_stats or [extractor.last_stats])]
             r.completion_tokens = sum(t for t in tokens if t) if any(tokens) else None  # 時間は 2 回分なので 2 回分を足す
@@ -263,7 +263,7 @@ def run_direct(out: Path) -> int:
                 rec["stopped"] = f"{name} の前の空き {avail} MiB < {ARGS.min_available_mib} MiB"
                 log(rec["stopped"])
                 return 3
-            s5.wait_gpu_released(read_mib, baseline)
+            s5.wait_gpu_released(read_mib, baseline, tol_mib=ARGS.gpu_tol_mib)
             t0 = time.time()
             srv, _gpu = start_server(DIRECT_CTX, arm_dir / f"llama_{name}.log")
             try:
@@ -383,6 +383,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--gpu-name", default="NVIDIA GeForce RTX 3060")
     p.add_argument("--min-available-mib", type=int, default=4096,
                    help="各回の前に要る本体のメモリの空き。足りなければ流さない")
+    p.add_argument("--gpu-tol-mib", type=int, default=1024, help="各回の前に GPU がここまで戻るのを待つ幅。残ったサーバーは 4GB を超えるので 1GB でも見分けられる。他のアプリの増減で止まらないよう広げた")
     return p.parse_args(argv)
 
 

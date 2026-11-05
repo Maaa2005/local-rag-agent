@@ -1,0 +1,90 @@
+{"id": "W046", "facts": {"tenure_m": 120, "ytd": 12, "req_h": 2, "days_before": 3, "submit_min": 600}, "unknowns": {}}
+{"id": "W031", "facts": {"regular": true, "tenure_m": 240, "income": 16000000, "loan": 2300000, "balance": 800000, "installments": 60, "disaster": false}, "unknowns": {}}
+{"id": "W064", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "議事録", "base": "2019-07-08", "today": "2026-05-20"}, "unknowns": {}}
+{"id": "W043", "facts": {"registered": true, "copy": false, "approved": false, "hold": false, "kind": "経費精算書", "base": "2017-11-02", "today": "2026-07-01"}, "unknowns": {}}
+{"id": "W072", "facts": {"kind": "lease", "amount": 2000000}, "unknowns": {}}
+{"id": "W056", "facts": {"registered": true, "copy": true, "hold": false, "kind": "議事録", "base": "2025-09-15", "today": "2026-03-02"}, "unknowns": {}}
+{"id": "W001", "facts": {"regular": true, "tenure_m": 180, "income": 9000000, "loan": 1700000, "balance": 0, "installments": 36}, "unknowns": {}}
+{"id": "W011", "facts": {"tenure_m": 72, "short_h": 8, "ytd": 38, "req_h": 3}, "unknowns": {}}
+{"id": "W024", "facts": {"tenure_m": 72, "short_h": 6, "ytd": 28, "req_h": 3, "days_before": 5, "submit_min": 600}, "unknowns": {}}
+{"id": "W080", "facts": {"regular": true, "tenure_m": 120, "income": 10000000, "loan": 1000000, "balance": 0, "installments": 72}, "unknowns": {}}
+{"id": "W047", "facts": {"tenure_m": 48, "short_h": 8, "ytd": 10, "req_h": 3, "days_before": 0, "submit_min": 520, "start_min": 540, "reason": "family_live"}, "unknowns": {}}
+{"id": "W023", "facts": {"registered": false, "approved": true, "kind": "議事録", "base": "2015-04-10", "today": "2026-09-01"}, "unknowns": {}}
+{"id": "W009", "facts": {"indoor": false, "md": "04-12", "wind": {"kmh": "50.4"}}, "unknowns": {}}
+{"id": "W042", "facts": {"regular": true, "tenure_m": 32, "income": 8000000, "loan": 500000, "balance": 0, "installments": 24}, "unknowns": {}}
+{"id": "W090", "facts": {"kind": "goods", "amount": 318000, "genuine": false, "urgent_days": 20}, "unknowns": {}}
+{"id": "W083", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "経費精算書", "base": "2021-03-25", "today": "2026-03-31"}, "unknowns": {}}
+{"id": "W014", "facts": {"indoor": false, "md": "08-05", "wind": 4, "wbgt": 29, "cont": 130, "emergency": false}, "unknowns": {}}
+{"id": "W049", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "経費精算書", "base": "2021-03-25", "today": "2026-03-31"}, "unknowns": {}}
+{"id": "W035", "facts": {"regular": true, "tenure_m": 96, "income": 10000000, "loan": 1900000, "balance": 0, "installments": 48}, "unknowns": {}}
+{"id": "W003", "facts": {"indoor": false, "md": "03-05", "wind": "17.5", "emergency": false}, "unknowns": {}}
+{"id": "W029", "facts": {"indoor": false, "md": "05-10", "wind": 8}, "unknowns": {}}
+{"id": "W086", "facts": {"hire": "2012-04-01", "regular": true, "leave_private": 0, "discipline": "2024-06-10", "prior_award": false}, "unknowns": {}}
+{"id": "W051", "facts": {"hire": "2016-10-01", "regular": true, "leave_private": 0, "discipline": null, "prior_award": false}, "unknowns": {}}
+{"id": "W076", "facts": {"tenure_m": 4, "ytd": 0, "req_h": 1}, "unknowns": {}}
+{"id": "W030", "facts": {"kind": "goods", "amount": 300000, "genuine": false, "urgent_days": 20}, "unknowns": {}}
+{"id": "W088", "facts": {"indoor": false, "md": "01-15", "wind": 16, "emergency": true}, "unknowns": {"approved": [true, false]}}
+{"id": "W032", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "議事録", "base": "2022-05-10", "today": "2026-02-15"}, "unknowns": {}}
+{"id": "W026", "facts": {"indoor": false, "md": "08-20", "wind": 4, "cont": 60, "emergency": false}, "unknowns": {"wbgt": [26, 32]}}
+{"id": "W045", "facts": {"tenure_m": 84, "short_h": 8, "req_h": 2, "days_before": 5, "submit_min": 600}, "unknowns": {"ytd": [37, 38, 39, 40]}}
+{"id": "W067", "facts": {"kind": "goods", "amount": 400000, "genuine": false, "urgent_days": 5, "approved": true}, "unknowns": {}}
+{"id": "W018", "facts": {"regular": true, "tenure_m": 108, "income": 10000000, "loan": 1500000, "installments": 36}, "unknowns": {"balance": [0, 50000, 99999]}}
+{"id": "W052", "facts": {"regular": true, "tenure_m": 72, "income": 6000000, "loan": 4000000, "balance": 0, "installments": 60, "disaster": false}, "unknowns": {}}
+{"id": "W048", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "議事録", "today": "2026-08-20"}, "unknowns": {"base": ["2023-03-15", "2023-04-15"]}}
+{"id": "W039", "facts": {"kind": "goods", "amount": 299000, "prior": 0}, "unknowns": {}}
+{"id": "W060", "facts": {"registered": true, "copy": false, "approved": true, "hold": true, "kind": "議事録", "base": "2019-07-08", "today": "2026-05-20"}, "unknowns": {}}
+{"id": "W008", "facts": {"kind": "goods", "amount": 120000, "prior": 400000, "genuine": false, "urgent_days": 20}, "unknowns": {}}
+{"id": "W040", "facts": {"regular": true, "leave_private": 0, "discipline": null, "prior_award": false}, "unknowns": {"hire": ["2010-04-01", "2021-04-01"]}}
+{"id": "W073", "facts": {"indoor": false, "md": "11-10", "wind": {"kmh": 54}, "emergency": false}, "unknowns": {}}
+{"id": "W027", "facts": {"tenure_m": 84, "short_h": 8, "ytd": 20, "req_h": 2, "days_before": 1, "submit_min": 1050, "reason": "other"}, "unknowns": {}}
+{"id": "W017", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "契約書", "base": "2016-03-20", "today": "2026-04-10"}, "unknowns": {}}
+{"id": "W012", "facts": {"regular": true, "tenure_m": 84, "loan": 1500000, "balance": 0, "installments": 36, "disaster": false}, "unknowns": {"income": [5000000, 10000000]}}
+{"id": "W059", "facts": {"kind": "goods", "amount": 450000, "genuine": false, "urgent_days": 2, "approved": true}, "unknowns": {}}
+{"id": "W022", "facts": {"hire": "2014-10-01", "regular": true, "discipline": null, "prior_award": false}, "unknowns": {"leave_private": [0, 30]}}
+{"id": "W081", "facts": {"kind": "goods", "prior": 0, "genuine": false, "urgent_days": 20}, "unknowns": {"amount": [100000, 400000]}}
+{"id": "W036", "facts": {"regular": true, "tenure_m": 72, "income": 6000000, "loan": 4000000, "balance": 0, "installments": 60, "disaster": true}, "unknowns": {}}
+{"id": "W061", "facts": {"indoor": false, "md": "06-01", "wind": 3, "wbgt": "31.5", "emergency": false}, "unknowns": {}}
+{"id": "W084", "facts": {"regular": true, "tenure_m": 60, "loan": 1800000, "balance": 0, "installments": 48, "disaster": false}, "unknowns": {"income": [8000000, 9000000, 10000000]}}
+{"id": "W021", "facts": {"indoor": true, "md": "07-15", "wbgt": 33}, "unknowns": {}}
+{"id": "W074", "facts": {"kind": "goods", "amount": 299000, "prior": 0}, "unknowns": {}}
+{"id": "W010", "facts": {"hire": "2014-10-01", "regular": true, "leave_private": 0, "leave_work": 30, "discipline": null, "prior_award": false}, "unknowns": {}}
+{"id": "W062", "facts": {"hire": "2016-10-01", "regular": true, "leave_private": 0, "discipline": null, "prior_award": false}, "unknowns": {}}
+{"id": "W033", "facts": {"kind": "goods", "amount": 100000}, "unknowns": {"prior": [0, 100000, 200000]}}
+{"id": "W015", "facts": {"regular": true, "tenure_m": 96, "income": 10000000, "loan": 2000000, "balance": 0, "installments": 48}, "unknowns": {}}
+{"id": "W082", "facts": {"indoor": false, "md": "10-03", "wind": 6}, "unknowns": {}}
+{"id": "W038", "facts": {"kind": "goods", "amount": 350000, "urgent_days": 20}, "unknowns": {"genuine": [true, false]}}
+{"id": "W013", "facts": {"tenure_m": 60, "short_h": 8, "ytd": 10, "req_h": 2, "days_before": 0, "submit_min": 510, "start_min": 540}, "unknowns": {"reason": ["family_live", "other"]}}
+{"id": "W087", "facts": {"regular": true, "leave_private": 0, "discipline": null, "prior_award": false}, "unknowns": {"hire": ["2016-09-01", "2016-11-01"]}}
+{"id": "W041", "facts": {"indoor": false, "md": "02-08", "wind": 18, "emergency": true, "approved": true}, "unknowns": {}}
+{"id": "W019", "facts": {"indoor": false, "md": "05-15", "emergency": false}, "unknowns": {"wind": [{"kmh": 50}, {"kmh": 58}]}}
+{"id": "W034", "facts": {"hire": "2016-10-02", "regular": true, "leave_private": 0, "discipline": null, "prior_award": false}, "unknowns": {}}
+{"id": "W016", "facts": {"kind": "goods", "amount": {"unit": 25000, "qty": 11, "ship": 2000}, "genuine": false, "urgent_days": 20}, "unknowns": {}}
+{"id": "W071", "facts": {"kind": "goods", "prior": 0, "genuine": false, "urgent_days": 20}, "unknowns": {"amount": [280000, 300000, 320000]}}
+{"id": "W053", "facts": {"kind": "goods", "amount": 300000, "genuine": false, "urgent_days": 20}, "unknowns": {}}
+{"id": "W075", "facts": {"hire": "2019-04-01", "regular": true}, "unknowns": {}}
+{"id": "W063", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "稟議書", "base": "2018-06-01", "today": "2026-04-01"}, "unknowns": {}}
+{"id": "W050", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "稟議書", "base": "2016-09-15", "today": "2026-01-20"}, "unknowns": {}}
+{"id": "W028", "facts": {"regular": true, "tenure_m": 96, "income": 10000000, "loan": 2000000, "balance": 0, "installments": 48}, "unknowns": {}}
+{"id": "W089", "facts": {"indoor": false, "md": "04-12", "wind": 14}, "unknowns": {}}
+{"id": "W044", "facts": {"hire": "2018-04-01", "old_m": 43, "regular": true, "leave_private": 2, "discipline": null, "prior_award": false}, "unknowns": {}}
+{"id": "W020", "facts": {"registered": true, "copy": false, "approved": true, "kind": "稟議書", "base": "2016-10-03", "today": "2026-06-15"}, "unknowns": {"hold": [true, false]}}
+{"id": "W054", "facts": {"tenure_m": 96, "short_h": 8, "ytd": 38, "req_h": 2, "days_before": 2, "submit_min": 720}, "unknowns": {}}
+{"id": "W070", "facts": {"hire": "2014-10-01", "regular": true, "leave_private": 30, "discipline": null, "prior_award": false}, "unknowns": {}}
+{"id": "W058", "facts": {"tenure_m": 72, "short_h": 8, "ytd": 38, "req_h": 3}, "unknowns": {}}
+{"id": "W005", "facts": {"tenure_m": 108, "short_h": 8, "req_h": 2, "days_before": 1, "submit_min": 600}, "unknowns": {"ytd": [10, 39]}}
+{"id": "W065", "facts": {"hire": "2012-04-01", "regular": false, "leave_private": 0, "discipline": null}, "unknowns": {}}
+{"id": "W007", "facts": {"regular": true, "tenure_m": 132, "income": 10000000, "loan": 1800000, "installments": 48, "disaster": false}, "unknowns": {"balance": [0, 500000]}}
+{"id": "W006", "facts": {"tenure_m": 96, "short_h": 8, "ytd": 38, "req_h": 2, "days_before": 2, "submit_min": 720}, "unknowns": {}}
+{"id": "W002", "facts": {"regular": true, "tenure_m": 72, "income": 10000000, "loan": 2100000, "balance": 0, "installments": 48, "disaster": false}, "unknowns": {}}
+{"id": "W037", "facts": {"tenure_m": 50, "short_h": 8, "ytd": 30, "req_h": 3, "days_before": 5, "submit_min": 600}, "unknowns": {}}
+{"id": "W078", "facts": {"hire": "2016-10-02", "regular": true, "leave_private": 0, "discipline": null, "prior_award": false}, "unknowns": {}}
+{"id": "W079", "facts": {"indoor": false, "md": "02-08", "wind": 18, "emergency": false}, "unknowns": {}}
+{"id": "W055", "facts": {"indoor": false, "md": "11-10", "wind": 15, "emergency": false}, "unknowns": {}}
+{"id": "W004", "facts": {"regular": true, "tenure_m": 72, "income": 10000000, "loan": 2100000, "balance": 0, "installments": 48, "disaster": false}, "unknowns": {}}
+{"id": "W068", "facts": {"hire": "2014-02-15", "regular": true, "leave_private": 0, "discipline": null, "prior_award": false}, "unknowns": {}}
+{"id": "W025", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "議事録", "today": "2026-08-20"}, "unknowns": {"base": ["2015-06-01", "2025-06-01"]}}
+{"id": "W066", "facts": {"kind": "goods", "amount": 180000, "prior": 0}, "unknowns": {}}
+{"id": "W057", "facts": {"tenure_m": 144, "short_h": 8, "req_h": 2, "days_before": 1, "submit_min": 900}, "unknowns": {"ytd": [0, 10, 20]}}
+{"id": "W077", "facts": {"tenure_m": 48, "short_h": 8, "ytd": 10, "req_h": 3, "days_before": 0, "submit_min": 520, "start_min": 540, "reason": "other"}, "unknowns": {}}
+{"id": "W069", "facts": {"registered": true, "copy": false, "approved": true, "hold": false, "kind": "稟議書", "base": "2018-06-01", "today": "2026-04-01"}, "unknowns": {}}
+{"id": "W085", "facts": {"hire": "2013-07-01", "regular": true, "leave_private": 0, "discipline": null, "prior_award": false}, "unknowns": {}}

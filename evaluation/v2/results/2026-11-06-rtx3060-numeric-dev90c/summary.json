@@ -1,0 +1,204 @@
+{
+  "runs": 2,
+  "rounds": {
+    "1": {
+      "n": 90,
+      "complete": true,
+      "answerable": 72,
+      "should_hold": 18,
+      "wrong_assertions": 4,
+      "held": 17,
+      "decided": 30,
+      "decided_required": 65,
+      "pairs": 12,
+      "pairs_both_correct": 3,
+      "pairs_required": 11,
+      "stop_reasons": {
+        "no_card": 5,
+        "extract_failed": 1,
+        "validation_failed": 0,
+        "unknown_hold": 51,
+        "confirm_mismatch": 2
+      },
+      "per_rule": {
+        "マイカー通勤規程": {
+          "answerable": 12,
+          "decided": 3,
+          "correct": 3,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "リフレッシュ休暇規程": {
+          "answerable": 12,
+          "decided": 2,
+          "correct": 2,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "保養所利用規程": {
+          "answerable": 12,
+          "decided": 6,
+          "correct": 5,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "深夜帰宅タクシー利用規程": {
+          "answerable": 12,
+          "decided": 7,
+          "correct": 6,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "社内サークル助成規程": {
+          "answerable": 12,
+          "decided": 7,
+          "correct": 7,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "資格受験料補助規程": {
+          "answerable": 12,
+          "decided": 5,
+          "correct": 4,
+          "wrong": 2,
+          "should_hold": 3,
+          "held": 2,
+          "required": 10,
+          "ok": false
+        }
+      },
+      "lines": {
+        "wrong_assertions_zero": false,
+        "all_held": false,
+        "decided_overall": false,
+        "decided_per_rule": false,
+        "pairs": false
+      },
+      "ok": false
+    },
+    "2": {
+      "n": 90,
+      "complete": true,
+      "answerable": 72,
+      "should_hold": 18,
+      "wrong_assertions": 4,
+      "held": 17,
+      "decided": 30,
+      "decided_required": 65,
+      "pairs": 12,
+      "pairs_both_correct": 3,
+      "pairs_required": 11,
+      "stop_reasons": {
+        "no_card": 5,
+        "extract_failed": 1,
+        "validation_failed": 0,
+        "unknown_hold": 51,
+        "confirm_mismatch": 2
+      },
+      "per_rule": {
+        "マイカー通勤規程": {
+          "answerable": 12,
+          "decided": 3,
+          "correct": 3,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "リフレッシュ休暇規程": {
+          "answerable": 12,
+          "decided": 2,
+          "correct": 2,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "保養所利用規程": {
+          "answerable": 12,
+          "decided": 6,
+          "correct": 5,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "深夜帰宅タクシー利用規程": {
+          "answerable": 12,
+          "decided": 7,
+          "correct": 6,
+          "wrong": 1,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "社内サークル助成規程": {
+          "answerable": 12,
+          "decided": 7,
+          "correct": 7,
+          "wrong": 0,
+          "should_hold": 3,
+          "held": 3,
+          "required": 10,
+          "ok": false
+        },
+        "資格受験料補助規程": {
+          "answerable": 12,
+          "decided": 5,
+          "correct": 4,
+          "wrong": 2,
+          "should_hold": 3,
+          "held": 2,
+          "required": 10,
+          "ok": false
+        }
+      },
+      "lines": {
+        "wrong_assertions_zero": false,
+        "all_held": false,
+        "decided_overall": false,
+        "decided_per_rule": false,
+        "pairs": false
+      },
+      "ok": false
+    }
+  },
+  "ok": false,
+  "issue": 16,
+  "dev": true,
+  "stopped": null,
+  "unable_rules": [],
+  "conditions": {
+    "conclusion_options_given_first": true,
+    "retrieval": false,
+    "no_card_goes_to_model": false
+  },
+  "set_sha256": "1bd00ce56bd799b6a8a38eb08a62564d786e193402a6e1cdab92430bbb967a82",
+  "freeze_sha256": "6e0f57045e408ff87e0bdd38cf8e00645a3952a93083b6fe67fa1b83345eb832",
+  "lines_definition": {
+    "wrong_assertions_max": 0,
+    "hold": "全部 (答えなかった問は数えない)",
+    "decided_overall": "9/10 以上 (切り上げ)",
+    "decided_per_rule": "8/10 以上 (切り上げ)",
+    "pairs": "9/10 以上 (切り上げ)"
+  }
+}

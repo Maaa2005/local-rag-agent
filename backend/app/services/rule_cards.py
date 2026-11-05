@@ -13,7 +13,7 @@
 カードの形（JSON・format: rule-card@1）:
   id, status, drafted_by, confirmed_by, doc{source, section, quote}, target,
   match{conclusions: [then, else], keywords: [...]},
-  slots{名前: {type: number|date|time|bool, unit?, describe}}（time の値は "HH:MM"・00:00〜23:59）,
+  slots{名前: {type: number|date|time|bool, unit?, same_units?, describe}}（time の値は "HH:MM"・00:00〜23:59）,
   derive{名前: 式}（拾えなかった項目を他の項目から計算する。例: 出勤日数 = 全労働日数 - 欠勤日数）,
   constraints[{name, left, op, right}]（値の筋が通らなければ保留。例: 出勤日数 <= 全労働日数）,
   conditions[{name, left, op, right[, quote]}], combine: all|any, conclusion{then, else},
@@ -29,6 +29,8 @@
 from __future__ import annotations
 
 import json
+import itertools
+import os
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -45,7 +47,7 @@ SLOT_TYPES = ("number", "date", "time", "bool")
 BOOL_VALUES = ("あり", "なし")
 # 数え方の語の言い換え（引用の数の直後にあるかを見る）
 UNIT_ALIASES = {"か月": ("か月", "ヶ月", "カ月", "箇月", "ケ月"), "%": ("%", "パーセント")}
-_EXPR_FUNCS = {"add", "sub", "mul", "div", "add_days", "month_day", "date", "time", "min", "max", "month_end",
+_EXPR_FUNCS = {"in_md_range", "months_between", "year_start", "add", "sub", "mul", "div", "add_days", "month_day", "date", "time", "min", "max", "month_end",
                "add_months", "minutes_between"}
 _MAX_NEST = 5  # 条件の入れ子の深さの上限
 _OPTIONS = re.compile(r"「結論\s*[:：]\s*(.+?)」")
@@ -61,6 +63,19 @@ _MIDDAY = "正午"
 # 引用の中の時間の長さ: 6時間10分・3時間半・8時間（枠の単位が 分 なら分に、時間なら時間にして照合する）
 _DURATION = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)時間(?:(\d+)分|(半))?")
 DURATION_UNITS = ("分", "時間")
+# 同じ量の別の言い方（verify="equiv" の時だけ見る）: 3年 = 36か月・1年1か月 = 13か月（2023年11月 のような年月は除く）・4千6百円
+_YEARS = re.compile(r"(?<![\d.,年])(\d{1,2})年(?!\d+月)(?:(\d+)(?:か月|ヶ月|カ月|箇月|ケ月))?")
+_SENN_HYAKU = re.compile(r"(?<![\d.,])(\d+)千(\d+)百")
+_SENN_MAN = re.compile(r"(?<![\d.,])(\d+)千万")
+_OKU = re.compile(r"(?<![\d.,])(\d+)億")
+_KM_UNITS = ("キロメートル", "キロ", "km")
+_M_UNITS = ("メートル", "m")
+_LOOSE_MD = re.compile(r"^(?:YYYY-|\d{4}-)?(\d{1,2})-(\d{1,2})$|^(?:\d{4}年)?(\d{1,2})月(\d{1,2})日$")
+# 問が「知らない」と明言している時は、話題が無いとは言えない。既定の値を使わず保留の側へ倒す
+# 引用の値が確かでない言い方。範囲や「ごろ」の値を 1 つに決めない（保留の側へ倒す）
+_HEDGE = re.compile(r"ごろ|頃|くらい|ぐらい|たぶん|多分|はず|およそ|約\d|から.{0,12}の間|前後|あたり")
+UNKNOWN_WORDS = ("聞いていません", "聞いてません", "聞きそびれ", "分かりません", "わかりません", "不明", "未定",
+                 "確認していません", "覚えていません", "知りません", "決まっていません")
 ZERO_WORDS = ("ない", "なし", "ありません", "持っていない", "無い")  # 数の枠の 0 は、引用にこの語がある時だけ通す
 # 年のない日付: 12月18日・1/30（直前が「年」や数字・斜線の物は年つきの日付の一部なので除く）
 _MD_KANJI = re.compile(r"(?<![年\d])(\d{1,2})月(\d{1,2})日")
@@ -79,6 +94,9 @@ class Slot:
     type: str
     unit: str | None
     describe: str
+    same_units: tuple[str, ...] = ()  # 規程の定めで同じ量と言える別の単位（「1 日に 2 回でも 1 回と数える」の日分）
+    absent: str | None = None  # あり/なしの枠: 話題が質問に無い時の値
+    mention: tuple[str, ...] = ()  # absent を使わない語（話題が出た印）
 
 
 @dataclass(frozen=True, order=True)
@@ -148,7 +166,7 @@ def _check_expr(card_id: str, e: Any, slots: Mapping[str, Slot]) -> None:
             return
         if not isinstance(args, list) or not args:
             raise CardError(f"{card_id}: {fn} needs a list of arguments")
-        arity = {"sub": 2, "div": 2, "add_days": 2, "month_day": 3, "add_months": 2, "minutes_between": 2}.get(fn)
+        arity = {"sub": 2, "div": 2, "add_days": 2, "month_day": 3, "add_months": 2, "minutes_between": 2, "in_md_range": 5, "months_between": 2, "year_start": 3}.get(fn)
         if arity is not None and len(args) != arity:
             raise CardError(f"{card_id}: {fn} takes {arity} arguments")
         if fn in ("min", "max") and len(args) < 2:
@@ -165,7 +183,12 @@ def _check_cond(card_id: str, c: Any, slots: Mapping[str, Slot], extra: Sequence
         raise CardError(f"{card_id}: condition needs name: {c!r}")
     if "quote" in c and not (isinstance(c["quote"], str) and c["quote"].strip()):
         raise CardError(f"{card_id}: condition quote must be a non-empty string: {c!r}")
-    keys = {"name", "quote", *extra}
+    keys = {"name", "quote", "unless_mentioned", "mention", *extra}
+    if ("unless_mentioned" in c) != ("mention" in c):
+        raise CardError(f"{card_id}: unless_mentioned and mention go together: {c!r}")
+    if "mention" in c and (not isinstance(c["unless_mentioned"], bool) or not isinstance(c["mention"], list) or not c["mention"]
+                           or not all(isinstance(w, str) and w.strip() for w in c["mention"])):
+        raise CardError(f"{card_id}: unless_mentioned must be a bool and mention a non-empty list of words: {c!r}")
     group = [k for k in ("all", "any") if k in c]
     if group:
         if len(group) != 1 or set(c) - {*keys, group[0]} or not isinstance(c[group[0]], list) or not c[group[0]]:
@@ -205,7 +228,10 @@ def parse_card(doc: Mapping[str, Any]) -> Card:
     for name, s in (doc.get("slots") or {}).items():
         if not isinstance(s, dict) or s.get("type") not in SLOT_TYPES or not s.get("describe"):
             raise CardError(f"{cid}: slot {name} needs type ({'/'.join(SLOT_TYPES)}) and describe")
-        slots[name] = Slot(name, s["type"], s.get("unit"), s["describe"])
+        if ("absent" in s) != ("mention" in s) or ("absent" in s and (s["type"] != "bool" or s["absent"] not in BOOL_VALUES or not s["mention"])):
+            raise CardError(f"{cid}: slot {name}: absent and mention go together on a bool slot")
+        slots[name] = Slot(name, s["type"], s.get("unit"), s["describe"], tuple(s.get("same_units") or ()),
+                           s.get("absent"), tuple(s.get("mention") or ()))
     if not slots:
         raise CardError(f"{cid}: no slots")
     derive = doc.get("derive") or {}
@@ -286,6 +312,8 @@ def conclusion_options(question: str) -> tuple[str, ...]:
 # （開発用 90 問・N 12 問・開発用 24 問。誤選択 0 の範囲で選択数が最大の点のうち、最も厳しい点）。変えたら数え直す
 SELECT_MIN_SCORE = 14  # 1 位の点の下限。語の組に合うカードが 1 枚だけの時も要る
 SELECT_MIN_MARGIN = 8  # 1 位と 2 位の点の差の下限（2 枚以上の時）
+SELECT_MIN_SCORE_V2 = 8  # RULE_CARDS_V2 の時の下限。14 と 12 では正しいカードが選ばれない問があった（1 位は全て正しい規程）
+SELECT_MIN_MARGIN_V2 = 4  # 同じく差の下限
 SELECT_KEYWORD_WEIGHT = 3  # keywords の文字 2-gram の重み（他は 1）
 _NOT_GRAM = re.compile(r"[\s、。，．,.!?！？「」『』（）()・:：;；/／]")
 
@@ -333,9 +361,10 @@ def select_card(cards: Sequence[Card], question: str) -> Card | None:
     opts = set(conclusion_options(question))
     ranked = sorted(((select_score(c, question), i) for i, c in enumerate(cards) if opts == set(c.conclusions)),
                     key=lambda x: (-x[0], x[1]))
-    if not ranked or ranked[0][0] < SELECT_MIN_SCORE:
+    min_score, min_margin = (SELECT_MIN_SCORE_V2, SELECT_MIN_MARGIN_V2) if V2 else (SELECT_MIN_SCORE, SELECT_MIN_MARGIN)
+    if not ranked or ranked[0][0] < min_score:
         return None
-    if len(ranked) > 1 and ranked[0][0] - ranked[1][0] < SELECT_MIN_MARGIN:
+    if len(ranked) > 1 and ranked[0][0] - ranked[1][0] < min_margin:
         return None
     return cards[ranked[0][1]]
 
@@ -375,6 +404,7 @@ def extraction_messages(card: Card, question: str, *, reverse: bool = False) -> 
               "quote には質問の文を言い換えずにそのまま入れます。value は quote に書かれている通りに決めます。\n"
               "質問に書かれていない項目は quote と value を null にします。計算・推測・換算はしません。"
               "ただし、数の単位が 分 や 時間 で quote が「6時間10分」「3時間半」のような時間の長さの時だけは、その単位の数に直します。\n"
+              + ("項目は質問者本人（同僚の話なら同僚）の事です。家族など別の人の事を当てはめません。" if V2 else "")
               + "\n".join(lines))
     return [{"role": "system", "content": system}, {"role": "user", "content": question_body(question).strip()}]
 
@@ -415,7 +445,33 @@ def _numbers_with_unit(text: str, unit: str | None) -> list[Decimal]:
     return out
 
 
-def _number_in_quote(dv: Decimal, quote: str, unit: str | None) -> bool:
+def _equiv_numbers(quote: str, unit: str | None) -> list[Decimal]:
+    """引用の数と同じ量だとコードで確かめられる別の値。年→か月・千百の混じり・単位の合う数が 2 つ以上ある時の合計。"""
+    out: list[Decimal] = []
+    if unit == "か月":
+        out += [Decimal(m[1]) * 12 + Decimal(m[2] or 0) for m in _YEARS.finditer(quote)]
+    if unit in _KM_UNITS or unit in _M_UNITS:  # 距離の言い方。「3キロ」は km の枠で 3、m の枠で 3000
+        for aliases_, scale in ((_KM_UNITS, Decimal(1) if unit in _KM_UNITS else Decimal(1000)),
+                                (_M_UNITS, Decimal("0.001") if unit in _KM_UNITS else Decimal(1))):
+            for m in _NUM.finditer(quote):
+                if any(quote[m.end():].lstrip().startswith(a) for a in aliases_):
+                    out.append(Decimal(m.group().replace(",", "")) * scale)
+    out += [Decimal(m[1]) * 10 ** 7 for m in _SENN_MAN.finditer(quote)] + [Decimal(m[1]) * 10 ** 8 for m in _OKU.finditer(quote)]
+    aliases = UNIT_ALIASES.get(unit or "", (unit,)) if unit else ()
+    mixed = [(m, Decimal(m[1]) * 1000 + Decimal(m[2]) * 100) for m in _SENN_HYAKU.finditer(quote)]
+    out += [v for m, v in mixed if not aliases or any(quote[m.end():].lstrip().startswith(a) for a in aliases)]
+    same = _numbers_with_unit(quote, unit) if unit else []
+    if len(same) >= 2:
+        out.append(sum(same, Decimal(0)))
+    return out
+
+
+def _number_in_quote(dv: Decimal, quote: str, unit: str | None, *, equiv: bool = False,
+                     same_units: Sequence[str] = ()) -> bool:
+    if equiv and dv in _equiv_numbers(quote, unit):
+        return True
+    if equiv and any(dv == Decimal(m[1]) for u in same_units for m in re.finditer(rf"(\d+)\s*{re.escape(u)}", quote)):
+        return True
     cands = _numbers_with_unit(quote, unit)
     if unit == "時間":  # 6時間10分 = 6.1666… に対して 6.17 を通す（±0.01）
         return any(abs(dv - c) <= Decimal("0.01") for c in cands if c != c.to_integral_value()) or dv in cands
@@ -531,11 +587,14 @@ def _unused_slots(card: Card, values: Mapping[str, Any]) -> set[str]:
     return {n for n in card.slots if n not in used and n not in card.derive}
 
 
-def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, Any], list[str]]:
+def validate_extraction(card: Card, question: str, raw: Any, *, verify: str = "strict",
+                        problem_as_unknown: bool = False) -> tuple[dict[str, Any], list[str]]:
     """抽出の結果を確かめ、(値, 問題の一覧) を返す。問題が 1 つでもあれば保留にする。
 
     値は 数=Decimal・日付=date・bool=「あり」/「なし」・不明=None。
     判定に使わない枠の問題だけは保留の理由にしない（検査に通らない値は使わず、不明として扱う）。
+    verify="equiv" は同じ量の別の言い方も照合で通す。problem_as_unknown は問題のある枠を不明にして残りの枠で判定に進む
+    （結論に効かない枠の読み落としで保留にしない。結論に効けば decide が保留にする）。どちらも既定は今の動き。
     """
     problems: list[str] = []
     values: dict[str, Any] = {}
@@ -559,6 +618,9 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
         if nq not in body:
             problems.append(f"{name}: quote is not in the question")
             continue
+        if verify == "equiv" and s.type in ("number", "date", "time") and _HEDGE.search(nq):
+            problems.append(f"{name}: the quote gives no exact value")
+            continue
         if s.type == "number":
             if isinstance(v, bool) or not isinstance(v, (int, float)):
                 problems.append(f"{name}: value is not a number")
@@ -570,7 +632,7 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
             if dv == 0 and _zero_in_quote(nq):  # 「ない」「ありません」など。0 という数字は引用に無くてよい
                 values[name] = dv
                 continue
-            if not _number_in_quote(dv, nq, s.unit):
+            if not _number_in_quote(dv, nq, s.unit, equiv=verify == "equiv", same_units=s.same_units):
                 problems.append(f"{name}: value {dv} is not the number in its quote")
                 continue
             values[name] = dv
@@ -579,6 +641,11 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
                 dd = date.fromisoformat(v) if isinstance(v, str) else None
             except ValueError:
                 dd = None
+            if dd is None and verify == "equiv" and isinstance(v, str) and (lm := _LOOSE_MD.match(v.strip())):
+                mo, da = int(lm[1] or lm[3]), int(lm[2] or lm[4])  # 年の無い問でモデルが YYYY-07-01 や 7月1日 と返す
+                if (mo, da) in _month_days(nq):
+                    yearless.append((name, mo, da))
+                    continue
             if dd is not None and dd in _dates(nq):
                 values[name] = dd
             elif dd is not None and (dd.month, dd.day) in _month_days(nq):
@@ -623,6 +690,10 @@ def validate_extraction(card: Card, question: str, raw: Any) -> tuple[dict[str, 
     problems = [p for p in problems if p.split(":", 1)[0] not in unused]
     for name in unused:
         values.setdefault(name, None)
+    if problem_as_unknown:
+        for p in problems:
+            values[p.split(":", 1)[0]] = None
+        problems = []
     return values, problems
 
 
@@ -705,6 +776,26 @@ def _eval(e: Any, values: Mapping[str, Any]) -> Any:
             raise CardError("add_months needs a date and a whole number of months")
         y, m = divmod(d.month - 1 + int(k), 12)
         return date(d.year + y, m + 1, min(d.day, _last_day(d.year + y, m + 1)))
+    if fn == "in_md_range":  # 毎年の期間の中か。終わりが始めより前なら年をまたぐ
+        d, m1, d1, m2, d2 = xs
+        if type(d) is not date or not all(type(x) is Decimal for x in (m1, d1, m2, d2)):
+            raise CardError("in_md_range needs a date and numbers")
+        x, a, b = (d.month, d.day), (int(m1), int(d1)), (int(m2), int(d2))
+        return "あり" if (a <= x <= b if a <= b else x >= a or x <= b) else "なし"
+    if fn == "months_between":  # 満の月数（1 か月未満は切り捨て）。始めより前なら負
+        a, b = xs
+        if type(a) is not date or type(b) is not date:
+            raise CardError("months_between needs two dates")
+        n = (b.year - a.year) * 12 + b.month - a.month
+        anniversary = date(a.year + (a.month - 1 + n) // 12, (a.month - 1 + n) % 12 + 1,
+                           min(a.day, _last_day(a.year + (a.month - 1 + n) // 12, (a.month - 1 + n) % 12 + 1)))
+        return Decimal(n - 1 if anniversary > b else n)
+    if fn == "year_start":  # 日付以前で最も近いその月日（4 月 1 日なら年度の始め）
+        d, mo, da = xs
+        if type(d) is not date or type(mo) is not Decimal or type(da) is not Decimal:
+            raise CardError("year_start needs a date and numbers")
+        s = date(d.year, int(mo), int(da))
+        return s if s <= d else date(d.year - 1, int(mo), int(da))
     if fn == "minutes_between":
         _need(fn, xs, Clock)
         a, b = xs
@@ -731,12 +822,34 @@ def _kleene(results: Sequence[bool | None], combine: str) -> bool | None:
     return False if all(r is False for r in results) else None
 
 
-def _eval_cond(c: Mapping[str, Any], vals: Mapping[str, Any]) -> bool | None:
-    """条件 1 つの 3 値（True 成立 / False 不成立 / None 不明）。入れ子は Kleene の all / any。"""
+def _says_unknown(body: str) -> bool:
+    return any(w in body for w in UNKNOWN_WORDS)
+
+
+def _mentioned(c: Mapping[str, Any], body: str) -> bool:
+    return _says_unknown(body) or any(_norm(w) in body for w in c.get("mention", ()))
+
+
+def _absent_values(card: Card, values: Mapping[str, Any], body: str) -> dict[str, Any]:
+    """読めなかったあり/なしの枠のうち、話題が質問に無い物の既定の値。"""
+    if _says_unknown(body):
+        return {}
+    return {n: s.absent for n, s in card.slots.items()
+            if s.absent is not None and values.get(n) is None and not any(_norm(w) in body for w in s.mention)}
+
+
+def _eval_cond(c: Mapping[str, Any], vals: Mapping[str, Any], body: str | None = None) -> bool | None:
+    """条件 1 つの 3 値（True 成立 / False 不成立 / None 不明）。入れ子は Kleene の all / any。
+    body（質問の文）を渡した時は、不明でも mention の語が質問に 1 つも無い条件は unless_mentioned の値にする。"""
     for k in ("all", "any"):
         if k in c:
-            return _kleene([_eval_cond(child, vals) for child in c[k]], k)
-    return _compare(_eval(c["left"], vals), c["op"], _eval(c["right"], vals))
+            r = _kleene([_eval_cond(child, vals, body) for child in c[k]], k)
+            break
+    else:
+        r = _compare(_eval(c["left"], vals), c["op"], _eval(c["right"], vals))
+    if r is None and body is not None and "unless_mentioned" in c and not _mentioned(c, body):
+        return c["unless_mentioned"]
+    return r
 
 
 @dataclass
@@ -756,8 +869,48 @@ class CardDecision:
     pass_stats: list[dict[str, Any]] = field(default_factory=list)
 
 
-def decide(card: Card, values: Mapping[str, Any]) -> CardDecision:
+def _defaulted_names(card: Card, body: str) -> set[str]:
+    """既定の値で済ませる条件（話題が質問に無い）だけが使う枠。全部の値を試す対象から外す。"""
+    names: set[str] = set()
+
+    def walk(c: Mapping[str, Any]) -> None:
+        if "unless_mentioned" in c and not _mentioned(c, body):
+            names.update(_cond_names(c, card.slots))
+            return
+        for k in ("all", "any"):
+            for child in c.get(k, ()):
+                walk(child)
+
+    for c in (*card.conditions, *card.exceptions):
+        walk(c)
+    return names
+
+
+def decide_v2(card: Card, values: Mapping[str, Any], question: str) -> CardDecision:
+    """話題が質問に無い条件を既定の値にして判定し、なお決まらなければ不明のあり/なしの枠に両方の値を入れて試す。
+    全部の組で結論が同じ時だけ決める（書いていない事実で結論が割れれば保留）。"""
+    body = _norm(question_body(question))
+    base = decide(card, values, body=body)
+    if base.conclusion is not None:
+        return base
+    used = {n for c in (*card.constraints, *card.conditions, *card.exceptions) for n in _cond_names(c, card.slots)}
+    for e in card.derive.values():
+        used |= _names(e, card.slots)
+    skip = _defaulted_names(card, body) | set(_absent_values(card, values, body))
+    unknown = [n for n, s in card.slots.items() if s.type == "bool" and values.get(n) is None and n in used and n not in skip]
+    if not unknown or len(unknown) > MAX_ENUMERATED_BOOLS:
+        return base
+    got = {decide(card, {**values, **dict(zip(unknown, combo))}, body=body).conclusion
+           for combo in itertools.product(BOOL_VALUES, repeat=len(unknown))}
+    if len(got) == 1 and None not in got:
+        return CardDecision(card.id, got.pop(), None, dict(values), base.conditions)
+    return base
+
+
+def decide(card: Card, values: Mapping[str, Any], *, body: str | None = None) -> CardDecision:
     vals = dict(values)
+    if body is not None:
+        vals.update(_absent_values(card, values, body))
     for name, e in card.derive.items():
         if vals.get(name) is None:
             try:
@@ -775,7 +928,7 @@ def decide(card: Card, values: Mapping[str, Any]) -> CardDecision:
         first_unknown: str | None = None
         fired: Mapping[str, Any] | None = None
         for x in card.exceptions:
-            r = _eval_cond(x, vals)
+            r = _eval_cond(x, vals, body)
             if r is True:
                 possible.append(x["conclusion"])
                 fired = x
@@ -785,7 +938,7 @@ def decide(card: Card, values: Mapping[str, Any]) -> CardDecision:
                 first_unknown = first_unknown or x["name"]
         results: list[tuple[str, bool | None]] = []
         if fired is None:
-            results = [(c["name"], _eval_cond(c, vals)) for c in card.conditions]
+            results = [(c["name"], _eval_cond(c, vals, body)) for c in card.conditions]
             combined = _kleene([r for _, r in results], card.combine)
             possible += list(card.conclusions) if combined is None else [card.conclusions[0] if combined else card.conclusions[1]]
     except (CardError, ArithmeticError, ValueError) as ex:
@@ -866,6 +1019,9 @@ class OpenAICompatExtractor:
         return json.loads(msg.content or "null")
 
 
+# 検査と判定の新しい組（同じ量の照合・問題の枠は不明・話題の無い条件は既定・あり/なしは両方試す）。実験の間は環境変数で選ぶ
+V2 = os.environ.get("RULE_CARDS_V2") == "true"
+MAX_ENUMERATED_BOOLS = 4
 CONFIRM_PASSES = 2  # 1 回目で結論が決まった時、枠の順を逆にした別の呼び出しで読み直す回数（1 なら確認しない）
 HOLD_MISMATCH = "2 回の読みが一致しない"
 
@@ -878,10 +1034,11 @@ async def _read_once(card: Card, question: str, extractor: Extractor, *, reverse
     except Exception as e:  # noqa: BLE001  抽出の失敗はすべて保留
         return CardDecision(card.id, None, f"抽出に失敗した（{type(e).__name__}）"), dict(getattr(extractor, "last_stats", {}) or {})
     stats = dict(getattr(extractor, "last_stats", {}) or {})
-    values, problems = validate_extraction(card, question, raw)
+    values, problems = (validate_extraction(card, question, raw, verify="equiv", problem_as_unknown=True) if V2
+                        else validate_extraction(card, question, raw))
     if problems:
         return CardDecision(card.id, None, "抽出の検査に通らない: " + "; ".join(problems[:3]), values, raw=raw), stats
-    d = decide(card, values)
+    d = decide_v2(card, values, question) if V2 else decide(card, values)
     d.raw = raw
     return d, stats
 

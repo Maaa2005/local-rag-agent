@@ -368,7 +368,7 @@ def cmd_run(a: argparse.Namespace) -> int:
                 s2.log(rec["stopped"])
                 code = 3
                 return code
-            s5.wait_gpu_released(s2.read_mib, baseline)
+            s5.wait_gpu_released(s2.read_mib, baseline, tol_mib=a.gpu_tol_mib)
             t0 = time.time()
             log_path = out / f"llama_{k}.log"
             srv, _gpu = na.start_server(na.DIRECT_CTX, log_path)
@@ -438,6 +438,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     r.add_argument("--runs", type=int, default=2)
     r.add_argument("--dev", action="store_true", help="開発用の問。封の照合と draft の禁止を外す")
     r.add_argument("--sealed-dir", help="封の本体のフォルダ (--dev でない時に要る)")
+    r.add_argument("--gpu-tol-mib", type=int, default=1024, help="各回の前に GPU がここまで戻るのを待つ幅。残ったサーバーは 4GB を超えるので 1GB でも見分けられる。他のアプリの増減で止まらないよう広げた")
     r.add_argument("--min-available-mib", type=int, default=4096, help="各回の前に要る本体のメモリの空き。足りなければ流さない")
     s = sub.add_parser("summary")
     s.add_argument("--out", required=True)

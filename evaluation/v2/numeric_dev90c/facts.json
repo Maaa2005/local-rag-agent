@@ -1,0 +1,1157 @@
+{
+ "Z032": {
+  "facts": {
+   "leave": 1349,
+   "fare": 8400,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z049": {
+  "facts": {
+   "leave": 1349,
+   "fare": 8400,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z083": {
+  "facts": {
+   "leave": 1350,
+   "fare": 12000,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z069": {
+  "facts": {
+   "leave": 1350,
+   "fare": 12000,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z063": {
+  "facts": {
+   "leave": 1390,
+   "fare": 9500,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z060": {
+  "facts": {
+   "leave": 1280,
+   "fare": 6200,
+   "approved": true,
+   "pregnant": true
+  },
+  "skip_text_check": []
+ },
+ "Z064": {
+  "facts": {
+   "leave": 1280,
+   "fare": 6200,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z023": {
+  "facts": {
+   "leave": 1410,
+   "fare": 7000,
+   "approved": false,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z043": {
+  "facts": {
+   "leave": 1445,
+   "fare": 16800,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z050": {
+  "facts": {
+   "leave": 1385,
+   "fare": 9800,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": []
+ },
+ "Z017": {
+  "facts": {
+   "leave": 1335,
+   "fare": 7500,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": [
+   "leave"
+  ]
+ },
+ "Z056": {
+  "facts": {
+   "leave": 1420,
+   "fare": 13000,
+   "approved": true,
+   "pregnant": {
+    "any": [
+     true,
+     false
+    ]
+   }
+  },
+  "skip_text_check": []
+ },
+ "Z025": {
+  "facts": {
+   "leave": {
+    "any": [
+     1320,
+     1380
+    ]
+   },
+   "fare": 8000,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": [
+   "leave"
+  ]
+ },
+ "Z020": {
+  "facts": {
+   "leave": 1305,
+   "fare": 6000,
+   "approved": true,
+   "pregnant": {
+    "any": [
+     true,
+     false
+    ]
+   }
+  },
+  "skip_text_check": []
+ },
+ "Z048": {
+  "facts": {
+   "leave": {
+    "any": [
+     1340,
+     1350,
+     1360
+    ]
+   },
+   "fare": 9000,
+   "approved": true,
+   "pregnant": false
+  },
+  "skip_text_check": [
+   "leave"
+  ]
+ },
+ "Z074": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     45000
+    ]
+   ],
+   "fee": 14800,
+   "pass_date": "2026-08-01",
+   "apply_date": "2026-08-20",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z039": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     45000
+    ]
+   ],
+   "fee": 15000,
+   "pass_date": "2026-09-01",
+   "apply_date": "2026-09-15",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z030": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     45000
+    ]
+   ],
+   "fee": 15000,
+   "pass_date": "2026-09-01",
+   "apply_date": "2026-09-15",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z053": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     45000
+    ]
+   ],
+   "fee": 16000,
+   "pass_date": "2026-10-01",
+   "apply_date": "2026-10-10",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z090": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     45000
+    ]
+   ],
+   "fee": 16000,
+   "pass_date": "2026-10-01",
+   "apply_date": "2026-10-10",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z059": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     55000
+    ]
+   ],
+   "fee": 9300,
+   "pass_date": "2026-07-01",
+   "apply_date": "2026-07-20",
+   "regular": true,
+   "required": true
+  },
+  "skip_text_check": []
+ },
+ "Z067": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     55000
+    ]
+   ],
+   "fee": 10900,
+   "pass_date": "2026-07-01",
+   "apply_date": "2026-07-20",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z072": {
+  "facts": {
+   "prior": [],
+   "fee": 8000,
+   "pass_date": "2026-06-01",
+   "apply_date": "2026-06-10",
+   "regular": false,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z008": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     20000
+    ]
+   ],
+   "fee": 7000,
+   "pass_date": "2026-05-10",
+   "apply_date": "2026-08-20",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z066": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     20000
+    ]
+   ],
+   "fee": 8000,
+   "pass_date": "2026-11-02",
+   "apply_date": "2026-11-05",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z016": {
+  "facts": {
+   "prior": [
+    [
+     "2026-03-10",
+     30000
+    ],
+    [
+     "2026-05-20",
+     40000
+    ]
+   ],
+   "fee": 15000,
+   "pass_date": "2026-07-10",
+   "apply_date": "2026-07-25",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z033": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     60000
+    ]
+   ],
+   "fee": 10000,
+   "pass_date": "2026-09-10",
+   "apply_date": {
+    "any": [
+     "2026-09-20",
+     "2026-12-20"
+    ]
+   },
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": []
+ },
+ "Z081": {
+  "facts": {
+   "prior": {
+    "any": [
+     [],
+     [
+      [
+       "2026-05-10",
+       50000
+      ]
+     ]
+    ]
+   },
+   "fee": 20000,
+   "pass_date": "2026-09-01",
+   "apply_date": "2026-09-10",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": [
+   "prior"
+  ]
+ },
+ "Z038": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     55000
+    ]
+   ],
+   "fee": 10000,
+   "pass_date": "2026-06-15",
+   "apply_date": "2026-06-25",
+   "regular": true,
+   "required": {
+    "any": [
+     true,
+     false
+    ]
+   }
+  },
+  "skip_text_check": []
+ },
+ "Z071": {
+  "facts": {
+   "prior": [
+    [
+     "2026-05-10",
+     45000
+    ]
+   ],
+   "fee": {
+    "any": [
+     10000,
+     15000,
+     20000
+    ]
+   },
+   "pass_date": "2026-10-20",
+   "apply_date": "2026-10-30",
+   "regular": true,
+   "required": false
+  },
+  "skip_text_check": [
+   "fee"
+  ]
+ },
+ "Z089": {
+  "facts": {
+   "checkin": "2026-09-01",
+   "nights": 3,
+   "apply": "2026-08-01",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": []
+ },
+ "Z009": {
+  "facts": {
+   "checkin": "2026-10-10",
+   "nights": 4,
+   "apply": "2026-09-25",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": []
+ },
+ "Z055": {
+  "facts": {
+   "checkin": "2026-10-10",
+   "nights": 4,
+   "apply": "2026-09-25",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": [
+   "nights"
+  ]
+ },
+ "Z073": {
+  "facts": {
+   "checkin": "2026-11-03",
+   "nights": 5,
+   "apply": "2026-10-01",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": []
+ },
+ "Z003": {
+  "facts": {
+   "checkin": "2026-11-03",
+   "nights": 5,
+   "apply": "2026-10-01",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": []
+ },
+ "Z041": {
+  "facts": {
+   "checkin": "2026-08-10",
+   "nights": 4,
+   "apply": "2026-06-20",
+   "accompany": true,
+   "award": "2026-04-01"
+  },
+  "skip_text_check": []
+ },
+ "Z079": {
+  "facts": {
+   "checkin": "2026-08-10",
+   "nights": 4,
+   "apply": "2026-06-20",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": []
+ },
+ "Z021": {
+  "facts": {
+   "checkin": "2026-10-05",
+   "nights": 2,
+   "apply": "2026-09-01",
+   "accompany": false,
+   "award": null
+  },
+  "skip_text_check": []
+ },
+ "Z061": {
+  "facts": {
+   "checkin": "2026-10-20",
+   "nights": 3,
+   "apply": "2026-10-15",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": []
+ },
+ "Z029": {
+  "facts": {
+   "checkin": "2026-09-08",
+   "nights": 2,
+   "apply": "2026-08-01",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": []
+ },
+ "Z014": {
+  "facts": {
+   "checkin": "2026-12-27",
+   "nights": 4,
+   "apply": "2026-12-01",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": [
+   "nights"
+  ]
+ },
+ "Z082": {
+  "facts": {
+   "checkin": "2026-12-30",
+   "nights": 5,
+   "apply": "2026-11-01",
+   "accompany": true,
+   "award": {
+    "any": [
+     null,
+     "2026-04-01"
+    ]
+   }
+  },
+  "skip_text_check": []
+ },
+ "Z026": {
+  "facts": {
+   "checkin": "2026-08-05",
+   "nights": {
+    "any": [
+     2,
+     3
+    ]
+   },
+   "apply": "2026-06-01",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": [
+   "nights"
+  ]
+ },
+ "Z088": {
+  "facts": {
+   "checkin": "2026-08-15",
+   "nights": 3,
+   "apply": "2026-07-01",
+   "accompany": true,
+   "award": {
+    "any": [
+     null,
+     "2026-04-01"
+    ]
+   }
+  },
+  "skip_text_check": []
+ },
+ "Z019": {
+  "facts": {
+   "checkin": {
+    "any": [
+     "2026-12-26",
+     "2026-12-27",
+     "2026-12-28",
+     "2026-12-29"
+    ]
+   },
+   "nights": 3,
+   "apply": "2026-11-10",
+   "accompany": true,
+   "award": null
+  },
+  "skip_text_check": [
+   "checkin"
+  ]
+ },
+ "Z037": {
+  "facts": {
+   "dist_m": 1950,
+   "coverage_man": 5000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z006": {
+  "facts": {
+   "dist_m": 1950,
+   "coverage_man": 5000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z054": {
+  "facts": {
+   "dist_m": 2000,
+   "coverage_man": 10000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z011": {
+  "facts": {
+   "dist_m": 2000,
+   "coverage_man": 10000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z058": {
+  "facts": {
+   "dist_m": 3400,
+   "coverage_man": 3000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z047": {
+  "facts": {
+   "dist_m": 900,
+   "coverage_man": 5000,
+   "probation_done": true,
+   "handicap": true
+  },
+  "skip_text_check": []
+ },
+ "Z077": {
+  "facts": {
+   "dist_m": 900,
+   "coverage_man": 5000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z076": {
+  "facts": {
+   "dist_m": 5000,
+   "coverage_man": 10000,
+   "probation_done": false,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z027": {
+  "facts": {
+   "dist_m": 3000,
+   "coverage_man": 2000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z046": {
+  "facts": {
+   "dist_m": 4200,
+   "coverage_man": 10000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": []
+ },
+ "Z024": {
+  "facts": {
+   "dist_m": 1850,
+   "coverage_man": 5000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": [
+   "dist_m"
+  ]
+ },
+ "Z057": {
+  "facts": {
+   "dist_m": 3000,
+   "coverage_man": 5000,
+   "probation_done": true,
+   "handicap": {
+    "any": [
+     true,
+     false
+    ]
+   }
+  },
+  "skip_text_check": []
+ },
+ "Z005": {
+  "facts": {
+   "dist_m": {
+    "any": [
+     1000,
+     3000
+    ]
+   },
+   "coverage_man": 10000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": [
+   "dist_m"
+  ]
+ },
+ "Z013": {
+  "facts": {
+   "dist_m": 1200,
+   "coverage_man": 10000,
+   "probation_done": true,
+   "handicap": {
+    "any": [
+     true,
+     false
+    ]
+   }
+  },
+  "skip_text_check": []
+ },
+ "Z045": {
+  "facts": {
+   "dist_m": {
+    "any": [
+     1800,
+     2000,
+     2200
+    ]
+   },
+   "coverage_man": 5000,
+   "probation_done": true,
+   "handicap": false
+  },
+  "skip_text_check": [
+   "dist_m"
+  ]
+ },
+ "Z078": {
+  "facts": {
+   "minutes": 85,
+   "members": 6,
+   "cost": 10000,
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z034": {
+  "facts": {
+   "minutes": 85,
+   "members": 6,
+   "cost": 10000,
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z051": {
+  "facts": {
+   "minutes": 90,
+   "members": 7,
+   "cost": 12000,
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z062": {
+  "facts": {
+   "minutes": 90,
+   "members": 7,
+   "cost": 12000,
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z068": {
+  "facts": {
+   "minutes": 120,
+   "members": 5,
+   "cost": 8000,
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z010": {
+  "facts": {
+   "minutes": 100,
+   "members": 3,
+   "cost": 8000,
+   "month": 4,
+   "welcome": true,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z070": {
+  "facts": {
+   "minutes": 100,
+   "members": 3,
+   "cost": 8000,
+   "month": 5,
+   "welcome": true,
+   "registered": true
+  },
+  "skip_text_check": [
+   "month"
+  ]
+ },
+ "Z065": {
+  "facts": {
+   "minutes": 120,
+   "members": 8,
+   "cost": 20000,
+   "month": 6,
+   "welcome": false,
+   "registered": false
+  },
+  "skip_text_check": []
+ },
+ "Z086": {
+  "facts": {
+   "minutes": 120,
+   "members": 4,
+   "cost": 20000,
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z085": {
+  "facts": {
+   "minutes": 150,
+   "members": 9,
+   "cost": 30000,
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z044": {
+  "facts": {
+   "minutes": 120,
+   "members": 6,
+   "cost": 5000,
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": []
+ },
+ "Z075": {
+  "facts": {
+   "minutes": 120,
+   "members": 8,
+   "cost": 20000,
+   "month": 4,
+   "welcome": {
+    "any": [
+     true,
+     false
+    ]
+   },
+   "registered": true
+  },
+  "skip_text_check": [
+   "month"
+  ]
+ },
+ "Z040": {
+  "facts": {
+   "minutes": 120,
+   "members": 6,
+   "cost": {
+    "any": [
+     2000,
+     20000
+    ]
+   },
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": [
+   "cost"
+  ]
+ },
+ "Z022": {
+  "facts": {
+   "minutes": 120,
+   "members": 3,
+   "cost": 8000,
+   "month": 4,
+   "welcome": {
+    "any": [
+     true,
+     false
+    ]
+   },
+   "registered": true
+  },
+  "skip_text_check": [
+   "month"
+  ]
+ },
+ "Z087": {
+  "facts": {
+   "minutes": 120,
+   "members": 8,
+   "cost": {
+    "any": [
+     5000,
+     6000,
+     7000
+    ]
+   },
+   "month": 6,
+   "welcome": false,
+   "registered": true
+  },
+  "skip_text_check": [
+   "cost"
+  ]
+ },
+ "Z035": {
+  "facts": {
+   "hire": "2016-04-02",
+   "start": "2026-05-20",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z028": {
+  "facts": {
+   "hire": "2016-04-02",
+   "start": "2026-05-20",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z015": {
+  "facts": {
+   "hire": "2016-04-01",
+   "start": "2026-06-01",
+   "days_before": 20,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z004": {
+  "facts": {
+   "hire": "2016-04-01",
+   "start": "2026-06-01",
+   "days_before": 20,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z002": {
+  "facts": {
+   "hire": "2014-10-01",
+   "start": "2026-07-06",
+   "days_before": 14,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z036": {
+  "facts": {
+   "hire": "2019-04-01",
+   "start": "2026-09-01",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": 60
+  },
+  "skip_text_check": [
+   "transfer_months"
+  ]
+ },
+ "Z052": {
+  "facts": {
+   "hire": "2019-04-01",
+   "start": "2026-09-01",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z042": {
+  "facts": {
+   "hire": "2012-04-01",
+   "start": "2026-08-03",
+   "days_before": 30,
+   "regular": false,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z080": {
+  "facts": {
+   "hire": "2013-04-01",
+   "start": "2026-10-05",
+   "days_before": 10,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z001": {
+  "facts": {
+   "hire": "2012-07-01",
+   "start": "2026-08-17",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z031": {
+  "facts": {
+   "hire": "2016-01-10",
+   "start": "2026-03-20",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": []
+ },
+ "Z018": {
+  "facts": {
+   "hire": {
+    "any": [
+     "2010-01-15",
+     "2010-02-15",
+     "2010-03-15",
+     "2010-04-15",
+     "2010-05-15",
+     "2010-06-15",
+     "2010-07-15",
+     "2010-08-15",
+     "2010-09-15",
+     "2010-10-15",
+     "2010-11-15",
+     "2010-12-15"
+    ]
+   },
+   "start": "2026-11-16",
+   "days_before": 20,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": [
+   "hire"
+  ]
+ },
+ "Z012": {
+  "facts": {
+   "hire": {
+    "any": [
+     "2005-04-01",
+     "2024-04-01"
+    ]
+   },
+   "start": "2026-08-03",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": [
+   "hire"
+  ]
+ },
+ "Z007": {
+  "facts": {
+   "hire": "2019-04-01",
+   "start": "2026-09-07",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": {
+    "any": [
+     0,
+     48
+    ]
+   }
+  },
+  "skip_text_check": [
+   "transfer_months"
+  ]
+ },
+ "Z084": {
+  "facts": {
+   "hire": {
+    "any": [
+     "2016-03-01",
+     "2016-04-01",
+     "2016-05-01"
+    ]
+   },
+   "start": "2026-06-15",
+   "days_before": 30,
+   "regular": true,
+   "transfer_months": 0
+  },
+  "skip_text_check": [
+   "hire"
+  ]
+ }
+}

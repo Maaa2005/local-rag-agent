@@ -1,0 +1,42 @@
+{
+  "format": "numeric-sealed-run@1",
+  "dev": true,
+  "runs": 2,
+  "n": 90,
+  "set_sha256": "1bd00ce56bd799b6a8a38eb08a62564d786e193402a6e1cdab92430bbb967a82",
+  "freeze_sha256": "6e0f57045e408ff87e0bdd38cf8e00645a3952a93083b6fe67fa1b83345eb832",
+  "unable_rules": [],
+  "ctx": 4096,
+  "server_extra": [
+    "--cache-ram",
+    "1024"
+  ],
+  "conditions": {
+    "conclusion_options_given_first": true,
+    "retrieval": false,
+    "no_card_goes_to_model": false
+  },
+  "baseline_mib": 11794,
+  "rounds": {
+    "1": {
+      "available_before_mib": 4190,
+      "launch_seconds": 310.2,
+      "eval_seconds": 1089.5,
+      "oom_lines": 0,
+      "overflow_lines": 0,
+      "peak_gpu_mib": 12029
+    },
+    "2": {
+      "available_before_mib": 4458,
+      "launch_seconds": 18.5,
+      "eval_seconds": 1052.7,
+      "oom_lines": 0,
+      "overflow_lines": 0,
+      "peak_gpu_mib": 11928
+    }
+  },
+  "min_available_mib": 8,
+  "peak_rss_mib": {
+    "llama": 6335
+  }
+}
