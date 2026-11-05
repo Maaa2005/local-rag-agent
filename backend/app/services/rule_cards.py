@@ -29,6 +29,8 @@
 from __future__ import annotations
 
 import json
+import itertools
+import os
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -168,7 +170,12 @@ def _check_cond(card_id: str, c: Any, slots: Mapping[str, Slot], extra: Sequence
         raise CardError(f"{card_id}: condition needs name: {c!r}")
     if "quote" in c and not (isinstance(c["quote"], str) and c["quote"].strip()):
         raise CardError(f"{card_id}: condition quote must be a non-empty string: {c!r}")
-    keys = {"name", "quote", *extra}
+    keys = {"name", "quote", "unless_mentioned", "mention", *extra}
+    if ("unless_mentioned" in c) != ("mention" in c):
+        raise CardError(f"{card_id}: unless_mentioned and mention go together: {c!r}")
+    if "mention" in c and (not isinstance(c["unless_mentioned"], bool) or not isinstance(c["mention"], list) or not c["mention"]
+                           or not all(isinstance(w, str) and w.strip() for w in c["mention"])):
+        raise CardError(f"{card_id}: unless_mentioned must be a bool and mention a non-empty list of words: {c!r}")
     group = [k for k in ("all", "any") if k in c]
     if group:
         if len(group) != 1 or set(c) - {*keys, group[0]} or not isinstance(c[group[0]], list) or not c[group[0]]:
@@ -757,12 +764,22 @@ def _kleene(results: Sequence[bool | None], combine: str) -> bool | None:
     return False if all(r is False for r in results) else None
 
 
-def _eval_cond(c: Mapping[str, Any], vals: Mapping[str, Any]) -> bool | None:
-    """条件 1 つの 3 値（True 成立 / False 不成立 / None 不明）。入れ子は Kleene の all / any。"""
+def _mentioned(c: Mapping[str, Any], body: str) -> bool:
+    return any(_norm(w) in body for w in c.get("mention", ()))
+
+
+def _eval_cond(c: Mapping[str, Any], vals: Mapping[str, Any], body: str | None = None) -> bool | None:
+    """条件 1 つの 3 値（True 成立 / False 不成立 / None 不明）。入れ子は Kleene の all / any。
+    body（質問の文）を渡した時は、不明でも mention の語が質問に 1 つも無い条件は unless_mentioned の値にする。"""
     for k in ("all", "any"):
         if k in c:
-            return _kleene([_eval_cond(child, vals) for child in c[k]], k)
-    return _compare(_eval(c["left"], vals), c["op"], _eval(c["right"], vals))
+            r = _kleene([_eval_cond(child, vals, body) for child in c[k]], k)
+            break
+    else:
+        r = _compare(_eval(c["left"], vals), c["op"], _eval(c["right"], vals))
+    if r is None and body is not None and "unless_mentioned" in c and not _mentioned(c, body):
+        return c["unless_mentioned"]
+    return r
 
 
 @dataclass
@@ -782,7 +799,45 @@ class CardDecision:
     pass_stats: list[dict[str, Any]] = field(default_factory=list)
 
 
-def decide(card: Card, values: Mapping[str, Any]) -> CardDecision:
+def _defaulted_names(card: Card, body: str) -> set[str]:
+    """既定の値で済ませる条件（話題が質問に無い）だけが使う枠。全部の値を試す対象から外す。"""
+    names: set[str] = set()
+
+    def walk(c: Mapping[str, Any]) -> None:
+        if "unless_mentioned" in c and not _mentioned(c, body):
+            names.update(_cond_names(c, card.slots))
+            return
+        for k in ("all", "any"):
+            for child in c.get(k, ()):
+                walk(child)
+
+    for c in (*card.conditions, *card.exceptions):
+        walk(c)
+    return names
+
+
+def decide_v2(card: Card, values: Mapping[str, Any], question: str) -> CardDecision:
+    """話題が質問に無い条件を既定の値にして判定し、なお決まらなければ不明のあり/なしの枠に両方の値を入れて試す。
+    全部の組で結論が同じ時だけ決める（書いていない事実で結論が割れれば保留）。"""
+    body = _norm(question_body(question))
+    base = decide(card, values, body=body)
+    if base.conclusion is not None:
+        return base
+    used = {n for c in (*card.constraints, *card.conditions, *card.exceptions) for n in _cond_names(c, card.slots)}
+    for e in card.derive.values():
+        used |= _names(e, card.slots)
+    skip = _defaulted_names(card, body)
+    unknown = [n for n, s in card.slots.items() if s.type == "bool" and values.get(n) is None and n in used and n not in skip]
+    if not unknown or len(unknown) > MAX_ENUMERATED_BOOLS:
+        return base
+    got = {decide(card, {**values, **dict(zip(unknown, combo))}, body=body).conclusion
+           for combo in itertools.product(BOOL_VALUES, repeat=len(unknown))}
+    if len(got) == 1 and None not in got:
+        return CardDecision(card.id, got.pop(), None, dict(values), base.conditions)
+    return base
+
+
+def decide(card: Card, values: Mapping[str, Any], *, body: str | None = None) -> CardDecision:
     vals = dict(values)
     for name, e in card.derive.items():
         if vals.get(name) is None:
@@ -801,7 +856,7 @@ def decide(card: Card, values: Mapping[str, Any]) -> CardDecision:
         first_unknown: str | None = None
         fired: Mapping[str, Any] | None = None
         for x in card.exceptions:
-            r = _eval_cond(x, vals)
+            r = _eval_cond(x, vals, body)
             if r is True:
                 possible.append(x["conclusion"])
                 fired = x
@@ -811,7 +866,7 @@ def decide(card: Card, values: Mapping[str, Any]) -> CardDecision:
                 first_unknown = first_unknown or x["name"]
         results: list[tuple[str, bool | None]] = []
         if fired is None:
-            results = [(c["name"], _eval_cond(c, vals)) for c in card.conditions]
+            results = [(c["name"], _eval_cond(c, vals, body)) for c in card.conditions]
             combined = _kleene([r for _, r in results], card.combine)
             possible += list(card.conclusions) if combined is None else [card.conclusions[0] if combined else card.conclusions[1]]
     except (CardError, ArithmeticError, ValueError) as ex:
@@ -892,6 +947,9 @@ class OpenAICompatExtractor:
         return json.loads(msg.content or "null")
 
 
+# 検査と判定の新しい組（同じ量の照合・問題の枠は不明・話題の無い条件は既定・あり/なしは両方試す）。実験の間は環境変数で選ぶ
+V2 = os.environ.get("RULE_CARDS_V2") == "true"
+MAX_ENUMERATED_BOOLS = 4
 CONFIRM_PASSES = 2  # 1 回目で結論が決まった時、枠の順を逆にした別の呼び出しで読み直す回数（1 なら確認しない）
 HOLD_MISMATCH = "2 回の読みが一致しない"
 
@@ -904,10 +962,11 @@ async def _read_once(card: Card, question: str, extractor: Extractor, *, reverse
     except Exception as e:  # noqa: BLE001  抽出の失敗はすべて保留
         return CardDecision(card.id, None, f"抽出に失敗した（{type(e).__name__}）"), dict(getattr(extractor, "last_stats", {}) or {})
     stats = dict(getattr(extractor, "last_stats", {}) or {})
-    values, problems = validate_extraction(card, question, raw)
+    values, problems = (validate_extraction(card, question, raw, verify="equiv", problem_as_unknown=True) if V2
+                        else validate_extraction(card, question, raw))
     if problems:
         return CardDecision(card.id, None, "抽出の検査に通らない: " + "; ".join(problems[:3]), values, raw=raw), stats
-    d = decide(card, values)
+    d = decide_v2(card, values, question) if V2 else decide(card, values)
     d.raw = raw
     return d, stats
 

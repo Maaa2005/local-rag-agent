@@ -233,7 +233,7 @@ async def _direct_round(dataset: str, cards: list) -> list[QuestionResult]:
             r.total_latency = r.first_token_latency = time.perf_counter() - t
             first = d.pass_stats[0] if d.pass_stats else extractor.last_stats  # last_stats は直前の 1 回（2 回目）の数
             r.rule_card = {"card_id": d.card_id, "conclusion": d.conclusion, "hold_reason": d.hold_reason, "raw": d.raw,
-                           "first_conclusion": d.first_conclusion, "second_conclusion": d.second_conclusion,
+                           "first_conclusion": d.first_conclusion, "second_conclusion": d.second_conclusion, "second_hold_reason": d.second_hold_reason, "second_raw": d.second_raw,
                            **first}
             tokens = [x.get("completion_tokens") for x in (d.pass_stats or [extractor.last_stats])]
             r.completion_tokens = sum(t for t in tokens if t) if any(tokens) else None  # 時間は 2 回分なので 2 回分を足す

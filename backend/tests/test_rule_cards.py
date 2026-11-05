@@ -1150,3 +1150,50 @@ def test_problem_as_unknown_decides_only_when_conclusion_does_not_depend():
     raw["日数"]["quote"] = "額は200円"  # 日数の読みも落ちる → 両方不明で保留
     values, _ = validate_extraction(card, q, raw, problem_as_unknown=True)
     assert decide(card, values).conclusion is None
+
+
+# ---- 話題の無い条件の既定と、あり/なしの全値代入 (decide_v2)
+
+
+def _v2_card():
+    return parse_card({
+        "format": "rule-card@1", "id": "t", "status": "draft", "target": "t",
+        "doc": {"source": "a.md", "quote": "q"}, "match": {"conclusions": ["可", "不可"], "keywords": ["t"]},
+        "slots": {"時間": {"type": "number", "unit": "時間", "describe": "h"},
+                  "短時間勤務か": {"type": "bool", "describe": "s"},
+                  "再婚か": {"type": "bool", "describe": "r"}},
+        "conditions": [{"name": "時間", "any": [
+            {"name": "通常", "left": "時間", "op": ">=", "right": 4},
+            {"name": "短時間", "all": [{"name": "短", "left": "短時間勤務か", "op": "==", "right": "あり"},
+                                    {"name": "3h", "left": "時間", "op": ">=", "right": 3}]}]}],
+        "combine": "all",
+        "exceptions": [{"name": "再婚", "left": "再婚か", "op": "==", "right": "あり", "conclusion": "不可",
+                        "unless_mentioned": False, "mention": ["再婚"]}],
+        "conclusion": {"then": "可", "else": "不可"}})
+
+
+def test_v2_exception_ignored_only_when_topic_is_absent():
+    c = _v2_card()
+    v = {"時間": Decimal(5), "短時間勤務か": None, "再婚か": None}
+    assert rule_cards.decide_v2(c, v, "5時間です。").conclusion == "可"
+    assert rule_cards.decide_v2(c, v, "5時間です。再婚かは分かりません。").conclusion is None
+
+
+def test_v2_enumerates_bool_and_holds_when_split():
+    c = _v2_card()
+    assert rule_cards.decide_v2(c, {"時間": Decimal("2"), "短時間勤務か": None, "再婚か": None}, "2時間").conclusion == "不可"
+    assert rule_cards.decide_v2(c, {"時間": Decimal("3.5"), "短時間勤務か": None, "再婚か": None}, "3.5時間").conclusion is None
+    assert rule_cards.decide_v2(c, {"時間": None, "短時間勤務か": None, "再婚か": None}, "不明").conclusion is None
+
+
+def test_v2_mention_needs_unless_mentioned():
+    d = {"format": "rule-card@1", "id": "t", "status": "draft", "target": "t", "doc": {"source": "a.md", "quote": "q"},
+         "match": {"conclusions": ["可", "不可"], "keywords": ["t"]}, "slots": {"x": {"type": "bool", "describe": "x"}},
+         "conditions": [{"name": "x", "left": "x", "op": "==", "right": "あり", "mention": ["x"]}], "combine": "all",
+         "conclusion": {"then": "可", "else": "不可"}}
+    with pytest.raises(CardError):
+        parse_card(d)
+
+
+def test_v2_off_by_default():
+    assert rule_cards.V2 is False
