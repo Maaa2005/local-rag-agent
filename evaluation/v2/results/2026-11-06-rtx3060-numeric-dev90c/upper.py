@@ -8,7 +8,7 @@ from evaluation.gpu_local import numeric_replay as nr
 from app.services import rule_cards as rc
 base=os.path.expanduser('~/.cache/lr-gpu')
 cards=nr.load_cards(base+'/v2c/cards')
-gold=json.load(open(base+'/gold_c/gold.json',encoding='utf8'))
+gold=json.load(open(base+'/gold_c/'+os.environ.get('GOLD','gold.json')+'',encoding='utf8'))
 inp={x['id']:x for x in json.load(open(base+'/gold_c/input.json',encoding='utf8'))}
 qs=nr.read_jsonl('evaluation/v2/numeric_dev90c/questions.jsonl')
 def conv(c,k,v):
