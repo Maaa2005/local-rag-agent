@@ -13,7 +13,7 @@
 カードの形（JSON・format: rule-card@1）:
   id, status, drafted_by, confirmed_by, doc{source, section, quote}, target,
   match{conclusions: [then, else], keywords: [...]},
-  slots{名前: {type: number|date|time|bool, unit?, describe}}（time の値は "HH:MM"・00:00〜23:59）,
+  slots{名前: {type: number|date|time|bool, unit?, same_units?, describe}}（time の値は "HH:MM"・00:00〜23:59）,
   derive{名前: 式}（拾えなかった項目を他の項目から計算する。例: 出勤日数 = 全労働日数 - 欠勤日数）,
   constraints[{name, left, op, right}]（値の筋が通らなければ保留。例: 出勤日数 <= 全労働日数）,
   conditions[{name, left, op, right[, quote]}], combine: all|any, conclusion{then, else},
@@ -47,7 +47,7 @@ SLOT_TYPES = ("number", "date", "time", "bool")
 BOOL_VALUES = ("あり", "なし")
 # 数え方の語の言い換え（引用の数の直後にあるかを見る）
 UNIT_ALIASES = {"か月": ("か月", "ヶ月", "カ月", "箇月", "ケ月"), "%": ("%", "パーセント")}
-_EXPR_FUNCS = {"add", "sub", "mul", "div", "add_days", "month_day", "date", "time", "min", "max", "month_end",
+_EXPR_FUNCS = {"in_md_range", "add", "sub", "mul", "div", "add_days", "month_day", "date", "time", "min", "max", "month_end",
                "add_months", "minutes_between"}
 _MAX_NEST = 5  # 条件の入れ子の深さの上限
 _OPTIONS = re.compile(r"「結論\s*[:：]\s*(.+?)」")
@@ -84,6 +84,7 @@ class Slot:
     type: str
     unit: str | None
     describe: str
+    same_units: tuple[str, ...] = ()  # 規程の定めで同じ量と言える別の単位（「1 日に 2 回でも 1 回と数える」の日分）
 
 
 @dataclass(frozen=True, order=True)
@@ -153,7 +154,7 @@ def _check_expr(card_id: str, e: Any, slots: Mapping[str, Slot]) -> None:
             return
         if not isinstance(args, list) or not args:
             raise CardError(f"{card_id}: {fn} needs a list of arguments")
-        arity = {"sub": 2, "div": 2, "add_days": 2, "month_day": 3, "add_months": 2, "minutes_between": 2}.get(fn)
+        arity = {"sub": 2, "div": 2, "add_days": 2, "month_day": 3, "add_months": 2, "minutes_between": 2, "in_md_range": 5}.get(fn)
         if arity is not None and len(args) != arity:
             raise CardError(f"{card_id}: {fn} takes {arity} arguments")
         if fn in ("min", "max") and len(args) < 2:
@@ -215,7 +216,7 @@ def parse_card(doc: Mapping[str, Any]) -> Card:
     for name, s in (doc.get("slots") or {}).items():
         if not isinstance(s, dict) or s.get("type") not in SLOT_TYPES or not s.get("describe"):
             raise CardError(f"{cid}: slot {name} needs type ({'/'.join(SLOT_TYPES)}) and describe")
-        slots[name] = Slot(name, s["type"], s.get("unit"), s["describe"])
+        slots[name] = Slot(name, s["type"], s.get("unit"), s["describe"], tuple(s.get("same_units") or ()))
     if not slots:
         raise CardError(f"{cid}: no slots")
     derive = doc.get("derive") or {}
@@ -296,6 +297,8 @@ def conclusion_options(question: str) -> tuple[str, ...]:
 # （開発用 90 問・N 12 問・開発用 24 問。誤選択 0 の範囲で選択数が最大の点のうち、最も厳しい点）。変えたら数え直す
 SELECT_MIN_SCORE = 14  # 1 位の点の下限。語の組に合うカードが 1 枚だけの時も要る
 SELECT_MIN_MARGIN = 8  # 1 位と 2 位の点の差の下限（2 枚以上の時）
+SELECT_MIN_SCORE_V2 = 12  # RULE_CARDS_V2 の時の下限。14 では正しいカードが 9/90 問で選ばれなかった
+SELECT_MIN_MARGIN_V2 = 4  # 同じく差の下限
 SELECT_KEYWORD_WEIGHT = 3  # keywords の文字 2-gram の重み（他は 1）
 _NOT_GRAM = re.compile(r"[\s、。，．,.!?！？「」『』（）()・:：;；/／]")
 
@@ -343,9 +346,10 @@ def select_card(cards: Sequence[Card], question: str) -> Card | None:
     opts = set(conclusion_options(question))
     ranked = sorted(((select_score(c, question), i) for i, c in enumerate(cards) if opts == set(c.conclusions)),
                     key=lambda x: (-x[0], x[1]))
-    if not ranked or ranked[0][0] < SELECT_MIN_SCORE:
+    min_score, min_margin = (SELECT_MIN_SCORE_V2, SELECT_MIN_MARGIN_V2) if V2 else (SELECT_MIN_SCORE, SELECT_MIN_MARGIN)
+    if not ranked or ranked[0][0] < min_score:
         return None
-    if len(ranked) > 1 and ranked[0][0] - ranked[1][0] < SELECT_MIN_MARGIN:
+    if len(ranked) > 1 and ranked[0][0] - ranked[1][0] < min_margin:
         return None
     return cards[ranked[0][1]]
 
@@ -439,8 +443,11 @@ def _equiv_numbers(quote: str, unit: str | None) -> list[Decimal]:
     return out
 
 
-def _number_in_quote(dv: Decimal, quote: str, unit: str | None, *, equiv: bool = False) -> bool:
+def _number_in_quote(dv: Decimal, quote: str, unit: str | None, *, equiv: bool = False,
+                     same_units: Sequence[str] = ()) -> bool:
     if equiv and dv in _equiv_numbers(quote, unit):
+        return True
+    if equiv and any(dv == Decimal(m[1]) for u in same_units for m in re.finditer(rf"(\d+)\s*{re.escape(u)}", quote)):
         return True
     cands = _numbers_with_unit(quote, unit)
     if unit == "時間":  # 6時間10分 = 6.1666… に対して 6.17 を通す（±0.01）
@@ -599,7 +606,7 @@ def validate_extraction(card: Card, question: str, raw: Any, *, verify: str = "s
             if dv == 0 and _zero_in_quote(nq):  # 「ない」「ありません」など。0 という数字は引用に無くてよい
                 values[name] = dv
                 continue
-            if not _number_in_quote(dv, nq, s.unit, equiv=verify == "equiv"):
+            if not _number_in_quote(dv, nq, s.unit, equiv=verify == "equiv", same_units=s.same_units):
                 problems.append(f"{name}: value {dv} is not the number in its quote")
                 continue
             values[name] = dv
@@ -738,6 +745,12 @@ def _eval(e: Any, values: Mapping[str, Any]) -> Any:
             raise CardError("add_months needs a date and a whole number of months")
         y, m = divmod(d.month - 1 + int(k), 12)
         return date(d.year + y, m + 1, min(d.day, _last_day(d.year + y, m + 1)))
+    if fn == "in_md_range":  # 毎年の期間の中か。終わりが始めより前なら年をまたぐ
+        d, m1, d1, m2, d2 = xs
+        if type(d) is not date or not all(type(x) is Decimal for x in (m1, d1, m2, d2)):
+            raise CardError("in_md_range needs a date and numbers")
+        x, a, b = (d.month, d.day), (int(m1), int(d1)), (int(m2), int(d2))
+        return "あり" if (a <= x <= b if a <= b else x >= a or x <= b) else "なし"
     if fn == "minutes_between":
         _need(fn, xs, Clock)
         a, b = xs

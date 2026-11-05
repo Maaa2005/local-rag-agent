@@ -1197,3 +1197,35 @@ def test_v2_mention_needs_unless_mentioned():
 
 def test_v2_off_by_default():
     assert rule_cards.V2 is False
+
+
+def test_in_md_range_handles_year_wrap_and_unknown():
+    e = {"in_md_range": ["d", 12, 1, 1, 10]}
+    for day, want in ((date(2026, 12, 1), "あり"), (date(2027, 1, 10), "あり"), (date(2026, 1, 11), "なし"), (date(2026, 11, 30), "なし")):
+        assert rule_cards._eval(e, {"d": day}) == want
+    assert rule_cards._eval({"in_md_range": ["d", 3, 1, 3, 31]}, {"d": date(2026, 3, 31)}) == "あり"
+    assert rule_cards._eval({"in_md_range": ["d", 3, 1, 3, 31]}, {"d": date(2026, 4, 1)}) == "なし"
+    assert rule_cards._eval(e, {"d": None}) is None
+
+
+def test_same_units_only_when_card_says_so():
+    q = "食堂の利用は5日分"
+    assert not rule_cards._number_in_quote(Decimal(5), q, "回", equiv=True)  # カードに無ければ通さない
+    assert rule_cards._number_in_quote(Decimal(5), q, "回", equiv=True, same_units=("日分",))
+    assert not rule_cards._number_in_quote(Decimal(6), q, "回", equiv=True, same_units=("日分",))
+    assert not rule_cards._number_in_quote(Decimal(5), q, "回", same_units=("日分",))  # 厳密の照合は今のまま
+
+
+def test_select_card_v2_thresholds_are_only_for_v2(monkeypatch):
+    calls = {"a": 23, "b": 19}
+    cards = [SimpleNamespace(id=k, conclusions=("x", "y")) for k in calls]
+    monkeypatch.setattr(rule_cards, "conclusion_options", lambda q: ("x", "y"))
+    monkeypatch.setattr(rule_cards, "select_score", lambda c, q: calls[c.id])
+    monkeypatch.setattr(rule_cards, "V2", False)
+    assert rule_cards.select_card(cards, "q") is None
+    monkeypatch.setattr(rule_cards, "V2", True)
+    assert rule_cards.select_card(cards, "q").id == "a"
+    calls["b"] = 20  # 差 3 は選ばない
+    assert rule_cards.select_card(cards, "q") is None
+    calls.update(a=11, b=0)  # 下限未満は選ばない
+    assert rule_cards.select_card(cards, "q") is None
