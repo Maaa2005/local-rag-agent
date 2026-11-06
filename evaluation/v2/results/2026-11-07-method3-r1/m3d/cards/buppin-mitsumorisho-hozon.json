@@ -1,0 +1,65 @@
+{
+ "format": "rule-card@1",
+ "id": "buppin-mitsumorisho-hozon",
+ "status": "draft",
+ "drafted_by": "claude-fable-5-1",
+ "confirmed_by": null,
+ "doc": {
+  "source": "物品購入相見積規程",
+  "section": "第7条",
+  "quote": "見積書は、発注の日から5年間、発注部門で保存する。"
+ },
+ "target": "見積書の保存期間",
+ "match": {
+  "conclusions": [
+   "保管継続",
+   "廃棄可"
+  ],
+  "keywords": [
+   "見積書",
+   "保存"
+  ]
+ },
+ "slots": {
+  "発注日": {
+   "type": "date",
+   "describe": "見積書に係る発注の日"
+  },
+  "判定日": {
+   "type": "date",
+   "describe": "保存を続けるか判断する日（今日の日付、廃棄しようとする日）"
+  },
+  "発注からの経過年数": {
+   "type": "number",
+   "unit": "年",
+   "describe": "発注の日から判定日までに経過した年数"
+  }
+ },
+ "derive": {
+  "発注からの経過年数": {
+   "div": [
+    {
+     "months_between": [
+      "発注日",
+      "判定日"
+     ]
+    },
+    12
+   ]
+  }
+ },
+ "conditions": [
+  {
+   "name": "発注の日から5年間の中",
+   "left": "発注からの経過年数",
+   "op": "<",
+   "right": 5,
+   "quote": "見積書は、発注の日から5年間、発注部門で保存する。"
+  }
+ ],
+ "combine": "all",
+ "conclusion": {
+  "then": "保管継続",
+  "else": "廃棄可"
+ }
+}
