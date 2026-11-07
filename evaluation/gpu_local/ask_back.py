@@ -38,13 +38,19 @@ SEEDS = 20
 # ---------------------------------------------------------------- 判定と次の枠
 
 
+_memo: dict[tuple[str, str], str | None] = {}
+
+
 def decided(card: rc.Card, cand: dict[str, list[Any] | None]) -> str | None:
-    """結論が 1 つに決まればその語。まず 3 値で見て、決まらなければ値の組を全部試す。"""
+    """結論が 1 つに決まればその語。まず 3 値で見て、決まらなければ値の組を全部試す。同じ入力は覚えておく。"""
+    key = (card.id, repr(sorted((n, c) for n, c in cand.items() if c is not None)))
+    if key in _memo:
+        return _memo[key]
     fixed = {n: (c[0] if c and len(c) == 1 else None) for n, c in cand.items()}
     d = rc.decide(card, fixed)
-    if d.conclusion is not None:
-        return d.conclusion
-    return o.evaluate(card, cand)[0]
+    got = d.conclusion if d.conclusion is not None else o.evaluate(card, cand)[0]
+    _memo[key] = got
+    return got
 
 
 def askable(card: rc.Card) -> list[str]:
@@ -102,8 +108,7 @@ def next_slot(card: rc.Card, cand: dict[str, list[Any] | None], asked: set[str],
         hits = rs = 0
         for p in ps:
             trial = {**cand, n: [p]}
-            fixed = {m: (c[0] if c and len(c) == 1 else None) for m, c in trial.items()}
-            hits += rc.decide(card, fixed).conclusion is not None
+            hits += decided(card, trial) is not None
             rs += _resolved(card, trial)
         k = (hits / len(ps), rs / len(ps))
         if k > key:  # 同点は枠の順
