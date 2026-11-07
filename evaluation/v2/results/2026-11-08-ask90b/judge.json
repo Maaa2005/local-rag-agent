@@ -1,0 +1,5182 @@
+[
+ {
+  "lines": {
+   "1 正しい決定 65/72・各規程 10/12": true,
+   "2 誤った断定 0": true,
+   "3 本人も分からない 18/18": true,
+   "4 流される時の誤りが基準以下": true,
+   "5 やり取り 中央値3・最大6": true,
+   "6 打ち込みが読まない形の半分以下": true,
+   "7 読みの時間 p95 15秒": true
+  },
+  "values": {
+   "correct": 72,
+   "per_rule": {
+    "業務端末持出規程": 12,
+    "予防接種費用補助規程": 12,
+    "語学研修選抜規程": 12,
+    "独身寮入寮規程": 12,
+    "休日出勤振替規程": 12,
+    "海外出張渡航規程": 12
+   },
+   "wrong": 0,
+   "held": 18,
+   "hold_wrong": 0,
+   "pairs": 6,
+   "false_main": 1.6,
+   "false_base": 4.0,
+   "false_diff": {
+    "diff": -2.4,
+    "lo": -5.6,
+    "hi": -0.2
+   },
+   "turns_med": 2.0,
+   "turns_max": 6,
+   "items_mean": 2.07,
+   "typed": 148,
+   "typed_noread": 495,
+   "sec_p95": 8.83,
+   "no_truth": 0
+  },
+  "all": {
+   "基準/正直": {
+    "correct": 27,
+    "wrong": 2,
+    "hold_wrong": 2,
+    "held": 16,
+    "stopped": 43,
+    "turns_med": 0.0,
+    "turns_max": 0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/流される": {
+    "correct": 27.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/省く": {
+    "correct": 27.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/間違える": {
+    "correct": 27.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "聞く/正直": {
+    "correct": 69,
+    "wrong": 3,
+    "hold_wrong": 2,
+    "held": 16,
+    "stopped": 0,
+    "turns_med": 1.0,
+    "turns_max": 6,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/流される": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 6.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/省く": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 6.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/間違える": {
+    "correct": 63.75,
+    "wrong": 8.1,
+    "hold_wrong": 2.65,
+    "held": 15.35,
+    "stopped": 0.15,
+    "turns_med": 1.0,
+    "turns_max": 5.95,
+    "items_mean": 0.0,
+    "typed_mean": 1.29
+   },
+   "本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.07,
+    "typed_mean": 1.64
+   },
+   "本命/流される": {
+    "correct": 71.2,
+    "wrong": 0.8,
+    "hold_wrong": 0.8,
+    "held": 17.2,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.06,
+    "typed_mean": 1.61
+   },
+   "本命/省く": {
+    "correct": 71.0,
+    "wrong": 1.0,
+    "hold_wrong": 1.0,
+    "held": 17.0,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.06,
+    "typed_mean": 1.57
+   },
+   "本命/間違える": {
+    "correct": 64.7,
+    "wrong": 7.05,
+    "hold_wrong": 1.4,
+    "held": 16.6,
+    "stopped": 0.25,
+    "turns_med": 2.0,
+    "turns_max": 6.15,
+    "items_mean": 2.0,
+    "typed_mean": 1.6
+   },
+   "旧本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.24,
+    "typed_mean": 1.57
+   },
+   "旧本命/流される": {
+    "correct": 69.65,
+    "wrong": 2.35,
+    "hold_wrong": 1.55,
+    "held": 16.45,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.19,
+    "typed_mean": 1.43
+   },
+   "旧本命/省く": {
+    "correct": 69.45,
+    "wrong": 2.55,
+    "hold_wrong": 1.75,
+    "held": 16.25,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.19,
+    "typed_mean": 1.39
+   },
+   "旧本命/間違える": {
+    "correct": 64.25,
+    "wrong": 7.6,
+    "hold_wrong": 2.2,
+    "held": 15.8,
+    "stopped": 0.15,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.15,
+    "typed_mean": 1.41
+   },
+   "読まない選ぶ/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/間違える": {
+    "correct": 54.75,
+    "wrong": 16.4,
+    "hold_wrong": 5.6,
+    "held": 12.4,
+    "stopped": 0.85,
+    "turns_med": 4.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 4.52
+   },
+   "読まない順番/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/間違える": {
+    "correct": 54.85,
+    "wrong": 16.3,
+    "hold_wrong": 6.1,
+    "held": 11.9,
+    "stopped": 0.85,
+    "turns_med": 5.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.32
+   }
+  },
+  "by_kind": {
+   "基準/正直": {
+    "complete": {
+     "correct": 19,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 24,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 2,
+     "held": 16,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_hit": {
+     "correct": 0,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 5,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_miss": {
+     "correct": 2,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "irrelevant_gap": {
+     "correct": 5,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 1,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_many": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 18,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_one": {
+     "correct": 1,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 11,
+     "n": 12,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    }
+   },
+   "聞く/正直": {
+    "complete": {
+     "correct": 23,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 0.17,
+     "typed_mean": 0.17
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 2,
+     "held": 16,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.72,
+     "typed_mean": 2.72
+    },
+    "exc_hit": {
+     "correct": 4,
+     "wrong": 2,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.83,
+     "typed_mean": 0.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.17,
+     "typed_mean": 0.17
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.28,
+     "typed_mean": 2.28
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    }
+   },
+   "本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.29,
+     "typed_mean": 0.46
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.33,
+     "typed_mean": 3.33
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.33,
+     "typed_mean": 1.33
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.0,
+     "typed_mean": 2.17
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.17
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.33,
+     "typed_mean": 2.33
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "旧本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.25,
+     "typed_mean": 0.42
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.06,
+     "typed_mean": 3.06
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.67
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.17,
+     "typed_mean": 0.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.28,
+     "typed_mean": 2.28
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "読まない選ぶ/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.67,
+     "typed_mean": 4.67
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.67,
+     "typed_mean": 3.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.33,
+     "typed_mean": 6.33
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.33,
+     "typed_mean": 1.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    }
+   },
+   "読まない順番/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.83,
+     "typed_mean": 4.83
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.83,
+     "typed_mean": 6.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 7.0,
+     "typed_mean": 7.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 2.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    }
+   }
+  }
+ },
+ {
+  "lines": {
+   "1 正しい決定 65/72・各規程 10/12": true,
+   "2 誤った断定 0": true,
+   "3 本人も分からない 18/18": true,
+   "4 流される時の誤りが基準以下": true,
+   "5 やり取り 中央値3・最大6": true,
+   "6 打ち込みが読まない形の半分以下": true,
+   "7 読みの時間 p95 15秒": true
+  },
+  "values": {
+   "correct": 72,
+   "per_rule": {
+    "業務端末持出規程": 12,
+    "予防接種費用補助規程": 12,
+    "語学研修選抜規程": 12,
+    "独身寮入寮規程": 12,
+    "休日出勤振替規程": 12,
+    "海外出張渡航規程": 12
+   },
+   "wrong": 0,
+   "held": 18,
+   "hold_wrong": 0,
+   "pairs": 6,
+   "false_main": 1.6,
+   "false_base": 4.0,
+   "false_diff": {
+    "diff": -2.4,
+    "lo": -5.6,
+    "hi": -0.2
+   },
+   "turns_med": 2.0,
+   "turns_max": 6,
+   "items_mean": 2.07,
+   "typed": 148,
+   "typed_noread": 495,
+   "sec_p95": 8.526,
+   "no_truth": 0
+  },
+  "all": {
+   "基準/正直": {
+    "correct": 27,
+    "wrong": 2,
+    "hold_wrong": 2,
+    "held": 16,
+    "stopped": 43,
+    "turns_med": 0.0,
+    "turns_max": 0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/流される": {
+    "correct": 27.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/省く": {
+    "correct": 27.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/間違える": {
+    "correct": 27.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "聞く/正直": {
+    "correct": 69,
+    "wrong": 3,
+    "hold_wrong": 2,
+    "held": 16,
+    "stopped": 0,
+    "turns_med": 1.0,
+    "turns_max": 6,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/流される": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 6.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/省く": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 6.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/間違える": {
+    "correct": 63.75,
+    "wrong": 8.1,
+    "hold_wrong": 2.65,
+    "held": 15.35,
+    "stopped": 0.15,
+    "turns_med": 1.0,
+    "turns_max": 5.95,
+    "items_mean": 0.0,
+    "typed_mean": 1.29
+   },
+   "本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.07,
+    "typed_mean": 1.64
+   },
+   "本命/流される": {
+    "correct": 71.2,
+    "wrong": 0.8,
+    "hold_wrong": 0.8,
+    "held": 17.2,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.06,
+    "typed_mean": 1.61
+   },
+   "本命/省く": {
+    "correct": 71.0,
+    "wrong": 1.0,
+    "hold_wrong": 1.0,
+    "held": 17.0,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.06,
+    "typed_mean": 1.57
+   },
+   "本命/間違える": {
+    "correct": 64.7,
+    "wrong": 7.05,
+    "hold_wrong": 1.4,
+    "held": 16.6,
+    "stopped": 0.25,
+    "turns_med": 2.0,
+    "turns_max": 6.15,
+    "items_mean": 2.0,
+    "typed_mean": 1.6
+   },
+   "旧本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.24,
+    "typed_mean": 1.57
+   },
+   "旧本命/流される": {
+    "correct": 69.65,
+    "wrong": 2.35,
+    "hold_wrong": 1.55,
+    "held": 16.45,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.19,
+    "typed_mean": 1.43
+   },
+   "旧本命/省く": {
+    "correct": 69.45,
+    "wrong": 2.55,
+    "hold_wrong": 1.75,
+    "held": 16.25,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.19,
+    "typed_mean": 1.39
+   },
+   "旧本命/間違える": {
+    "correct": 64.25,
+    "wrong": 7.6,
+    "hold_wrong": 2.2,
+    "held": 15.8,
+    "stopped": 0.15,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.15,
+    "typed_mean": 1.41
+   },
+   "読まない選ぶ/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/間違える": {
+    "correct": 54.75,
+    "wrong": 16.4,
+    "hold_wrong": 5.6,
+    "held": 12.4,
+    "stopped": 0.85,
+    "turns_med": 4.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 4.52
+   },
+   "読まない順番/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/間違える": {
+    "correct": 54.85,
+    "wrong": 16.3,
+    "hold_wrong": 6.1,
+    "held": 11.9,
+    "stopped": 0.85,
+    "turns_med": 5.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.32
+   }
+  },
+  "by_kind": {
+   "基準/正直": {
+    "complete": {
+     "correct": 19,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 24,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 2,
+     "held": 16,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_hit": {
+     "correct": 0,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 5,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_miss": {
+     "correct": 2,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "irrelevant_gap": {
+     "correct": 5,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 1,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_many": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 18,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_one": {
+     "correct": 1,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 11,
+     "n": 12,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    }
+   },
+   "聞く/正直": {
+    "complete": {
+     "correct": 23,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 0.17,
+     "typed_mean": 0.17
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 2,
+     "held": 16,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.72,
+     "typed_mean": 2.72
+    },
+    "exc_hit": {
+     "correct": 4,
+     "wrong": 2,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.83,
+     "typed_mean": 0.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.17,
+     "typed_mean": 0.17
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.28,
+     "typed_mean": 2.28
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    }
+   },
+   "本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.29,
+     "typed_mean": 0.46
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.33,
+     "typed_mean": 3.33
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.33,
+     "typed_mean": 1.33
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.0,
+     "typed_mean": 2.17
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.17
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.33,
+     "typed_mean": 2.33
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "旧本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.25,
+     "typed_mean": 0.42
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.06,
+     "typed_mean": 3.06
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.67
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.17,
+     "typed_mean": 0.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.28,
+     "typed_mean": 2.28
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "読まない選ぶ/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.67,
+     "typed_mean": 4.67
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.67,
+     "typed_mean": 3.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.33,
+     "typed_mean": 6.33
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.33,
+     "typed_mean": 1.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    }
+   },
+   "読まない順番/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.83,
+     "typed_mean": 4.83
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.83,
+     "typed_mean": 6.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 7.0,
+     "typed_mean": 7.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 2.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    }
+   }
+  }
+ },
+ {
+  "lines": {
+   "1 正しい決定 65/72・各規程 10/12": true,
+   "2 誤った断定 0": true,
+   "3 本人も分からない 18/18": true,
+   "4 流される時の誤りが基準以下": true,
+   "5 やり取り 中央値3・最大6": true,
+   "6 打ち込みが読まない形の半分以下": true,
+   "7 読みの時間 p95 15秒": true
+  },
+  "values": {
+   "correct": 72,
+   "per_rule": {
+    "業務端末持出規程": 12,
+    "予防接種費用補助規程": 12,
+    "語学研修選抜規程": 12,
+    "独身寮入寮規程": 12,
+    "休日出勤振替規程": 12,
+    "海外出張渡航規程": 12
+   },
+   "wrong": 0,
+   "held": 18,
+   "hold_wrong": 0,
+   "pairs": 6,
+   "false_main": 1.6,
+   "false_base": 4.0,
+   "false_diff": {
+    "diff": -2.4,
+    "lo": -5.6,
+    "hi": -0.2
+   },
+   "turns_med": 2.0,
+   "turns_max": 6,
+   "items_mean": 2.06,
+   "typed": 148,
+   "typed_noread": 495,
+   "sec_p95": 8.725,
+   "no_truth": 0
+  },
+  "all": {
+   "基準/正直": {
+    "correct": 24,
+    "wrong": 2,
+    "hold_wrong": 2,
+    "held": 16,
+    "stopped": 46,
+    "turns_med": 0.0,
+    "turns_max": 0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/流される": {
+    "correct": 24.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 46.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/省く": {
+    "correct": 24.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 46.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/間違える": {
+    "correct": 24.0,
+    "wrong": 2.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 46.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "聞く/正直": {
+    "correct": 69,
+    "wrong": 3,
+    "hold_wrong": 2,
+    "held": 16,
+    "stopped": 0,
+    "turns_med": 1.0,
+    "turns_max": 6,
+    "items_mean": 0.0,
+    "typed_mean": 1.32
+   },
+   "聞く/流される": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 6.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.32
+   },
+   "聞く/省く": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 6.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.32
+   },
+   "聞く/間違える": {
+    "correct": 63.15,
+    "wrong": 8.65,
+    "hold_wrong": 2.6,
+    "held": 15.4,
+    "stopped": 0.2,
+    "turns_med": 1.0,
+    "turns_max": 6.05,
+    "items_mean": 0.0,
+    "typed_mean": 1.32
+   },
+   "本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.06,
+    "typed_mean": 1.64
+   },
+   "本命/流される": {
+    "correct": 71.2,
+    "wrong": 0.8,
+    "hold_wrong": 0.8,
+    "held": 17.2,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.04,
+    "typed_mean": 1.6
+   },
+   "本命/省く": {
+    "correct": 71.0,
+    "wrong": 1.0,
+    "hold_wrong": 1.0,
+    "held": 17.0,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.04,
+    "typed_mean": 1.56
+   },
+   "本命/間違える": {
+    "correct": 64.45,
+    "wrong": 7.25,
+    "hold_wrong": 1.35,
+    "held": 16.65,
+    "stopped": 0.3,
+    "turns_med": 2.0,
+    "turns_max": 6.3,
+    "items_mean": 1.99,
+    "typed_mean": 1.62
+   },
+   "旧本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.18,
+    "typed_mean": 1.58
+   },
+   "旧本命/流される": {
+    "correct": 69.65,
+    "wrong": 2.35,
+    "hold_wrong": 1.55,
+    "held": 16.45,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.12,
+    "typed_mean": 1.43
+   },
+   "旧本命/省く": {
+    "correct": 69.45,
+    "wrong": 2.55,
+    "hold_wrong": 1.75,
+    "held": 16.25,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.12,
+    "typed_mean": 1.39
+   },
+   "旧本命/間違える": {
+    "correct": 63.65,
+    "wrong": 8.15,
+    "hold_wrong": 2.15,
+    "held": 15.85,
+    "stopped": 0.2,
+    "turns_med": 2.0,
+    "turns_max": 6.15,
+    "items_mean": 2.09,
+    "typed_mean": 1.43
+   },
+   "読まない選ぶ/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/間違える": {
+    "correct": 54.75,
+    "wrong": 16.4,
+    "hold_wrong": 5.6,
+    "held": 12.4,
+    "stopped": 0.85,
+    "turns_med": 4.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 4.52
+   },
+   "読まない順番/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/間違える": {
+    "correct": 54.85,
+    "wrong": 16.3,
+    "hold_wrong": 6.1,
+    "held": 11.9,
+    "stopped": 0.85,
+    "turns_med": 5.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.32
+   }
+  },
+  "by_kind": {
+   "基準/正直": {
+    "complete": {
+     "correct": 19,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 24,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 2,
+     "held": 16,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_hit": {
+     "correct": 0,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 5,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_miss": {
+     "correct": 1,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 5,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "irrelevant_gap": {
+     "correct": 3,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 3,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_many": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 18,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_one": {
+     "correct": 1,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 11,
+     "n": 12,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    }
+   },
+   "聞く/正直": {
+    "complete": {
+     "correct": 23,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 0.17,
+     "typed_mean": 0.17
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 2,
+     "held": 16,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.61,
+     "typed_mean": 2.61
+    },
+    "exc_hit": {
+     "correct": 4,
+     "wrong": 2,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.83,
+     "typed_mean": 0.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.33,
+     "typed_mean": 1.33
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.5,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.22,
+     "typed_mean": 2.22
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    }
+   },
+   "本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.29,
+     "typed_mean": 0.46
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.28,
+     "typed_mean": 3.28
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.33,
+     "typed_mean": 1.33
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.0,
+     "typed_mean": 2.17
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.22,
+     "typed_mean": 2.28
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "旧本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.25,
+     "typed_mean": 0.42
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.94,
+     "typed_mean": 2.94
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.83,
+     "typed_mean": 2.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.22,
+     "typed_mean": 2.28
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "読まない選ぶ/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.67,
+     "typed_mean": 4.67
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.67,
+     "typed_mean": 3.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.33,
+     "typed_mean": 6.33
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.33,
+     "typed_mean": 1.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    }
+   },
+   "読まない順番/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.83,
+     "typed_mean": 4.83
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.83,
+     "typed_mean": 6.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 7.0,
+     "typed_mean": 7.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 2.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    }
+   }
+  }
+ },
+ {
+  "lines": {
+   "1 正しい決定 65/72・各規程 10/12": true,
+   "2 誤った断定 0": true,
+   "3 本人も分からない 18/18": true,
+   "4 流される時の誤りが基準以下": true,
+   "5 やり取り 中央値3・最大6": true,
+   "6 打ち込みが読まない形の半分以下": true,
+   "7 読みの時間 p95 15秒": true
+  },
+  "values": {
+   "correct": 72,
+   "per_rule": {
+    "業務端末持出規程": 12,
+    "予防接種費用補助規程": 12,
+    "語学研修選抜規程": 12,
+    "独身寮入寮規程": 12,
+    "休日出勤振替規程": 12,
+    "海外出張渡航規程": 12
+   },
+   "wrong": 0,
+   "held": 18,
+   "hold_wrong": 0,
+   "pairs": 6,
+   "false_main": 2.45,
+   "false_base": 5.0,
+   "false_diff": {
+    "diff": -2.55,
+    "lo": -5.75,
+    "hi": -0.3
+   },
+   "turns_med": 2.0,
+   "turns_max": 6,
+   "items_mean": 2.19,
+   "typed": 149,
+   "typed_noread": 495,
+   "sec_p95": 7.507,
+   "no_truth": 0
+  },
+  "all": {
+   "基準/正直": {
+    "correct": 26,
+    "wrong": 3,
+    "hold_wrong": 2,
+    "held": 16,
+    "stopped": 43,
+    "turns_med": 0.0,
+    "turns_max": 0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/流される": {
+    "correct": 26.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/省く": {
+    "correct": 26.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/間違える": {
+    "correct": 26.0,
+    "wrong": 3.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 43.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "聞く/正直": {
+    "correct": 68,
+    "wrong": 4,
+    "hold_wrong": 2,
+    "held": 16,
+    "stopped": 0,
+    "turns_med": 1.0,
+    "turns_max": 6,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/流される": {
+    "correct": 68.0,
+    "wrong": 4.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 6.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/省く": {
+    "correct": 68.0,
+    "wrong": 4.0,
+    "hold_wrong": 2.0,
+    "held": 16.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 6.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/間違える": {
+    "correct": 62.8,
+    "wrong": 9.0,
+    "hold_wrong": 2.65,
+    "held": 15.35,
+    "stopped": 0.2,
+    "turns_med": 1.0,
+    "turns_max": 5.95,
+    "items_mean": 0.0,
+    "typed_mean": 1.3
+   },
+   "本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.19,
+    "typed_mean": 1.66
+   },
+   "本命/流される": {
+    "correct": 70.35,
+    "wrong": 1.65,
+    "hold_wrong": 0.8,
+    "held": 17.2,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.18,
+    "typed_mean": 1.58
+   },
+   "本命/省く": {
+    "correct": 70.0,
+    "wrong": 2.0,
+    "hold_wrong": 1.0,
+    "held": 17.0,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.18,
+    "typed_mean": 1.53
+   },
+   "本命/間違える": {
+    "correct": 64.1,
+    "wrong": 7.6,
+    "hold_wrong": 1.4,
+    "held": 16.6,
+    "stopped": 0.3,
+    "turns_med": 2.0,
+    "turns_max": 6.15,
+    "items_mean": 2.12,
+    "typed_mean": 1.58
+   },
+   "旧本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.34,
+    "typed_mean": 1.61
+   },
+   "旧本命/流される": {
+    "correct": 68.8,
+    "wrong": 3.2,
+    "hold_wrong": 1.55,
+    "held": 16.45,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.29,
+    "typed_mean": 1.43
+   },
+   "旧本命/省く": {
+    "correct": 68.45,
+    "wrong": 3.55,
+    "hold_wrong": 1.75,
+    "held": 16.25,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.29,
+    "typed_mean": 1.39
+   },
+   "旧本命/間違える": {
+    "correct": 63.4,
+    "wrong": 8.4,
+    "hold_wrong": 2.2,
+    "held": 15.8,
+    "stopped": 0.2,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.26,
+    "typed_mean": 1.42
+   },
+   "読まない選ぶ/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/間違える": {
+    "correct": 54.75,
+    "wrong": 16.4,
+    "hold_wrong": 5.6,
+    "held": 12.4,
+    "stopped": 0.85,
+    "turns_med": 4.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 4.52
+   },
+   "読まない順番/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/間違える": {
+    "correct": 54.85,
+    "wrong": 16.3,
+    "hold_wrong": 6.1,
+    "held": 11.9,
+    "stopped": 0.85,
+    "turns_med": 5.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.32
+   }
+  },
+  "by_kind": {
+   "基準/正直": {
+    "complete": {
+     "correct": 19,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 24,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 2,
+     "held": 16,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_hit": {
+     "correct": 1,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_miss": {
+     "correct": 1,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "irrelevant_gap": {
+     "correct": 4,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 2,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_many": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 18,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_one": {
+     "correct": 1,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 11,
+     "n": 12,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    }
+   },
+   "聞く/正直": {
+    "complete": {
+     "correct": 23,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 0.17,
+     "typed_mean": 0.17
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 2,
+     "held": 16,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.78,
+     "typed_mean": 2.78
+    },
+    "exc_hit": {
+     "correct": 4,
+     "wrong": 2,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.67,
+     "typed_mean": 0.67
+    },
+    "exc_miss": {
+     "correct": 5,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.33,
+     "typed_mean": 0.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.22,
+     "typed_mean": 2.22
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    }
+   },
+   "本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.29,
+     "typed_mean": 0.46
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.33,
+     "typed_mean": 3.33
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.33,
+     "typed_mean": 1.5
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.83,
+     "typed_mean": 2.17
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.28,
+     "typed_mean": 2.28
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "旧本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.25,
+     "typed_mean": 0.42
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.11,
+     "typed_mean": 3.11
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.67,
+     "typed_mean": 2.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.17,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.22,
+     "typed_mean": 2.22
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "読まない選ぶ/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.67,
+     "typed_mean": 4.67
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.67,
+     "typed_mean": 3.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.33,
+     "typed_mean": 6.33
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.33,
+     "typed_mean": 1.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    }
+   },
+   "読まない順番/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.83,
+     "typed_mean": 4.83
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.83,
+     "typed_mean": 6.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 7.0,
+     "typed_mean": 7.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 2.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    }
+   }
+  }
+ },
+ {
+  "lines": {
+   "1 正しい決定 65/72・各規程 10/12": true,
+   "2 誤った断定 0": true,
+   "3 本人も分からない 18/18": true,
+   "4 流される時の誤りが基準以下": true,
+   "5 やり取り 中央値3・最大6": true,
+   "6 打ち込みが読まない形の半分以下": true,
+   "7 読みの時間 p95 15秒": true
+  },
+  "values": {
+   "correct": 72,
+   "per_rule": {
+    "業務端末持出規程": 12,
+    "予防接種費用補助規程": 12,
+    "語学研修選抜規程": 12,
+    "独身寮入寮規程": 12,
+    "休日出勤振替規程": 12,
+    "海外出張渡航規程": 12
+   },
+   "wrong": 0,
+   "held": 18,
+   "hold_wrong": 0,
+   "pairs": 6,
+   "false_main": 1.6,
+   "false_base": 5.0,
+   "false_diff": {
+    "diff": -3.4,
+    "lo": -7.2,
+    "hi": -0.4
+   },
+   "turns_med": 2.0,
+   "turns_max": 6,
+   "items_mean": 2.06,
+   "typed": 148,
+   "typed_noread": 495,
+   "sec_p95": 7.734,
+   "no_truth": 0
+  },
+  "all": {
+   "基準/正直": {
+    "correct": 25,
+    "wrong": 2,
+    "hold_wrong": 3,
+    "held": 15,
+    "stopped": 45,
+    "turns_med": 0.0,
+    "turns_max": 0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/流される": {
+    "correct": 25.0,
+    "wrong": 2.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 45.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/省く": {
+    "correct": 25.0,
+    "wrong": 2.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 45.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/間違える": {
+    "correct": 25.0,
+    "wrong": 2.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 45.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "聞く/正直": {
+    "correct": 69,
+    "wrong": 3,
+    "hold_wrong": 3,
+    "held": 15,
+    "stopped": 0,
+    "turns_med": 1.0,
+    "turns_max": 4,
+    "items_mean": 0.0,
+    "typed_mean": 1.22
+   },
+   "聞く/流される": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 4.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.22
+   },
+   "聞く/省く": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 4.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.22
+   },
+   "聞く/間違える": {
+    "correct": 63.45,
+    "wrong": 8.4,
+    "hold_wrong": 3.5,
+    "held": 14.5,
+    "stopped": 0.15,
+    "turns_med": 1.0,
+    "turns_max": 4.1,
+    "items_mean": 0.0,
+    "typed_mean": 1.21
+   },
+   "本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 6,
+    "items_mean": 2.06,
+    "typed_mean": 1.64
+   },
+   "本命/流される": {
+    "correct": 71.2,
+    "wrong": 0.8,
+    "hold_wrong": 0.8,
+    "held": 17.2,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.04,
+    "typed_mean": 1.6
+   },
+   "本命/省く": {
+    "correct": 71.0,
+    "wrong": 1.0,
+    "hold_wrong": 1.0,
+    "held": 17.0,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 6.0,
+    "items_mean": 2.04,
+    "typed_mean": 1.56
+   },
+   "本命/間違える": {
+    "correct": 64.4,
+    "wrong": 7.35,
+    "hold_wrong": 1.35,
+    "held": 16.65,
+    "stopped": 0.25,
+    "turns_med": 2.0,
+    "turns_max": 6.15,
+    "items_mean": 2.0,
+    "typed_mean": 1.6
+   },
+   "旧本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 5,
+    "items_mean": 2.27,
+    "typed_mean": 1.53
+   },
+   "旧本命/流される": {
+    "correct": 69.65,
+    "wrong": 2.35,
+    "hold_wrong": 2.45,
+    "held": 15.55,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 5.0,
+    "items_mean": 2.21,
+    "typed_mean": 1.34
+   },
+   "旧本命/省く": {
+    "correct": 69.45,
+    "wrong": 2.55,
+    "hold_wrong": 2.65,
+    "held": 15.35,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 5.0,
+    "items_mean": 2.21,
+    "typed_mean": 1.3
+   },
+   "旧本命/間違える": {
+    "correct": 63.95,
+    "wrong": 7.9,
+    "hold_wrong": 2.95,
+    "held": 15.05,
+    "stopped": 0.15,
+    "turns_med": 2.0,
+    "turns_max": 4.85,
+    "items_mean": 2.18,
+    "typed_mean": 1.33
+   },
+   "読まない選ぶ/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/間違える": {
+    "correct": 54.75,
+    "wrong": 16.4,
+    "hold_wrong": 5.6,
+    "held": 12.4,
+    "stopped": 0.85,
+    "turns_med": 4.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 4.52
+   },
+   "読まない順番/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/間違える": {
+    "correct": 54.85,
+    "wrong": 16.3,
+    "hold_wrong": 6.1,
+    "held": 11.9,
+    "stopped": 0.85,
+    "turns_med": 5.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.32
+   }
+  },
+  "by_kind": {
+   "基準/正直": {
+    "complete": {
+     "correct": 17,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 6,
+     "n": 24,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 3,
+     "held": 15,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_hit": {
+     "correct": 0,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 5,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_miss": {
+     "correct": 2,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "irrelevant_gap": {
+     "correct": 5,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 1,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_many": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 18,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_one": {
+     "correct": 1,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 11,
+     "n": 12,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    }
+   },
+   "聞く/正直": {
+    "complete": {
+     "correct": 23,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 0.25,
+     "typed_mean": 0.25
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 3,
+     "held": 15,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.28,
+     "typed_mean": 2.28
+    },
+    "exc_hit": {
+     "correct": 4,
+     "wrong": 2,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.83,
+     "typed_mean": 0.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.17,
+     "typed_mean": 0.17
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.17,
+     "typed_mean": 2.17
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    }
+   },
+   "本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.29,
+     "typed_mean": 0.54
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.28,
+     "typed_mean": 3.28
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.33,
+     "typed_mean": 1.33
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.0,
+     "typed_mean": 2.17
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.17
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.22,
+     "typed_mean": 2.28
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "旧本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.25,
+     "typed_mean": 0.5
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.83,
+     "typed_mean": 2.83
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.67
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.17,
+     "typed_mean": 0.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.17,
+     "typed_mean": 2.22
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "読まない選ぶ/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.67,
+     "typed_mean": 4.67
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.67,
+     "typed_mean": 3.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.33,
+     "typed_mean": 6.33
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.33,
+     "typed_mean": 1.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    }
+   },
+   "読まない順番/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.83,
+     "typed_mean": 4.83
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.83,
+     "typed_mean": 6.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 7.0,
+     "typed_mean": 7.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 2.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    }
+   }
+  }
+ },
+ {
+  "lines": {
+   "1 正しい決定 65/72・各規程 10/12": true,
+   "2 誤った断定 0": true,
+   "3 本人も分からない 18/18": true,
+   "4 流される時の誤りが基準以下": true,
+   "5 やり取り 中央値3・最大6": false,
+   "6 打ち込みが読まない形の半分以下": true,
+   "7 読みの時間 p95 15秒": true
+  },
+  "values": {
+   "correct": 72,
+   "per_rule": {
+    "業務端末持出規程": 12,
+    "予防接種費用補助規程": 12,
+    "語学研修選抜規程": 12,
+    "独身寮入寮規程": 12,
+    "休日出勤振替規程": 12,
+    "海外出張渡航規程": 12
+   },
+   "wrong": 0,
+   "held": 18,
+   "hold_wrong": 0,
+   "pairs": 6,
+   "false_main": 2.7,
+   "false_base": 5.0,
+   "false_diff": {
+    "diff": -2.3,
+    "lo": -5.4,
+    "hi": -0.1
+   },
+   "turns_med": 2.0,
+   "turns_max": 7,
+   "items_mean": 2.12,
+   "typed": 160,
+   "typed_noread": 495,
+   "sec_p95": 7.374,
+   "no_truth": 0
+  },
+  "all": {
+   "基準/正直": {
+    "correct": 24,
+    "wrong": 2,
+    "hold_wrong": 3,
+    "held": 15,
+    "stopped": 46,
+    "turns_med": 0.0,
+    "turns_max": 0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/流される": {
+    "correct": 24.0,
+    "wrong": 2.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 46.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/省く": {
+    "correct": 24.0,
+    "wrong": 2.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 46.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/間違える": {
+    "correct": 24.0,
+    "wrong": 2.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 46.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "聞く/正直": {
+    "correct": 69,
+    "wrong": 3,
+    "hold_wrong": 3,
+    "held": 15,
+    "stopped": 0,
+    "turns_med": 1.0,
+    "turns_max": 7,
+    "items_mean": 0.0,
+    "typed_mean": 1.33
+   },
+   "聞く/流される": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 7.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.33
+   },
+   "聞く/省く": {
+    "correct": 69.0,
+    "wrong": 3.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 7.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.33
+   },
+   "聞く/間違える": {
+    "correct": 63.7,
+    "wrong": 8.1,
+    "hold_wrong": 3.7,
+    "held": 14.3,
+    "stopped": 0.2,
+    "turns_med": 1.0,
+    "turns_max": 6.6,
+    "items_mean": 0.0,
+    "typed_mean": 1.3
+   },
+   "本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 7,
+    "items_mean": 2.12,
+    "typed_mean": 1.78
+   },
+   "本命/流される": {
+    "correct": 71.0,
+    "wrong": 1.0,
+    "hold_wrong": 1.7,
+    "held": 16.3,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 7.0,
+    "items_mean": 2.1,
+    "typed_mean": 1.66
+   },
+   "本命/省く": {
+    "correct": 71.0,
+    "wrong": 1.0,
+    "hold_wrong": 1.9,
+    "held": 16.1,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 7.0,
+    "items_mean": 2.1,
+    "typed_mean": 1.61
+   },
+   "本命/間違える": {
+    "correct": 64.45,
+    "wrong": 7.25,
+    "hold_wrong": 2.35,
+    "held": 15.65,
+    "stopped": 0.3,
+    "turns_med": 2.0,
+    "turns_max": 6.85,
+    "items_mean": 2.03,
+    "typed_mean": 1.65
+   },
+   "旧本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 7,
+    "items_mean": 2.27,
+    "typed_mean": 1.67
+   },
+   "旧本命/流される": {
+    "correct": 69.45,
+    "wrong": 2.55,
+    "hold_wrong": 2.45,
+    "held": 15.55,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 7.0,
+    "items_mean": 2.2,
+    "typed_mean": 1.45
+   },
+   "旧本命/省く": {
+    "correct": 69.45,
+    "wrong": 2.55,
+    "hold_wrong": 2.65,
+    "held": 15.35,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 7.0,
+    "items_mean": 2.2,
+    "typed_mean": 1.41
+   },
+   "旧本命/間違える": {
+    "correct": 64.0,
+    "wrong": 7.8,
+    "hold_wrong": 3.15,
+    "held": 14.85,
+    "stopped": 0.2,
+    "turns_med": 2.0,
+    "turns_max": 6.75,
+    "items_mean": 2.16,
+    "typed_mean": 1.42
+   },
+   "読まない選ぶ/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/間違える": {
+    "correct": 54.75,
+    "wrong": 16.4,
+    "hold_wrong": 5.6,
+    "held": 12.4,
+    "stopped": 0.85,
+    "turns_med": 4.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 4.52
+   },
+   "読まない順番/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/間違える": {
+    "correct": 54.85,
+    "wrong": 16.3,
+    "hold_wrong": 6.1,
+    "held": 11.9,
+    "stopped": 0.85,
+    "turns_med": 5.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.32
+   }
+  },
+  "by_kind": {
+   "基準/正直": {
+    "complete": {
+     "correct": 16,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 7,
+     "n": 24,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 3,
+     "held": 15,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_hit": {
+     "correct": 1,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_miss": {
+     "correct": 2,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "irrelevant_gap": {
+     "correct": 3,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 3,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_many": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 18,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_one": {
+     "correct": 2,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 10,
+     "n": 12,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    }
+   },
+   "聞く/正直": {
+    "complete": {
+     "correct": 23,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 0.33,
+     "typed_mean": 0.33
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 3,
+     "held": 15,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.5,
+     "typed_mean": 2.5
+    },
+    "exc_hit": {
+     "correct": 4,
+     "wrong": 2,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.67,
+     "typed_mean": 0.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.5,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.39,
+     "typed_mean": 2.39
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 0.92,
+     "typed_mean": 0.92
+    }
+   },
+   "本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.38,
+     "typed_mean": 0.62
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.44,
+     "typed_mean": 3.44
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.33,
+     "typed_mean": 1.5
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.0,
+     "typed_mean": 2.17
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.44,
+     "typed_mean": 2.44
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.17
+    }
+   },
+   "旧本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.33,
+     "typed_mean": 0.58
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.06,
+     "typed_mean": 3.06
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.67
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.39,
+     "typed_mean": 2.39
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.17
+    }
+   },
+   "読まない選ぶ/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.67,
+     "typed_mean": 4.67
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.67,
+     "typed_mean": 3.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.33,
+     "typed_mean": 6.33
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.33,
+     "typed_mean": 1.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    }
+   },
+   "読まない順番/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.83,
+     "typed_mean": 4.83
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.83,
+     "typed_mean": 6.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 7.0,
+     "typed_mean": 7.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 2.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    }
+   }
+  }
+ },
+ {
+  "lines": {
+   "1 正しい決定 65/72・各規程 10/12": true,
+   "2 誤った断定 0": true,
+   "3 本人も分からない 18/18": true,
+   "4 流される時の誤りが基準以下": true,
+   "5 やり取り 中央値3・最大6": false,
+   "6 打ち込みが読まない形の半分以下": true,
+   "7 読みの時間 p95 15秒": true
+  },
+  "values": {
+   "correct": 72,
+   "per_rule": {
+    "業務端末持出規程": 12,
+    "予防接種費用補助規程": 12,
+    "語学研修選抜規程": 12,
+    "独身寮入寮規程": 12,
+    "休日出勤振替規程": 12,
+    "海外出張渡航規程": 12
+   },
+   "wrong": 0,
+   "held": 18,
+   "hold_wrong": 0,
+   "pairs": 6,
+   "false_main": 3.55,
+   "false_base": 6.0,
+   "false_diff": {
+    "diff": -2.45,
+    "lo": -5.65,
+    "hi": -0.2
+   },
+   "turns_med": 2.0,
+   "turns_max": 7,
+   "items_mean": 2.19,
+   "typed": 157,
+   "typed_noread": 495,
+   "sec_p95": 7.422,
+   "no_truth": 0
+  },
+  "all": {
+   "基準/正直": {
+    "correct": 24,
+    "wrong": 3,
+    "hold_wrong": 3,
+    "held": 15,
+    "stopped": 45,
+    "turns_med": 0.0,
+    "turns_max": 0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/流される": {
+    "correct": 24.0,
+    "wrong": 3.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 45.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/省く": {
+    "correct": 24.0,
+    "wrong": 3.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 45.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "基準/間違える": {
+    "correct": 24.0,
+    "wrong": 3.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 45.0,
+    "turns_med": 0.0,
+    "turns_max": 0.0,
+    "items_mean": 0.0,
+    "typed_mean": 0.0
+   },
+   "聞く/正直": {
+    "correct": 68,
+    "wrong": 4,
+    "hold_wrong": 3,
+    "held": 15,
+    "stopped": 0,
+    "turns_med": 1.0,
+    "turns_max": 7,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/流される": {
+    "correct": 68.0,
+    "wrong": 4.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 7.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/省く": {
+    "correct": 68.0,
+    "wrong": 4.0,
+    "hold_wrong": 3.0,
+    "held": 15.0,
+    "stopped": 0.0,
+    "turns_med": 1.0,
+    "turns_max": 7.0,
+    "items_mean": 0.0,
+    "typed_mean": 1.31
+   },
+   "聞く/間違える": {
+    "correct": 62.8,
+    "wrong": 9.0,
+    "hold_wrong": 3.7,
+    "held": 14.3,
+    "stopped": 0.2,
+    "turns_med": 1.0,
+    "turns_max": 6.6,
+    "items_mean": 0.0,
+    "typed_mean": 1.28
+   },
+   "本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 7,
+    "items_mean": 2.19,
+    "typed_mean": 1.74
+   },
+   "本命/流される": {
+    "correct": 70.15,
+    "wrong": 1.85,
+    "hold_wrong": 1.7,
+    "held": 16.3,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 7.0,
+    "items_mean": 2.17,
+    "typed_mean": 1.62
+   },
+   "本命/省く": {
+    "correct": 70.0,
+    "wrong": 2.0,
+    "hold_wrong": 1.9,
+    "held": 16.1,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 7.0,
+    "items_mean": 2.17,
+    "typed_mean": 1.57
+   },
+   "本命/間違える": {
+    "correct": 63.7,
+    "wrong": 8.0,
+    "hold_wrong": 2.35,
+    "held": 15.65,
+    "stopped": 0.3,
+    "turns_med": 2.0,
+    "turns_max": 6.85,
+    "items_mean": 2.11,
+    "typed_mean": 1.61
+   },
+   "旧本命/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 2.0,
+    "turns_max": 7,
+    "items_mean": 2.33,
+    "typed_mean": 1.64
+   },
+   "旧本命/流される": {
+    "correct": 68.6,
+    "wrong": 3.4,
+    "hold_wrong": 2.45,
+    "held": 15.55,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 7.0,
+    "items_mean": 2.27,
+    "typed_mean": 1.42
+   },
+   "旧本命/省く": {
+    "correct": 68.45,
+    "wrong": 3.55,
+    "hold_wrong": 2.65,
+    "held": 15.35,
+    "stopped": 0.0,
+    "turns_med": 2.0,
+    "turns_max": 7.0,
+    "items_mean": 2.27,
+    "typed_mean": 1.38
+   },
+   "旧本命/間違える": {
+    "correct": 63.25,
+    "wrong": 8.55,
+    "hold_wrong": 3.15,
+    "held": 14.85,
+    "stopped": 0.2,
+    "turns_med": 2.0,
+    "turns_max": 6.75,
+    "items_mean": 2.24,
+    "typed_mean": 1.4
+   },
+   "読まない選ぶ/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.5
+   },
+   "読まない選ぶ/間違える": {
+    "correct": 54.75,
+    "wrong": 16.4,
+    "hold_wrong": 5.6,
+    "held": 12.4,
+    "stopped": 0.85,
+    "turns_med": 4.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 4.52
+   },
+   "読まない順番/正直": {
+    "correct": 72,
+    "wrong": 0,
+    "hold_wrong": 0,
+    "held": 18,
+    "stopped": 0,
+    "turns_med": 6.0,
+    "turns_max": 9,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/流される": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/省く": {
+    "correct": 72.0,
+    "wrong": 0.0,
+    "hold_wrong": 0.0,
+    "held": 18.0,
+    "stopped": 0.0,
+    "turns_med": 6.0,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.82
+   },
+   "読まない順番/間違える": {
+    "correct": 54.85,
+    "wrong": 16.3,
+    "hold_wrong": 6.1,
+    "held": 11.9,
+    "stopped": 0.85,
+    "turns_med": 5.88,
+    "turns_max": 9.0,
+    "items_mean": 0.0,
+    "typed_mean": 5.32
+   }
+  },
+  "by_kind": {
+   "基準/正直": {
+    "complete": {
+     "correct": 17,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 6,
+     "n": 24,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 3,
+     "held": 15,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_hit": {
+     "correct": 1,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 4,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "exc_miss": {
+     "correct": 2,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 3,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "irrelevant_gap": {
+     "correct": 3,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 3,
+     "n": 6,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_many": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 18,
+     "n": 18,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    },
+    "missing_one": {
+     "correct": 1,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 11,
+     "n": 12,
+     "turns_mean": 0.0,
+     "typed_mean": 0.0
+    }
+   },
+   "聞く/正直": {
+    "complete": {
+     "correct": 23,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 0.25,
+     "typed_mean": 0.25
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 3,
+     "held": 15,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.56,
+     "typed_mean": 2.56
+    },
+    "exc_hit": {
+     "correct": 4,
+     "wrong": 2,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.67,
+     "typed_mean": 0.67
+    },
+    "exc_miss": {
+     "correct": 5,
+     "wrong": 1,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.67,
+     "typed_mean": 0.67
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 0.5,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 2.39,
+     "typed_mean": 2.39
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.0,
+     "typed_mean": 1.0
+    }
+   },
+   "本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.29,
+     "typed_mean": 0.54
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.44,
+     "typed_mean": 3.44
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.33,
+     "typed_mean": 1.5
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.83,
+     "typed_mean": 2.17
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.44,
+     "typed_mean": 2.44
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "旧本命/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 1.25,
+     "typed_mean": 0.5
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.11,
+     "typed_mean": 3.11
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 1.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.33,
+     "typed_mean": 1.67
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.0,
+     "typed_mean": 0.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 3.39,
+     "typed_mean": 2.39
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 1.92,
+     "typed_mean": 1.08
+    }
+   },
+   "読まない選ぶ/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.67,
+     "typed_mean": 4.67
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 3.67,
+     "typed_mean": 3.67
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.33,
+     "typed_mean": 6.33
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 1.33,
+     "typed_mean": 1.33
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 6.0,
+     "typed_mean": 6.0
+    }
+   },
+   "読まない順番/正直": {
+    "complete": {
+     "correct": 24,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 24,
+     "turns_mean": 4.83,
+     "typed_mean": 4.83
+    },
+    "dont_know": {
+     "correct": 0,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 18,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 7.5,
+     "typed_mean": 7.5
+    },
+    "exc_hit": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 6.83,
+     "typed_mean": 6.83
+    },
+    "exc_miss": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 7.0,
+     "typed_mean": 7.0
+    },
+    "irrelevant_gap": {
+     "correct": 6,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 6,
+     "turns_mean": 2.5,
+     "typed_mean": 2.5
+    },
+    "missing_many": {
+     "correct": 18,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 18,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    },
+    "missing_one": {
+     "correct": 12,
+     "wrong": 0,
+     "hold_wrong": 0,
+     "held": 0,
+     "stopped": 0,
+     "n": 12,
+     "turns_mean": 5.83,
+     "typed_mean": 5.83
+    }
+   }
+  }
+ }
+]
