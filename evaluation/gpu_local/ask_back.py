@@ -359,6 +359,71 @@ def cmd_run(a: argparse.Namespace) -> None:
                                         "turns_med", "turns_max", "items_mean", "typed_mean", "no_truth") if x in v})
 
 
+# ---------------------------------------------------------------- 線の判定（#29 に事前固定した物）
+
+
+def scene_diff(a: dict[str, float], b: dict[str, float], scenes: list[dict], n: int = 4000) -> dict[str, float]:
+    """場面ごとの誤りの率の差 (a - b) の合計と 95% の幅。言い換えの対は 1 つの塊として引き直す。"""
+    groups: dict[str, list[str]] = {}
+    for q in scenes:
+        groups.setdefault(q.get("pair_id") or q["id"], []).append(q["id"])
+    diffs = [sum(a.get(i, 0.0) - b.get(i, 0.0) for i in ids) for ids in groups.values()]
+    rng = random.Random(29)
+    boot = sorted(sum(rng.choices(diffs, k=len(diffs))) for _ in range(n))
+    return {"diff": round(sum(diffs), 3), "lo": round(boot[int(n * 0.025)], 3), "hi": round(boot[int(n * 0.975)], 3)}
+
+
+def by_kind(rows: list[dict]) -> dict[str, dict[str, Any]]:
+    out: dict[str, list[dict]] = {}
+    for r in rows:
+        out.setdefault(r["group"], []).append(r)
+    return {k: {x: o.score(v)[x] for x in ("correct", "wrong", "hold_wrong", "held", "stopped")}
+            | {"n": len(v), "turns_mean": round(sum(r["turns"] for r in v) / len(v), 2),
+               "typed_mean": round(sum(r["typed"] for r in v) / len(v), 2)}
+            for k, v in sorted(out.items())}
+
+
+def judge_one(res: dict[str, Any], scenes: list[dict], raw_rows: list[dict] | None) -> dict[str, Any]:
+    main_ = res["本命/正直"]
+    sway, sway_base = res["本命/流される"], res["基準/流される"]
+    noread = res["読まない選ぶ/正直"]
+    false_main = sum(sway["wrong_by_scene"].values())
+    false_base = sum(sway_base["wrong_by_scene"].values())
+    p95 = o.score(raw_rows).get("sec_p95") if raw_rows else None
+    lines = {
+        "1 正しい決定 65/72・各規程 10/12": main_["correct"] >= 65 and main_["per_rule_min"] >= 10,
+        "2 誤った断定 0": main_["wrong"] == 0,
+        "3 本人も分からない 18/18": main_["held"] == 18 and main_["hold_wrong"] == 0,
+        "4 流される時の誤りが基準以下": false_main <= false_base,
+        "5 やり取り 中央値3・最大6": main_["turns_med"] <= 3 and main_["turns_max"] <= 6,
+        "6 打ち込みが読まない形の半分以下": main_["typed_sum"] * 2 <= noread["typed_sum"],
+        "7 読みの時間 p95 15秒": p95 is not None and p95 <= 15,
+    }
+    return {"lines": lines,
+            "values": {"correct": main_["correct"], "per_rule": main_["per_rule"], "wrong": main_["wrong"],
+                       "held": main_["held"], "hold_wrong": main_["hold_wrong"], "pairs": main_["pairs"],
+                       "false_main": round(false_main, 3), "false_base": round(false_base, 3),
+                       "false_diff": scene_diff(sway["wrong_by_scene"], sway_base["wrong_by_scene"], scenes),
+                       "turns_med": main_["turns_med"], "turns_max": main_["turns_max"], "items_mean": main_["items_mean"],
+                       "typed": main_["typed_sum"], "typed_noread": noread["typed_sum"], "sec_p95": p95,
+                       "no_truth": main_["no_truth"]},
+            "all": {k: {x: res[k].get(x) for x in ("correct", "wrong", "hold_wrong", "held", "stopped", "turns_med",
+                                                   "turns_max", "items_mean", "typed_mean")} for k in res},
+            "by_kind": {k: by_kind(res[k]["rows"]) for k in res if "rows" in res[k]}}
+
+
+def cmd_judge(a: argparse.Namespace) -> None:
+    scenes = o.read_jsonl(a.questions)
+    out = []
+    for i, f in enumerate(a.runs):
+        raw = o.read_jsonl(a.raw[i]) if a.raw else None
+        out.append(judge_one(json.loads(Path(f).read_text(encoding="utf-8")), scenes, raw))
+    Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    for j in out:
+        print({k: ("○" if v else "×") for k, v in j["lines"].items()})
+        print(j["values"])
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -370,6 +435,12 @@ def main() -> None:
     for n in ("cards", "questions", "gold", "out"):
         d.add_argument(f"--{n}", required=True)
     d.set_defaults(fn=cmd_devtruth)
+    j = sub.add_parser("judge")
+    j.add_argument("--questions", required=True)
+    j.add_argument("--runs", nargs="+", required=True)
+    j.add_argument("--raw", nargs="*")
+    j.add_argument("--out", required=True)
+    j.set_defaults(fn=cmd_judge)
     a = p.parse_args()
     a.fn(a)
 

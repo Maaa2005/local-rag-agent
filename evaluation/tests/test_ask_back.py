@@ -168,3 +168,43 @@ def test_derived_read_is_dropped_when_inputs_are_read():
     first = {"開始": [rc.parse_time("09:00")], "終了": [rc.parse_time("11:00")], "時間": _d(30)}  # 読みが矛盾
     u = ab.User(card, {"開始": first["開始"], "終了": first["終了"]})
     assert ab.dialog(card, first, u, "基準")["conclusion"] == "支給"  # 計算した 120 分が勝つ
+
+
+def test_scene_diff_keeps_pairs_together_and_signs():
+    scenes = [{"id": "a", "pair_id": "p"}, {"id": "b", "pair_id": "p"}, {"id": "c", "pair_id": None}]
+    d = ab.scene_diff({"a": 1.0, "b": 1.0}, {"c": 1.0}, scenes, n=500)
+    assert d["diff"] == 1.0
+    assert d["lo"] <= d["diff"] <= d["hi"]
+
+
+def _res(**main):
+    base = {"correct": 0, "wrong": 0, "hold_wrong": 0, "held": 18, "stopped": 0, "per_rule_min": 0, "per_rule": {},
+            "pairs": 0, "turns_med": 0, "turns_max": 0, "items_mean": 0, "typed_sum": 10, "no_truth": 0,
+            "wrong_by_scene": {}}
+    good = {**base, "correct": 66, "per_rule_min": 10, "turns_med": 3, "turns_max": 6, "typed_sum": 5} | main
+    return {"本命/正直": good, "基準/正直": base, "本命/流される": base, "基準/流される": base, "読まない選ぶ/正直": base}
+
+
+RAW_OK = [{"conclusion": None, "should_hold": True, "seconds": 15.0, "calls": 1}]
+
+
+def test_judge_passes_at_exact_lines():
+    assert all(ab.judge_one(_res(), [{"id": "a"}], RAW_OK)["lines"].values())
+
+
+def test_judge_fails_each_line():
+    scenes = [{"id": "a"}]
+    def line(res, key, raw=RAW_OK):
+        return ab.judge_one(res, scenes, raw)["lines"][key]
+    assert not line(_res(correct=64), "1 正しい決定 65/72・各規程 10/12")
+    assert not line(_res(per_rule_min=9), "1 正しい決定 65/72・各規程 10/12")
+    assert not line(_res(wrong=1), "2 誤った断定 0")
+    assert not line(_res(held=17, hold_wrong=1), "3 本人も分からない 18/18")
+    assert not line(_res(turns_max=7), "5 やり取り 中央値3・最大6")
+    assert not line(_res(turns_med=3.5), "5 やり取り 中央値3・最大6")
+    assert not line(_res(typed_sum=6), "6 打ち込みが読まない形の半分以下")
+    r = _res()
+    r["本命/流される"] = {**r["本命/流される"], "wrong_by_scene": {"a": 0.1}}
+    assert not line(r, "4 流される時の誤りが基準以下")
+    slow = [{"conclusion": None, "should_hold": True, "seconds": 15.1, "calls": 1}]
+    assert not line(_res(), "7 読みの時間 p95 15秒", slow)
