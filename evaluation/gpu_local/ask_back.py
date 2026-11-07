@@ -26,13 +26,26 @@ rc = o.rc
 ARMS = {  # 名: (読むか, 確かめるか, 選び方, 聞くか)
     "基準": (True, False, "greedy", False),
     "聞く": (True, False, "greedy", True),
-    "本命": (True, True, "greedy", True),
+    "本命": (True, True, "greedy", True),  # 触れていない枠は見せず、直接聞く（試験 3 回目の前に固定）
+    "旧本命": (True, True, "greedy", True),  # 触れていない例外を「なし」と見せて確かめる（試験 2 回目の形）
     "読まない選ぶ": (False, False, "greedy", True),
     "読まない順番": (False, False, "order", True),
 }
 # (誤った読みを認める率, 答えを誤る率, この数を超える確認の画面は全部そのまま認める)
 USERS = {"正直": (0.0, 0.0, 0), "流される": (0.8, 0.0, 0), "省く": (0.8, 0.0, 3), "間違える": (0.8, 0.15, 0)}
 SEEDS = 20
+ASK_UNTOUCHED = {"本命"}
+
+
+def first_read(card: rc.Card, question: str, reading: dict[str, Any], arm: str) -> dict[str, list[Any] | None]:
+    """最初の読み。読めなかった事は値にしない形では、「触れない」の枠を空にして聞く側へ回す。"""
+    first = o.to_candidates(card, question, reading)
+    if arm in ASK_UNTOUCHED:
+        for n in card.slots:
+            it = reading.get(n)
+            if isinstance(it, dict) and it.get("status") == "触れない":
+                first[n] = None
+    return first
 
 
 # ---------------------------------------------------------------- 判定と次の枠
@@ -372,7 +385,7 @@ def run_all(cards: list[rc.Card], qs: list[dict], reads: dict, truth: dict) -> d
                     if not card:
                         rows.append({**base, "conclusion": None, "turns": 0, "items": 0, "typed": 0, "no_truth": []})
                         continue
-                    first = o.to_candidates(card, q["question"], reads.get(q["id"]) or {})
+                    first = first_read(card, q["question"], reads.get(q["id"]) or {}, arm)
                     u = User(card, parse_truth(card, truth.get(q["id"]) or {}), acc, err, skip,
                              random.Random(f"{seed}-{q['id']}"))
                     rows.append({**base, **dialog(card, first, u, arm)})

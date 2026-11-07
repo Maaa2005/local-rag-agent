@@ -312,12 +312,14 @@ def evaluate(card: rc.Card, cand: dict[str, list[Any] | None]) -> tuple[str | No
 
 
 class LLM:
-    def __init__(self, port: int) -> None:
+    def __init__(self, port: int, temperature: float = 0, seed: int = 1) -> None:
         self.url, self.calls, self.tokens = f"http://127.0.0.1:{port}/v1/chat/completions", 0, 0
+        self.temperature, self.seed = temperature, seed
 
     def __call__(self, messages: list[dict[str, str]], schema: dict[str, Any], max_tokens: int) -> Any:
         import urllib.request
-        body = {"model": "local-llm", "messages": messages, "temperature": 0, "seed": 1, "max_tokens": max_tokens,
+        body = {"model": "local-llm", "messages": messages, "temperature": self.temperature, "seed": self.seed,
+                "max_tokens": max_tokens,
                 "response_format": {"type": "json_schema", "json_schema": {"name": "r", "schema": schema, "strict": True}}}
         req = urllib.request.Request(self.url, json.dumps(body).encode(), {"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=120) as r:
@@ -433,7 +435,7 @@ def cmd_run(a: argparse.Namespace) -> None:
                 break
             except Exception:  # noqa: BLE001
                 time.sleep(1)
-        llm = LLM(a.port)
+        llm = LLM(a.port, a.temperature, a.seed)
         rows = []
         with open(out / f"raw_{a.arm}{a.round}.jsonl", "w", encoding="utf-8") as f:
             for q in qs:
@@ -474,6 +476,8 @@ def main() -> None:
     r.add_argument("--port", type=int, default=8098)
     r.add_argument("--ctx", type=int, default=4096)
     r.add_argument("--round", default="1")
+    r.add_argument("--temperature", type=float, default=0)
+    r.add_argument("--seed", type=int, default=1)
     a = p.parse_args()
     (cmd_upper if a.cmd == "upper" else cmd_run)(a)
 

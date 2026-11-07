@@ -234,6 +234,36 @@ def test_unknown_input_with_unknown_target_stays_unknown():
     assert ab.dialog(card, {}, ab.User(card, truth), "読まない選ぶ")["conclusion"] is None
 
 
+def _claim_card():
+    """懲戒は本人が言った時だけ当たる例外。触れていなければ今の読みは「なし」にする。"""
+    raw = {**_RAW, "exceptions": [{**_RAW["exceptions"][0], "if_unknown": "ignore"}],
+           "claim_only": {"懲戒": {"basis": "本人が言った時だけ"}}}
+    return rc.parse_card(raw)
+
+
+def test_untouched_is_asked_only_in_the_new_main_arm():
+    card = _claim_card()
+    q = "試験です。勤続5年で届出もあります。\n最後の行には「結論: 支給」または「結論: 不支給」のどちらかだけを書いてください。"
+    reading = {"勤続年数": {"status": "値", "quote": "勤続5年", "value": 5},
+               "届出": {"status": "値", "quote": "届出もあります", "value": "あり"},
+               "懲戒": {"status": "触れない", "quote": ""}}
+    plain = ab.o.to_candidates(card, q, reading)
+    assert plain["懲戒"] == ["なし"]
+    assert ab.first_read(card, q, reading, "旧本命")["懲戒"] == ["なし"]
+    assert ab.first_read(card, q, reading, "本命")["懲戒"] is None
+    assert ab.first_read(card, q, reading, "本命")["勤続年数"] == plain["勤続年数"]
+
+
+def test_new_main_arm_does_not_show_untouched_to_a_swayed_user():
+    """旧本命は「なし」を認めて誤り、本命は直接聞くので誤らない。"""
+    card = _card()
+    truth = {**TRUTH, "懲戒": ["あり"]}
+    shown = {"勤続年数": _d(5), "届出": ["あり"], "懲戒": ["なし"]}
+    assert ab.dialog(card, shown, _user(card, truth, accept=1.0), "旧本命")["conclusion"] == "支給"
+    hidden = {"勤続年数": _d(5), "届出": ["あり"]}
+    assert ab.dialog(card, hidden, _user(card, truth, accept=1.0), "本命")["conclusion"] == "不支給"
+
+
 def test_scene_diff_keeps_pairs_together_and_signs():
     scenes = [{"id": "a", "pair_id": "p"}, {"id": "b", "pair_id": "p"}, {"id": "c", "pair_id": None}]
     d = ab.scene_diff({"a": 1.0, "b": 1.0}, {"c": 1.0}, scenes, n=500)
