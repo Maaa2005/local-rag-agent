@@ -195,6 +195,45 @@ def test_not_applicable_amount_is_no_value_not_a_crash():
     assert ab.parse_truth(card, {"勤続年数": ["なし"], "懲戒": ["なし"]}) == {"勤続年数": None, "懲戒": ["なし"]}
 
 
+def _leave_card():
+    """700 点以上か、復職後 12 か月以内なら 600 点以上。"""
+    return rc.parse_card({**_RAW, "slots": {
+        "点数": {"type": "number", "unit": "点", "describe": "点数"},
+        "復職日": {"type": "date", "describe": "復職日"},
+        "締切日": {"type": "date", "describe": "締切日"},
+        "復職後月数": {"type": "number", "unit": "か月", "describe": "復職後月数"}},
+        "derive": {"復職後月数": {"months_between": ["復職日", "締切日"]}},
+        "conditions": [{"name": "点数", "quote": "所定の届出", "any": [
+            {"name": "700", "left": "点数", "op": ">=", "right": 700},
+            {"name": "特例", "all": [{"name": "12", "left": "復職後月数", "op": "<=", "right": 12},
+                                    {"name": "600", "left": "点数", "op": ">=", "right": 600}]}]}],
+        "exceptions": []})
+
+
+def test_not_applicable_means_the_comparison_fails_not_unknown():
+    card = _leave_card()
+    truth = ab.parse_truth(card, {"点数": [650], "復職日": ["なし"], "復職後月数": ["なし"], "締切日": ["2027-04-30"]})
+    assert truth["復職日"] is None and truth["復職後月数"] == [ab.o.BIG]
+    r = ab.dialog(card, {}, ab.User(card, truth), "読まない選ぶ")
+    assert r["conclusion"] == "不支給"
+    assert not r["no_truth"]
+
+
+def test_not_applicable_corrects_a_zero_read():
+    """「復職していない」を 0 か月と読むと特例が効く。確かめて直れば誤らない。"""
+    card = _leave_card()
+    truth = ab.parse_truth(card, {"点数": [650], "復職日": ["なし"], "復職後月数": ["なし"], "締切日": ["2027-04-30"]})
+    first = {"点数": _d(650), "復職後月数": _d(0)}
+    assert ab.dialog(card, first, ab.User(card, dict(truth)), "聞く")["conclusion"] == "支給"
+    assert ab.dialog(card, first, ab.User(card, dict(truth)), "本命")["conclusion"] == "不支給"
+
+
+def test_unknown_input_with_unknown_target_stays_unknown():
+    card = _leave_card()
+    truth = ab.parse_truth(card, {"点数": [650], "復職日": None, "復職後月数": None, "締切日": ["2027-04-30"]})
+    assert ab.dialog(card, {}, ab.User(card, truth), "読まない選ぶ")["conclusion"] is None
+
+
 def test_scene_diff_keeps_pairs_together_and_signs():
     scenes = [{"id": "a", "pair_id": "p"}, {"id": "b", "pair_id": "p"}, {"id": "c", "pair_id": None}]
     d = ab.scene_diff({"a": 1.0, "b": 1.0}, {"c": 1.0}, scenes, n=500)

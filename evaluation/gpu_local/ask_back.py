@@ -199,10 +199,10 @@ def _same(shown: list[Any], truth: list[Any]) -> bool:
 
 def _other_form(card: rc.Card, name: str, user: User) -> str | None:
     """本人が元の値の形では持っていない時、同じ量の計算された形で答えられる枠（税抜きが無く税込みはある等）。"""
-    if name in user.truth:
+    if user.truth.get(name) is not None:
         return None
     for target, e in card.derive.items():
-        if name in rc._names(e, card.slots) and target in user.truth:
+        if name in rc._names(e, card.slots) and user.truth.get(target) is not None:
             return target
     return None
 
@@ -268,6 +268,24 @@ def dialog(card: rc.Card, first: dict[str, list[Any] | None], user: User, arm: s
 # ---------------------------------------------------------------- 本当の値と集計
 
 
+def _upper_only(card: rc.Card, name: str) -> bool:
+    """この量が上限（以内・未満）の比べだけに出るか。出るなら「当たらない」は、どの比べも成り立たない大きな数で表せる。"""
+    ops: list[str] = []
+
+    def walk(c: Any) -> None:
+        if not isinstance(c, dict):
+            return
+        for key in ("any", "all"):
+            for sub in c.get(key) or []:
+                walk(sub)
+        if c.get("left") == name:
+            ops.append(str(c.get("op")))
+
+    for c in (*(card.raw.get("conditions") or []), *(card.raw.get("exceptions") or [])):
+        walk(c)
+    return bool(ops) and all(op in ("<", "<=") for op in ops)
+
+
 def parse_truth(card: rc.Card, slots: dict[str, Any]) -> dict[str, list[Any] | None]:
     out: dict[str, list[Any] | None] = {}
     for name, raw in slots.items():
@@ -278,8 +296,8 @@ def parse_truth(card: rc.Card, slots: dict[str, Any]) -> dict[str, list[Any] | N
             continue
         xs = raw if isinstance(raw, list) else [raw]
         t = card.slots[name].type
-        if t != "bool" and xs == [rc.BOOL_VALUES[1]]:  # 当たらない量（認定が無い時の認定日など）。答えられる値は無い
-            out[name] = None
+        if t != "bool" and xs == [rc.BOOL_VALUES[1]]:  # 本人が「当たらない」と答える量（育休が無い時の復職後月数など）
+            out[name] = [o.BIG] if t == "number" and _upper_only(card, name) else None
             continue
         if t == "number":
             out[name] = [Decimal(str(x)) for x in xs]
