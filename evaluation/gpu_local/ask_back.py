@@ -197,6 +197,16 @@ def _same(shown: list[Any], truth: list[Any]) -> bool:
 # ---------------------------------------------------------------- やり取り
 
 
+def _other_form(card: rc.Card, name: str, user: User) -> str | None:
+    """本人が元の値の形では持っていない時、同じ量の計算された形で答えられる枠（税抜きが無く税込みはある等）。"""
+    if name in user.truth:
+        return None
+    for target, e in card.derive.items():
+        if name in rc._names(e, card.slots) and target in user.truth:
+            return target
+    return None
+
+
 def dialog(card: rc.Card, first: dict[str, list[Any] | None], user: User, arm: str) -> dict[str, Any]:
     reads, check, policy, asks = ARMS[arm]
     cand: dict[str, list[Any] | None] = {n: None for n in card.slots}
@@ -218,6 +228,10 @@ def dialog(card: rc.Card, first: dict[str, list[Any] | None], user: User, arm: s
             turns += 1
             typed += 1
             asked.add(s)
+            other = _other_form(card, s, user)
+            if other:  # 同じ画面で別の形を入れてもらう。やり取りは増やさない
+                s = other
+                asked.add(s)
             v = user.answer(s)
             if v is not None:
                 cand[s] = v
@@ -234,6 +248,13 @@ def dialog(card: rc.Card, first: dict[str, list[Any] | None], user: User, arm: s
         items += len(need)
         bulk = bool(user.skip_over) and len(need) > user.skip_over
         for s in need:
+            other = None if bulk else _other_form(card, s, user)
+            if other:  # 読みと同じ形の本当の値を持たないので、別の形で直してもらう
+                confirmed.update((s, other))
+                asked.update((s, other))
+                typed += 1
+                cand[s], cand[other] = None, user.answer(other)
+                continue
             ok, fixed = (True, None) if bulk else user.confirm(s, cand[s])
             confirmed.add(s)
             if not ok:
@@ -257,6 +278,9 @@ def parse_truth(card: rc.Card, slots: dict[str, Any]) -> dict[str, list[Any] | N
             continue
         xs = raw if isinstance(raw, list) else [raw]
         t = card.slots[name].type
+        if t != "bool" and xs == [rc.BOOL_VALUES[1]]:  # 当たらない量（認定が無い時の認定日など）。答えられる値は無い
+            out[name] = None
+            continue
         if t == "number":
             out[name] = [Decimal(str(x)) for x in xs]
         elif t == "date":

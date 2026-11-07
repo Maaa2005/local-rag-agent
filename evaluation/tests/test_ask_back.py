@@ -170,6 +170,31 @@ def test_derived_read_is_dropped_when_inputs_are_read():
     assert ab.dialog(card, first, u, "基準")["conclusion"] == "支給"  # 計算した 120 分が勝つ
 
 
+def _tax_card():
+    raw = {**_RAW, "slots": {
+        "税抜き": {"type": "number", "unit": "円", "describe": "税抜き"},
+        "税込み": {"type": "number", "unit": "円", "describe": "税込み"},
+        "認定日": {"type": "date", "describe": "認定の日"}},
+        "derive": {"税込み": {"mul": ["税抜き", 1.1]}},
+        "conditions": [{"name": "5000円以下", "left": "税込み", "op": "<=", "right": 5000, "quote": "所定の届出"}],
+        "exceptions": []}
+    return raw
+
+
+def test_asked_input_falls_back_to_the_form_the_user_has():
+    card = rc.parse_card(_tax_card())
+    u = ab.User(card, {"税込み": _d(4400)})
+    r = ab.dialog(card, {}, u, "読まない選ぶ")
+    assert r["conclusion"] == "支給"
+    assert r["turns"] == r["typed"] == 1
+    assert not r["no_truth"]
+
+
+def test_not_applicable_amount_is_no_value_not_a_crash():
+    card = _card()
+    assert ab.parse_truth(card, {"勤続年数": ["なし"], "懲戒": ["なし"]}) == {"勤続年数": None, "懲戒": ["なし"]}
+
+
 def test_scene_diff_keeps_pairs_together_and_signs():
     scenes = [{"id": "a", "pair_id": "p"}, {"id": "b", "pair_id": "p"}, {"id": "c", "pair_id": None}]
     d = ab.scene_diff({"a": 1.0, "b": 1.0}, {"c": 1.0}, scenes, n=500)
