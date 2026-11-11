@@ -91,6 +91,30 @@ def _strict_tokens(res: dict, min_chunks: int, min_imatrix_chunks: int) -> str |
 READ_ERRORS = (OSError, ValueError, KeyError, TypeError)
 
 
+def _num(x) -> bool:
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def _offload(x) -> list[int]:
+    """基準の載りの記録 [載った層・全部の層] の形を確かめる。違えば ValueError。"""
+    if not (isinstance(x, list) and len(x) == 2 and all(type(v) is int for v in x) and x[1] > 0 and 0 <= x[0] <= x[1]):
+        raise ValueError(f"基準の載りの記録の形が違う（{x!r}・整数 2 つで 0 <= 載った <= 全部・全部 > 0 のはず）")
+    return x
+
+
+def _items(rows: list, need: dict[str, tuple], name: str) -> list[dict]:
+    """時間・変種の記録の行の形を確かめる。違えば ValueError。"""
+    for r in rows:
+        if not isinstance(r, dict) or any(not check(r.get(k)) for k, check in need.items()):
+            raise ValueError(f"{name} の行の形が違う（{r!r}）")
+    return rows
+
+
+NEED = {"timing.jsonl": {"step": lambda v: isinstance(v, str) and bool(v), "sec": _num},
+        "variants.jsonl": {"name": lambda v: isinstance(v, str) and bool(v), "sha256": lambda v: isinstance(v, str),
+                           "bytes": lambda v: type(v) is int and v >= 0}}
+
+
 def _read_rest(mdir: Path, qs, res: dict, skip: set[str]) -> dict[str, dict]:
     """基準の 2 回のほかの記録（変種の答え・KLD・比べ元・imatrix・載り・時間）を読む。変種の採点を返す。"""
     runs = {p.stem: _rows(p) for p in sorted((mdir / "runs").glob("*.jsonl")) if p.stem not in skip}
@@ -110,11 +134,12 @@ def _read_rest(mdir: Path, qs, res: dict, skip: set[str]) -> dict[str, dict]:
     res["imatrix_chunks"] = {x: d.get("chunks") for x, d in res["imatrix_logs"].items()}
     off = mdir / "ref_offload.json"
     if off.exists():
-        res["ref_offload"] = json.loads(off.read_text(encoding="utf-8"))["offloaded"]
+        res["ref_offload"] = _offload(json.loads(off.read_text(encoding="utf-8"))["offloaded"])
     for f in ("timing.jsonl", "variants.jsonl"):
         fp = mdir / f
         if fp.exists():
-            res[f.split(".")[0]] = [json.loads(l) for l in fp.read_text(encoding="utf-8").splitlines() if l.strip()]
+            rows = [json.loads(l) for l in fp.read_text(encoding="utf-8").splitlines() if l.strip()]
+            res[f.split(".")[0]] = _items(rows, NEED[f], f)  # 確かめてから入れる（壊れた行は表に使わない）
     return scored
 
 
@@ -128,7 +153,11 @@ def collect_model(mdir: Path, ids: set[str] | None = None, strict: bool = False,
         min_imatrix_chunks = max(min_imatrix_chunks, MAIN_MIN_IMATRIX_CHUNKS)
     answered = sorted((mdir / "runs").glob("*.jsonl"))
     if strict and (mdir / UNCONVERTIBLE).exists():
-        reason = (mdir / UNCONVERTIBLE).read_text(encoding="utf-8").strip()
+        try:
+            reason = (mdir / UNCONVERTIBLE).read_text(encoding="utf-8").strip()
+        except READ_ERRORS as e:
+            return {"status": "データ欠損", "summaries": {}, "metrics": {},
+                    "judge_error": f"変換不能の印が読めない（{type(e).__name__}）"}
         if answered:
             return {"status": "データ欠損", "reason": reason, "summaries": {}, "metrics": {},
                     "judge_error": f"変換不能の印があるのに答えの記録が {len(answered)} 本ある（答えを流した後の替えは受け付けない）"}

@@ -205,6 +205,9 @@ def test_parse_kld_log():
     assert two["runs"] == 2 and not two["complete"]
     # 数の付かない [n] は途中経過に数えない
     assert parse_log("perplexity: computing over 80 chunks\nsave [80] done\n")["chunks_done"] == 0
+    # 終わりの印の後に途中経過がある記録は済んだと見ない
+    late = parse_log("perplexity: computing over 2 chunks\n[1]9.1,\nFinal estimate: PPL = 9.1 +/- 0.1\n[2]9.2,\n")
+    assert late["chunks_done"] == 2 and not late["complete"]
 
 
 def test_offload_from_log():
@@ -553,6 +556,57 @@ def test_report_strict_keeps_minimum_inside(tmp_path):
     for x in P.TEXTS:
         (m / "logs" / f"{P.REF}-base-{x}.log").write_text(_progress_log("perplexity", 40), encoding="utf-8")
     assert "区切り" in collect_model(m, strict=True, min_chunks=20, min_imatrix_chunks=20)["judge_error"]
+
+
+@pytest.mark.parametrize("off", [[37], ["9", "37"], [38, 37], [-1, 37], [0, 0], [9.0, 37], "37/37", [True, 37]])
+def test_report_bad_offload_is_missing_data(tmp_path, off):
+    m = _model_dir(tmp_path)
+    (m / "ref_offload.json").write_text(json.dumps({"offloaded": off}), encoding="utf-8")
+    for kw in ({"strict": True}, {}):
+        res = collect_model(m, **kw)
+        assert res["status"] == "データ欠損" and "載り" in res["judge_error"]
+        assert "ref_offload" not in res and "データ欠損" in markdown("m", res, not kw)
+
+
+@pytest.mark.parametrize("off,want", [([9, 37], True), ([37, 37], False)])
+def test_report_partial_offload_needs_place_run(tmp_path, monkeypatch, off, want):
+    from evaluation.quant_probe import report
+    seen = {}
+
+    def fake(*a, **k):
+        seen["need_place"] = a[7]
+        raise J.StrictError("止めた")
+
+    monkeypatch.setattr(report, "judge_model", fake)
+    m = _model_dir(tmp_path)
+    (m / "ref_offload.json").write_text(json.dumps({"offloaded": off}), encoding="utf-8")
+    assert collect_model(m, strict=True)["status"] == "データ欠損"
+    assert seen["need_place"] is want  # 一部だけ載った時は載せ方違いの組を求める
+
+
+@pytest.mark.parametrize("name,line", [("timing.jsonl", "{}"), ("timing.jsonl", '{"step": "a", "sec": "9"}'),
+                                       ("timing.jsonl", "[1]"), ("variants.jsonl", '{"name": "Q4_K_M-en"}')])
+def test_report_bad_side_records_are_missing_data(tmp_path, name, line):
+    m = _model_dir(tmp_path)
+    (m / "ref_offload.json").write_text(json.dumps({"offloaded": [37, 37]}), encoding="utf-8")
+    (m / name).write_text(line + "\n", encoding="utf-8")
+    for kw in ({"strict": True}, {}):
+        res = collect_model(m, **kw)
+        assert res["status"] == "データ欠損" and name in res["judge_error"]
+        assert "データ欠損" in markdown("m", res, not kw)
+    good = ('{"step": "a", "sec": 1.5, "at": "x"}' if name == "timing.jsonl"
+            else '{"name": "Q4_K_M-en", "sha256": "ab", "bytes": 3}')
+    (m / name).write_text(good + "\n", encoding="utf-8")
+    assert collect_model(m)["status"] == "適格"
+
+
+def test_report_unreadable_marker_is_missing_data(tmp_path):
+    fresh = tmp_path / "fresh"
+    (fresh / "runs").mkdir(parents=True)
+    (fresh / "unconvertible.txt").write_bytes(b"\xff\xfe\xfa")
+    res = collect_model(fresh, strict=True)
+    assert res["status"] == "データ欠損" and "印" in res["judge_error"]
+    assert "データ欠損" in markdown("fresh", res, False)
 
 
 def test_report_missing_ref_answers(tmp_path):
