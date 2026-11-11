@@ -5,7 +5,7 @@
 - 結論の読み方と 6 つの分け方・集計
 - 検定（規程ごとの符号入れ替え・ブートストラップ・McNemar・Holm・Spearman）の値
 - KLD の出力の読み方・GPU への載り方の読み方
-- 判定の線 qp-judge-2（型 A・型 B・気づく・決められない・差が出ない・測れない・厳しく見る時・全体）
+- 判定の線 qp-judge-3（型 A・型 B・気づく・決められない・差が出ない・測れない・厳しく見る時・全体）
 - 全体を回す部品が、決めた順と引数でコマンドを組むこと・集計が記録をつなぐこと
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ from evaluation.quant_probe import pipeline as P
 from evaluation.quant_probe.kld import parse_log
 from evaluation.quant_probe.questions import (HOLD, PROMPT_VERSION, build_messages, domain_text,
                                               load_questions, load_rules, manifest)
-from evaluation.quant_probe.report import collect_model
+from evaluation.quant_probe.report import PLANNED, SPARE, collect_model, overall_block, overall_models
 from evaluation.quant_probe.score import classify, parse_conclusion, score_rows, summarize
 from evaluation.quant_probe.stats import (block_bootstrap_upper, holm, mcnemar_one_sided, mcnemar_two_sided,
                                           signflip_exact, spearman)
@@ -242,17 +242,27 @@ def test_noticed_when_only_high_kld_worse():
     vs = [variant("Q4_K_M-en", spread(1), 0.03), variant("Q6_K-en", set(), 0.005), variant("Q2_K-en", spread(30), 0.4)]
     r = judge(vs)
     assert r["worse"] == ["Q2_K-en"] and r["by_metric"]["kld_en"]["verdict"] == "気づく"
-    assert all(r["variants"][n]["same"] for n in ("Q4_K_M-en", "Q6_K-en"))
+    assert all(r["variants"][n]["small"] for n in ("Q4_K_M-en", "Q6_K-en"))
+    assert r["variants"]["Q2_K-en"]["upper95_ref"] is not None
+    assert judge(vs, boot_n=0)["variants"]["Q2_K-en"]["upper95_ref"] is None
 
 
-def test_cannot_decide_when_safe_variant_not_shown_same():
-    # 安全域の Q6_K-en が 4 規程に 4 問ずつ集まって増えた: 検定では悪化と言えないが、同じとも言えない
+def test_cannot_decide_when_safe_variant_not_small():
+    # 安全域の Q6_K-en が 4 規程に 4 問ずつ集まって増えた: 検定では悪化と言えないが、小さいとも言えない
     vs = [variant("Q4_K_M-en", set(), 0.03), variant("Q6_K-en", packed(4, 4), 0.005),
           variant("Q2_K-en", spread(30), 0.4)]
     r = judge(vs)
-    assert r["worse"] == ["Q2_K-en"] and not r["variants"]["Q6_K-en"]["same"]
+    assert r["worse"] == ["Q2_K-en"] and not r["variants"]["Q6_K-en"]["small"]
     b = r["by_metric"]["kld_en"]
-    assert b["verdict"] == "決められない" and b["safe_not_same"] == ["Q6_K-en"]
+    assert b["verdict"] == "決められない" and b["safe_left"] == ["Q6_K-en"]
+
+
+def test_cannot_decide_when_safe_variant_unresponsive():
+    # 安全域の Q6_K-en が保留ばかりしている: WA は増えないが、答えていないので「気づく」と言わない
+    over = set(ANSWERABLE[100:130])
+    vs = [variant("Q4_K_M-en", set(), 0.03), variant("Q6_K-en", set(), 0.005, over), variant("Q2_K-en", spread(30), 0.4)]
+    b = judge(vs)["by_metric"]["kld_en"]
+    assert b["verdict"] == "決められない" and b["safe_left"] == ["Q6_K-en"]
 
 
 def test_min_delta_and_noise():
@@ -287,7 +297,20 @@ def test_pattern_b_needs_responsive_lower_side():
     r = judge(vs)
     b = r["by_metric"]["kld_en"]
     assert b["pattern_b"] == [] and "Q3_K_M-en" in r["unresponsive"]
-    assert b["verdict"] == "気づく"
+    # 型 B にはできないが、片方だけ悪化した近い対が残るので「気づく」とも言わない
+    assert b["near_left"] == ["Q3_K_M-en|Q3_K_M-ja"] and b["verdict"] == "決められない"
+
+
+def test_near_pair_both_worse_is_left():
+    # Astra の例の形: 近い対の両方が悪化し、差が 4 規程に集まった（有意でない）。型 B と決まらないので「気づく」にしない
+    vs = [variant("Q4_K_M-en", set(), 0.03), variant("Q3_K_M-en", spread(30), 0.100),
+          variant("Q3_K_M-ja", spread(30) | packed(4, 4), 0.105)]
+    b = judge(vs)["by_metric"]["kld_en"]
+    assert b["pattern_b"] == [] and b["near_left"] == ["Q3_K_M-en|Q3_K_M-ja"] and b["verdict"] == "決められない"
+    # 差が 3 未満なら残らない
+    vs[2] = variant("Q3_K_M-ja", spread(32), 0.105)
+    b = judge(vs)["by_metric"]["kld_en"]
+    assert b["near_left"] == [] and b["verdict"] == "気づく"
 
 
 def test_weak_reference_not_measurable():
@@ -314,15 +337,25 @@ def test_strict_stops():
     with pytest.raises(J.StrictError, match="15"):
         judge(vs, strict=True)
     full = [variant(n, set(), 0.01 * (k + 1)) for k, n in enumerate(P.ALL_VARIANTS)]
-    assert judge(full, strict=True)["valid"]
+    o = outcomes(REF_WA)
+    with pytest.raises(J.StrictError, match="揺れの組"):
+        judge(full, strict=True)
+    pairs = [(P.RERUN, o, o)]
+    assert judge(full, strict=True, noise_pairs=pairs)["valid"]
+    with pytest.raises(J.StrictError, match="揺れの組"):
+        judge(full, strict=True, noise_pairs=pairs, need_place=True)
+    assert judge(full, strict=True, noise_pairs=pairs + [(P.PLACE, o, o)], need_place=True)["valid"]
+    few = {i: v for i, v in o.items() if i not in IDS[:15]}
+    with pytest.raises(J.StrictError, match="問が 345"):
+        J.judge_model(few, few, [{**v, "outcomes": few} for v in full], SH, BLOCKS, pairs, strict=True)
     miss = [dict(v) for v in full]
     miss[0] = {**miss[0], "outcomes": {**miss[0]["outcomes"], IDS[300]: "missing"}}
     with pytest.raises(J.StrictError, match="答えの無い"):
-        judge(miss, strict=True)
+        judge(miss, strict=True, noise_pairs=pairs)
     nan = [dict(v) for v in full]
     nan[1] = {**nan[1], "metrics": kmetrics(float("nan"))}
     with pytest.raises(J.StrictError, match="数でない"):
-        judge(nan, strict=True)
+        judge(nan, strict=True, noise_pairs=pairs)
 
 
 def _res(verdict, valid=True):
@@ -332,7 +365,7 @@ def _res(verdict, valid=True):
 @pytest.mark.parametrize("vs,want", [
     (["気づかない", "気づかない", "気づく"], "はい"),
     (["気づかない", "気づく", "気づく"], "モデルによる"),
-    (["気づく", "気づく", "差が出ない"], "いいえ"),
+    (["気づく", "気づく", "差が出ない"], "いいえ（この 360 問で）"),
     (["気づく", "決められない", "決められない"], "測れず"),
     (["気づく", "差が出ない", "差が出ない"], "測れず"),
     (["気づかない"], "測れず"),
@@ -343,12 +376,13 @@ def test_overall(vs, want):
 
 def test_overall_skips_invalid():
     r = {"a": _res("気づかない", valid=False), "b": _res("気づく"), "c": _res("気づく")}
-    assert J.judge_overall(r) == "いいえ"
+    assert J.judge_overall(r) == "いいえ（この 360 問で）"
 
 
 def test_alpha_bounds_two_false_of_three():
-    # 3 モデルで 2 つ以上誤る確率 <= 3*α/2（依存によらない）
-    assert 3 * J.ALPHA_MODEL / 2 <= 0.05 + 1e-12
+    # 本当に見逃すモデルが 0 なら 2 つ以上誤る確率 <= 3α/2、1 なら残り 2 つのどちらかが誤る確率 <= 2α（依存によらない）
+    assert 3 * J.ALPHA_MODEL / 2 <= 0.0375 + 1e-12
+    assert 2 * J.ALPHA_MODEL <= 0.05 + 1e-12
     assert J.ALPHA_A + J.ALPHA_B == pytest.approx(J.ALPHA_MODEL)
 
 
@@ -382,7 +416,8 @@ def test_pipeline_dry_run(tmp_path, capsys):
     assert len(base) == 3 and len(kl) == 6 and all("--chunks 80" in c for c in base + kl)
     srv = [c for c in cmds if " llama-server " in c]
     # 基準 2 回・Q4_K_M-en・その 2 回目・Q2_K-none
-    assert len(srv) == 5 and all("-np 1" in c and "--cache-ram 0" in c and "--seed 1" in c for c in srv)
+    assert len(srv) == 5 and all("-np 1" in c and "--cache-ram 0" in c and "--seed 1" in c and "-lv 4" in c
+                                 for c in srv)
 
 
 def test_pipeline_place_and_bf16_check(tmp_path, capsys):
@@ -420,10 +455,34 @@ def test_report_collect_model(tmp_path):
     assert j["valid"] and j["worse"] == [] and set(j["noise_each"]) == {"ref", P.RERUN}
     assert j["by_metric"]["kld_en"]["verdict"] == "差が出ない"
     assert res["base_chunks"] == {"en": 80, "ja": 80, "dom": 80} and res["imatrix_chunks"] == {"en": 128, "ja": 128}
+    assert "載り" in collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=128)["judge_error"]
+    (m / "ref_offload.json").write_text(json.dumps({"offloaded": [37, 37]}), encoding="utf-8")
     strict = collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=128)
     assert "15" in strict["judge_error"]
     assert "区切り" in collect_model(m, strict=True, min_chunks=100)["judge_error"]
     assert "imatrix" in collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=200)["judge_error"]
+
+
+def test_overall_block_and_spare():
+    ok = {m: {"judge": _res("気づく")} for m in PLANNED}
+    assert overall_block(ok) is None and set(overall_models(ok)) == set(PLANNED)
+    lost = {**ok, PLANNED[0]: {"judge_error": "答えの無い問が 3"}}
+    assert "データ欠損" in overall_block(lost) and "答えの無い" in overall_block(lost)
+    assert "決めたモデル" in overall_block({m: ok[m] for m in PLANNED[:2]})
+    assert "替える理由" in overall_block({**ok, SPARE: {"judge": _res("気づく")}})
+    weak = {**ok, PLANNED[1]: {"judge": _res("気づかない", valid=False)}, SPARE: {"judge": _res("気づく")}}
+    assert overall_block(weak) is None
+    use = overall_models(weak)
+    assert PLANNED[1] not in use and SPARE in use and len(use) == 3
+
+
+def test_power_runs_end_to_end():
+    from evaluation.quant_probe import power
+    import random
+    w = power.World(random.Random(1))
+    assert power.one_model(w, "null", 0, 24) in ("差が出ない", "決められない", "気づく", "気づかない")
+    o = power.combine([{v: (1.0 if v == "気づく" else 0.0) for v in power.VERDICTS}] * 3)
+    assert o["いいえ（この 360 問で）"] == pytest.approx(1.0)
 
 
 def test_pick_ja_articles():

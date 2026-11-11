@@ -1,36 +1,46 @@
-"""測る前に固定した判定の線 qp-judge-2（docs/quant-probe-plan.md の 5 章と同じ。変えるなら測る前に版を上げる）。
+"""測る前に固定した判定の線 qp-judge-3（docs/quant-probe-plan.md の 5 章と同じ。変えるなら測る前に版を上げる）。
 
 まとまり = 規程（24 規程・1 規程 15 問）。誤った断定（WA）の差は規程ごとに足し、規程を単位に検定する。
+検定の前提: 24 規程は「同じ作り方の規程」から引いた物と見なし、差が無い（帰無）時は、規程ごとに基準と変種の
+名札を入れ替えても差の分布が変わらない（規程の差の符号を独立に入れ替えてよい）。主の物差し kld_en は規程と別の文章で
+測るので、KLD で近い対を選んでも、この前提は崩れない。
 
 0. 基準が測れる: 基準 Q8_0 の 2 回とも、答えられる問の正答 >= 70%・保留すべき問の保留 >= 50%・形式違反 <= 5%。
-1. 揺れ: 同じ物をもう 1 回流した組（基準の 2 回・Q4_K_M-en の 2 回・置き方だけ変えた Q6_K-none）で、
+1. 揺れ: 同じ物をもう 1 回流した組（基準の 2 回・Q4_K_M-en の 2 回・基準が GPU に載り切らない時の Q6_K-none）で、
    WA が食い違った問の数の最大。
 2. 悪化した変種 W（家族 A）: 基準 1 回目との WA の差の合計 Δ >= 3、規程ごとの差の符号を入れ替える正確検定（片側）の
-   p を変種の数で Holm に直して < ALPHA_A、かつ Δ > 2×揺れ。
+   p を 15 変種で Holm に直して < ALPHA_A、かつ Δ > 2×揺れ。
 3. 物差し s の安全域 Safe_s: s のずれ <= ANCHOR（Q4_K_M-en）のずれ。
 4. 型 A（気づかない）: Safe_s ∩ W が空でない。
-5. 型 B（気づかない・家族 B）: s のずれの差が大きい方の 10% 以内の対（KLD だけで選び、答えは見ない）。
-   WA の差の符号入れ替え正確検定（両側）の p を対の数で Holm に直して < ALPHA_B、|Δ| >= 3、|Δ| > 2×揺れ、
-   WA の多い方が W に入り、少ない方が答えている（形式違反 <= 5%・保留しすぎの率の増え <= 5 点）。
+5. 型 B（気づかない・家族 B）: s のずれの差が大きい方の 10% 以内の対。WA の差の符号入れ替え正確検定（両側）の p を
+   対の数で Holm に直して < ALPHA_B、|Δ| >= 3、|Δ| > 2×揺れ、WA の多い方が W に入り、少ない方が答えている
+   （形式違反 <= 5%・保留しすぎの率の増え <= 5 点）。
 6. 答えていない変種（形式違反 > 5% か 保留しすぎの増え > 5 点）は「応答不能が増えた」と印を付ける。W からは外さない。
-7. 同じと言える: 規程を引き直すブートストラップ（種 20261111・1 万回）で WA の増えの 95% 上側 < 10 問。
-8. モデルごと・物差しごと: 0 を満たさない →「測れない」。型 A か B →「気づかない」。W があり Safe_s が全部同じと言える
-   →「気づく」。W があり Safe_s に同じと言えない物がある →「決められない」。W が無い →「差が出ない」。
-9. α: 1 モデル 0.10/3 を A と B に半分ずつ。3 モデルで「気づかない」を 2 つ以上誤って出す確率は
-   依存によらず <= 0.05（P(N>=2) <= E[N]/2）。主の物差しは kld_en だけ。ほかの物差しは同じ線で出すが探索の扱い。
-10. 全体: 「気づかない」2 つ以上 →「はい」、1 つ →「モデルによる」、0 で「気づく」2 つ以上 →「いいえ」、ほかは「測れず」。
-11. 厳しく見る時（本番）: 答えの欠け・変種が 15 でない・ずれが数でない → 判定せずに止める。
+7. 小さい: この 360 問の上で WA の増え Δ < 3（悪化の線と同じ幅。規程一般への保証は無い・記述）。
+   規程を引き直すブートストラップの 95% 上側は参考に出すだけで、線には使わない（24 規程では覆う確率を保証できない）。
+8. モデルごと・物差しごと: 0 を割る →「測れない」。型 A か B →「気づかない」。
+   W があり、Safe_s の全部が「答えている」かつ「小さい」、かつ「近い対で差が残る」物が無い →「気づく」。
+   「近い対で差が残る」= 近い対で |Δ| >= 3 なのに型 B と決まらなかった（両方が W の対も含む。少数の規程に
+   集まった型 B を「気づく」と取り違えないため）。
+   W があり、それ以外 →「決められない」（安全域で増えが残る・安全域が答えていない・近い対に差が残る）。W が無い →「差が出ない」。
+9. α: 1 モデル 0.025 を A と B に半分ずつ。「はい」（3 モデル中 2 つ以上で気づかない）を誤って出す確率は、
+   本当に見逃すモデルが 0 なら 3×0.025/2 = 0.0375 以下、1 なら残り 2 つのどちらかの誤り 2×0.025 = 0.05 以下。
+   主の物差しは kld_en だけ。ほかの物差しは同じ線で出すが探索の扱い。「いいえ」は 8 の記述の線に依り、誤りの確率を保証しない。
+10. 全体: 「気づかない」2 つ以上 →「はい」、1 つ →「モデルによる」、0 で「気づく」2 つ以上 →「いいえ（この 360 問で）」、ほかは「測れず」。
+11. 厳しく見る時（本番）: 答えの欠け・問が 360 でない・規程が 24 でない・変種が 15 でない・ずれが数でない・
+    揺れの組（Q4_K_M-en の 2 回目、基準が載り切らない時の Q6_K-none の載せ方違い）が無い → 判定せずに止める。
 """
 from __future__ import annotations
 
 import math
 from itertools import combinations
 
+from .pipeline import ALL_VARIANTS, PLACE, RERUN
 from .stats import block_bootstrap_upper, discordant, holm, mcnemar_one_sided, signflip_exact, spearman
 
-JUDGE_VERSION = "qp-judge-2"
+JUDGE_VERSION = "qp-judge-3"
 MIN_DELTA = 3
-ALPHA_MODEL = 0.10 / 3
+ALPHA_MODEL = 0.025
 ALPHA_A = ALPHA_MODEL / 2
 ALPHA_B = ALPHA_MODEL / 2
 NEAR_REL = 0.10
@@ -39,17 +49,17 @@ REF_MIN_HELD = 0.50
 REF_MAX_FORMAT = 0.05
 RESP_MAX_FORMAT = 0.05
 RESP_MAX_OVERHOLD_UP = 0.05
-EQUIV_MARGIN = 10
 BOOT_N = 10000
 BOOT_SEED = 20261111
 ANCHOR = "Q4_K_M-en"
-N_VARIANTS = 15
+N_QUESTIONS = 360
+N_BLOCKS = 24
 METRICS = ("kld_en", "ppl_en", "kld_ja", "ppl_ja", "kld_dom")
 PRIMARY = "kld_en"
 
 
 class StrictError(ValueError):
-    """厳しく見る時に、判定の前提が欠けている。"""
+    """厳しく見る時に、判定の前提が欠けている（基準が弱い「測れない」とは別）。"""
 
 
 def deviation(metrics: dict, s: str) -> float | None:
@@ -92,11 +102,16 @@ def ref_ok(q: dict[str, float]) -> bool:
     return q["correct"] >= REF_MIN_CORRECT and q["held"] >= REF_MIN_HELD and q["format"] <= REF_MAX_FORMAT
 
 
-def _check_strict(ref1, ref2, variants, noise_pairs) -> None:
-    from .pipeline import ALL_VARIANTS
+def _check_strict(ref1, ref2, variants, noise_pairs, blocks, need_place) -> None:
+    if len(ref1) != N_QUESTIONS or len({blocks[i] for i in ref1}) != N_BLOCKS:
+        raise StrictError(f"問が {len(ref1)}・規程が {len({blocks[i] for i in ref1})}（{N_QUESTIONS}・{N_BLOCKS} であるべき）")
     names = {v["name"] for v in variants}
     if names != set(ALL_VARIANTS):
         raise StrictError(f"変種が 15 そろっていない: 足りない {sorted(set(ALL_VARIANTS) - names)}")
+    have = {n for n, _, _ in noise_pairs}
+    need = {RERUN} | ({PLACE} if need_place else set())
+    if need - have:
+        raise StrictError(f"揺れの組が無い: {sorted(need - have)}")
     runs = [("ref-r1", ref1), ("ref-r2", ref2), *((v["name"], v["outcomes"]) for v in variants),
             *((f"{n}:a", a) for n, a, _ in noise_pairs), *((f"{n}:b", b) for n, _, b in noise_pairs)]
     for n, o in runs:
@@ -113,16 +128,17 @@ def _check_strict(ref1, ref2, variants, noise_pairs) -> None:
 def judge_model(ref1: dict[str, str], ref2: dict[str, str], variants: list[dict],
                 should_hold: dict[str, bool], blocks: dict[str, str],
                 noise_pairs: list[tuple[str, dict[str, str], dict[str, str]]] = (),
-                strict: bool = False) -> dict:
+                strict: bool = False, need_place: bool = False, boot_n: int = BOOT_N) -> dict:
     """ref1/ref2: id → 結果の語。variants: [{name, outcomes, metrics: {s: parse_log の辞書}}]。
-    blocks: id → 規程の名前。noise_pairs: [(名前, 1 回目の結果, 2 回目の結果)]（同じ物を 2 回流した組）。"""
+    blocks: id → 規程の名前。noise_pairs: [(名前, 1 回目の結果, 2 回目の結果)]（同じ物を 2 回流した組）。
+    need_place: 基準が GPU に載り切らなかった（厳しく見る時、置き方違いの組を求める）。boot_n=0 で参考の上側を省く。"""
     names = [v["name"] for v in variants]
     if ANCHOR not in names:
         raise ValueError(f"{ANCHOR} が変種に無い")
     if len(set(names)) != len(names):
         raise ValueError("変種の名前が重なっている")
     if strict:
-        _check_strict(ref1, ref2, variants, noise_pairs)
+        _check_strict(ref1, ref2, variants, noise_pairs, blocks, need_place)
     w_ref = _wa(ref1)
     q1, q2 = quality(ref1, should_hold), quality(ref2, should_hold)
     valid = ref_ok(q1) and ref_ok(q2)
@@ -138,11 +154,12 @@ def judge_model(ref1: dict[str, str], ref2: dict[str, str], variants: list[dict]
         b, c = discordant(w, w_ref)
         vq = quality(v["outcomes"], should_hold)
         responsive = vq["format"] <= RESP_MAX_FORMAT and vq["over_hold"] - q1["over_hold"] <= RESP_MAX_OVERHOLD_UP
-        upper = block_bootstrap_upper(d, 0.95, BOOT_N, BOOT_SEED)
         per[v["name"]] = {"wa": sum(w.values()), "delta": sum(d), "b": b, "c": c,
                           "p_mcnemar_ref": mcnemar_one_sided(b, c), "format_rate": vq["format"],
                           "over_hold_up": vq["over_hold"] - q1["over_hold"], "responsive": responsive,
-                          "upper95": upper, "same": upper < EQUIV_MARGIN, "_w": w}
+                          "small": sum(d) < MIN_DELTA,
+                          "upper95_ref": block_bootstrap_upper(d, 0.95, boot_n, BOOT_SEED) if boot_n else None,
+                          "_w": w}
         p1[v["name"]] = signflip_exact(d, "greater")
     ph = holm(p1)
     worse = []
@@ -174,17 +191,19 @@ def judge_model(ref1: dict[str, str], ref2: dict[str, str], variants: list[dict]
             if (abs(delta) >= MIN_DELTA and nh[k] < ALPHA_B and abs(delta) > 2 * noise
                     and hi in worse and per[lo]["responsive"]):
                 pattern_b.append(k)
+        safe_left = [n for n in safe if not (per[n]["responsive"] and per[n]["small"])]
+        near_left = [k for k, t in near.items() if abs(t[2]) >= MIN_DELTA and k not in pattern_b]
         if not valid:
             verdict = "測れない"
         elif pattern_a or pattern_b:
             verdict = "気づかない"
         elif worse:
-            verdict = "気づく" if all(per[n]["same"] for n in safe) else "決められない"
+            verdict = "気づく" if not safe_left and not near_left else "決められない"
         else:
             verdict = "差が出ない"
         rho = spearman([dev[n] for n in names], [per[n]["wa"] for n in names])
         by_metric[s] = {"verdict": verdict, "exploratory": s != PRIMARY, "anchor": dev[ANCHOR], "safe": safe,
-                        "safe_not_same": [n for n in safe if not per[n]["same"]], "pattern_a": pattern_a,
+                        "safe_left": safe_left, "near_left": near_left, "pattern_a": pattern_a,
                         "near_pairs": {k: {"delta": t[2], "p": t[3], "p_holm": nh[k]} for k, t in near.items()},
                         "pattern_b": pattern_b, "spearman_dev_wa": rho, "deviation": dev}
     for d in per.values():
@@ -205,5 +224,5 @@ def judge_overall(model_results: dict[str, dict], metric: str = PRIMARY) -> str:
     if miss == 1:
         return "モデルによる"
     if verdicts.count("気づく") >= 2:
-        return "いいえ"
+        return "いいえ（この 360 問で）"
     return "測れず"

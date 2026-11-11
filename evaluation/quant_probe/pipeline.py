@@ -169,7 +169,7 @@ class Pipeline:
         t0 = time.time()
         port = str(self.a.port)
         srv = self.t.popen(self.t.cmd("llama-server", "-m", model, "-c", str(self.a.ctx), "-np", "1",
-                                      *(self._ngl() if ngl is None else ngl), "--seed", "1", "--cache-ram", "0", "--host", "127.0.0.1",
+                                      *(self._ngl() if ngl is None else ngl), "--seed", "1", "--cache-ram", "0", "-lv", "4", "--host", "127.0.0.1",
                                       "--port", port), self.logs / f"{name}-server.log")
         try:
             if not self.t.dry:
