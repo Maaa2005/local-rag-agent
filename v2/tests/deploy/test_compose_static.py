@@ -1,6 +1,7 @@
 """deploy/compose.yml の静的要件検査（N3・N5・N6 の配置面）。実際の分離は deploy/isolation_test.sh で試す。"""
 from __future__ import annotations
 
+import posixpath
 import re
 from pathlib import Path
 
@@ -192,3 +193,101 @@ def test_internal_app_dockerfile_copies_only_common_and_orchestrator(services):
     assert not any("/run/gateway" in ln for ln in lines)
     users = [ln for ln in lines if ln.startswith("USER")]
     assert users and users[-1].split()[1] == services["internal-app"]["user"]
+
+
+# ---- vllm の配置（Issue #14・2026-11-04） ----
+
+VLLM_DIGEST = "sha256:e4f88a835143cd22aee2397a26ec6bb80b3a4a6fe0c882bcbc63822904766089"
+
+
+def test_vllm_image_is_pinned_by_digest(services):
+    image = services["vllm"]["image"]
+    assert image == f"vllm/vllm-openai:v0.25.1@{VLLM_DIGEST}"
+    assert re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image)
+
+
+def _is_tmp_path(value: object) -> bool:
+    # 前方一致では /tmp-cache や /tmp/../root/cache を通してしまう。正規化してから /tmp 自身か配下かを見る
+    if not isinstance(value, str):
+        return False
+    path = posixpath.normpath(value)
+    return path == "/tmp" or path.startswith("/tmp/")
+
+
+@pytest.mark.parametrize("value", ["/tmp", "/tmp/", "/tmp/.cache", "/tmp/a/../b"])
+def test_is_tmp_path_accepts_tmp_and_children(value):
+    assert _is_tmp_path(value)
+
+
+@pytest.mark.parametrize("value", ["/tmp-cache", "/tmp/../root/cache", "/tmp/..", "tmp/x", "/root/tmp", "", None])
+def test_is_tmp_path_rejects_outside_tmp(value):
+    assert not _is_tmp_path(value)
+
+
+def test_vllm_usage_stats_are_off(services):
+    env = services["vllm"]["environment"]
+    # 値は文字列の "1" の時だけ効く（"true" では効かない）
+    for k in ("VLLM_NO_USAGE_STATS", "VLLM_DO_NOT_TRACK", "DO_NOT_TRACK", "HF_HUB_DISABLE_TELEMETRY"):
+        assert env[k] == "1", k
+    for k in ("HOME", "XDG_CACHE_HOME", "VLLM_CONFIG_ROOT", "VLLM_CACHE_ROOT", "TRITON_CACHE_DIR"):
+        assert _is_tmp_path(env[k]), k
+
+
+def test_vllm_runs_as_the_supported_non_root_user(services):
+    svc = services["vllm"]
+    # 公式の vllm-openai が非 root で支えるのは同梱の vllm（UID 2000・GID 0）だけ（v0.25.1 docs/deployment/docker.md）
+    assert str(svc["user"]) == "2000:0"
+    assert svc["cap_drop"] == ["ALL"] and svc["read_only"] is True
+    others = {str(s.get("user", "")).split(":")[0] for n, s in services.items() if n != "vllm"}
+    assert "2000" not in others
+
+
+VLLM_TMPFS = "/tmp:exec,size=1g"
+
+
+def _tmpfs_entries(svc: dict) -> list[str]:
+    # compose は tmpfs の単一文字列も受ける。文字列のまま回すと 1 文字ずつの検査になる
+    t = svc.get("tmpfs") or []
+    return [t] if isinstance(t, str) else [str(x) for x in t]
+
+
+def _tmpfs_exec_violations(services: dict) -> list[tuple[str, str]]:
+    bad = []
+    for name, svc in services.items():
+        for t in _tmpfs_entries(svc):
+            opts = t.split(":", 1)[1].split(",") if ":" in t else []
+            if "exec" in opts and (name, t) != ("vllm", VLLM_TMPFS):
+                bad.append((name, t))
+    # 無いと Triton の .so を読めない。存在の検査がないとマウントの削除や noexec 化を見逃す
+    vllm_tmp = [t for t in _tmpfs_entries(services["vllm"]) if posixpath.normpath(t.split(":", 1)[0]) == "/tmp"]
+    if vllm_tmp != [VLLM_TMPFS]:
+        bad.append(("vllm", f"/tmp は {VLLM_TMPFS} の 1 件だけのはず: {vllm_tmp}"))
+    return bad
+
+
+def test_only_vllm_tmp_is_exec(services):
+    assert _tmpfs_exec_violations(services) == []
+
+
+@pytest.mark.parametrize(
+    "tmpfs",
+    [None, [], "/tmp", ["/tmp"], ["/tmp:noexec,size=1g"], ["/tmp:size=1g"], [VLLM_TMPFS, "/tmp"], ["/var/tmp:exec,size=1g"]],
+)
+def test_tmpfs_check_rejects_broken_vllm_mount(tmpfs):
+    vllm = {"tmpfs": tmpfs} if tmpfs is not None else {}
+    assert _tmpfs_exec_violations({"vllm": vllm})
+
+
+def test_tmpfs_check_rejects_exec_outside_vllm():
+    assert _tmpfs_exec_violations({"vllm": {"tmpfs": [VLLM_TMPFS]}, "qdrant": {"tmpfs": "/tmp:exec"}})
+
+
+def test_tmpfs_check_accepts_expected_mount():
+    assert _tmpfs_exec_violations({"vllm": {"tmpfs": [VLLM_TMPFS]}, "qdrant": {"tmpfs": ["/tmp"]}}) == []
+
+
+def test_vllm_text_only_and_single_sequence(services):
+    cmd = services["vllm"]["command"].split()
+    assert "--language-model-only" in cmd
+    assert cmd[cmd.index("--max-num-seqs") + 1] == "1"
+    assert "--quantization" not in cmd
