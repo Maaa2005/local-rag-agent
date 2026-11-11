@@ -585,7 +585,14 @@ def test_report_partial_offload_needs_place_run(tmp_path, monkeypatch, off, want
 
 
 @pytest.mark.parametrize("name,line", [("timing.jsonl", "{}"), ("timing.jsonl", '{"step": "a", "sec": "9"}'),
-                                       ("timing.jsonl", "[1]"), ("variants.jsonl", '{"name": "Q4_K_M-en"}')])
+                                       ("timing.jsonl", "[1]"), ("variants.jsonl", '{"name": "Q4_K_M-en"}'),
+                                       ("timing.jsonl", '{"step": "a", "sec": NaN}'),
+                                       ("timing.jsonl", '{"step": "a", "sec": Infinity}'),
+                                       ("timing.jsonl", '{"step": "a", "sec": -1}'),
+                                       ("variants.jsonl", '{"name": "Q4_K_M-en", "sha256": "", "bytes": 3}'),
+                                       ("variants.jsonl", '{"name": "Q4_K_M-en", "sha256": "ab", "bytes": 3}'),
+                                       ("variants.jsonl", '{"name": "Q4_K_M-en", "sha256": "' + "A" * 64 + '", "bytes": 3}'),
+                                       ("variants.jsonl", '{"name": "Q4_K_M-en", "sha256": "' + "a" * 64 + '", "bytes": 0}')])
 def test_report_bad_side_records_are_missing_data(tmp_path, name, line):
     m = _model_dir(tmp_path)
     (m / "ref_offload.json").write_text(json.dumps({"offloaded": [37, 37]}), encoding="utf-8")
@@ -595,7 +602,7 @@ def test_report_bad_side_records_are_missing_data(tmp_path, name, line):
         assert res["status"] == "データ欠損" and name in res["judge_error"]
         assert "データ欠損" in markdown("m", res, not kw)
     good = ('{"step": "a", "sec": 1.5, "at": "x"}' if name == "timing.jsonl"
-            else '{"name": "Q4_K_M-en", "sha256": "ab", "bytes": 3}')
+            else '{"name": "Q4_K_M-en", "sha256": "' + "0f" * 32 + '", "bytes": 3}')
     (m / name).write_text(good + "\n", encoding="utf-8")
     assert collect_model(m)["status"] == "適格"
 

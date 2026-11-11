@@ -1,4 +1,4 @@
-"""測る前に固定した判定の線 qp-judge-6（docs/quant-probe-plan.md の 5 章と同じ。変えるなら測る前に版を上げる）。
+"""測る前に固定した判定の線 qp-judge-7（docs/quant-probe-plan.md の 5 章と同じ。変えるなら測る前に版を上げる）。
 
 まとまり = 規程（24 規程・1 規程 15 問）。誤った断定（WA）の差は規程ごとに足し、規程を単位に検定する。
 検定の前提（比べる 2 つ a・b ごと）: モデル・量子化したファイル・評価の文章・KLD の値（まとめて F）を固定した上で、
@@ -44,7 +44,7 @@ from itertools import combinations
 from .pipeline import ALL_VARIANTS, PLACE, RERUN
 from .stats import block_bootstrap_upper, discordant, holm, mcnemar_one_sided, signflip_exact, spearman
 
-JUDGE_VERSION = "qp-judge-6"
+JUDGE_VERSION = "qp-judge-7"
 MIN_DELTA = 3
 ALPHA_MODEL = 0.025
 ALPHA_A = ALPHA_MODEL / 2

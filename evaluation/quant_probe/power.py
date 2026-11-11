@@ -1,4 +1,4 @@
-"""判定の線 qp-judge-6 の検出力と誤りの率を、測る前に見積もる。judge_model を端から端まで通す。結果は計画 6 章に写す。
+"""判定の線 qp-judge-7 の検出力と誤りの率を、測る前に見積もる。judge_model を端から端まで通す。結果は計画 6 章に写す。
 
     python -m evaluation.quant_probe.power --sims 2000 [--joint-sims 2000]
 

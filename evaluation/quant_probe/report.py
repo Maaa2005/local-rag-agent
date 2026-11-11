@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import re
 from pathlib import Path
 
 from .judge import (JUDGE_VERSION, METRICS, MIN_DELTA, PRIMARY, StrictError, judge_model,
@@ -110,9 +112,13 @@ def _items(rows: list, need: dict[str, tuple], name: str) -> list[dict]:
     return rows
 
 
-NEED = {"timing.jsonl": {"step": lambda v: isinstance(v, str) and bool(v), "sec": _num},
-        "variants.jsonl": {"name": lambda v: isinstance(v, str) and bool(v), "sha256": lambda v: isinstance(v, str),
-                           "bytes": lambda v: type(v) is int and v >= 0}}
+# 秒は有限で 0 以上・指紋は 16 進 64 文字・大きさは正の整数（Astra の 5 回目の点検）。
+# この 2 つは判定には使わない記録なので、無いことは止める理由にしない（形を確かめた ≠ 全部そろった）。
+NEED = {"timing.jsonl": {"step": lambda v: isinstance(v, str) and bool(v),
+                         "sec": lambda v: _num(v) and math.isfinite(v) and v >= 0},
+        "variants.jsonl": {"name": lambda v: isinstance(v, str) and bool(v),
+                           "sha256": lambda v: isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v) is not None,
+                           "bytes": lambda v: type(v) is int and v > 0}}
 
 
 def _read_rest(mdir: Path, qs, res: dict, skip: set[str]) -> dict[str, dict]:
