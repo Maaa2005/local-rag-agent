@@ -65,6 +65,9 @@ services:
       - hf_cache:/home/app/.cache/huggingface
     environment:
       - QDRANT_URL=http://qdrant:6333
+      # 既定 0 は今までと同じ (時間切れは qdrant-client の既定・送り直しなし)。backend/app/config.py を参照
+      - QDRANT_TIMEOUT_S=${QDRANT_TIMEOUT_S:-0}
+      - QDRANT_SEARCH_RETRIES=${QDRANT_SEARCH_RETRIES:-0}
       - VLLM_BASE_URL=http://vllm:8000/v1
       - LLM_MODEL=${LLM_MODEL:-local-llm}
       - EMBED_MODEL=${EMBED_MODEL:-intfloat/multilingual-e5-large}
