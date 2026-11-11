@@ -30,15 +30,19 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 import threading
 import time
 from typing import Any, Literal, Protocol
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 SHIM_VERSION = "laya-shim@1"
+# 要求の番号（X-Request-Id）。アダプタが付けた値を応答のヘッダに返し、ログにも残す（docs/redesign-v2.md 検証規則 6）。
+# 形の違う値は返さない・残さない（ヘッダからログへ任意の文字列を流さない）
+REQUEST_ID_RE = re.compile(r"[0-9a-f]{32}")  # fullmatch で使う（`$` は末尾の改行を通す）
 
 # 受け付ける大きさの上限。判定対象の長さは guard（max_input_chars）が先に切るので、ここは壊れた要求を止める柵
 MAX_CONTEXT_CHARS = 50_000
@@ -150,7 +154,11 @@ def create_app(agent: LayaAgent, *, model_name: str, revision: str, max_len: int
         return {"model": model_name, "revision": served_revision}
 
     @app.post("/v1/systemone")
-    def systemone(req: SystemOneRequest) -> dict[str, Any]:
+    def systemone(req: SystemOneRequest, request: Request, response: Response) -> dict[str, Any]:
+        rid = request.headers.get("x-request-id", "")
+        rid = rid if REQUEST_ID_RE.fullmatch(rid) else None
+        if rid:
+            response.headers["X-Request-Id"] = rid
         if req.model != model_name:
             # 別のモデル名で頼まれた判定を、このモデルが答えたことにしない
             raise HTTPException(422, f"this server serves {model_name!r}")
@@ -183,7 +191,7 @@ def create_app(agent: LayaAgent, *, model_name: str, revision: str, max_len: int
         truncated = is_truncated(usage)
         u = usage if isinstance(usage, dict) else {}
         # 本文は残さず、件ごとの突き合わせ用に本文のハッシュ先頭とトークン数だけを出す（長文ケースの切り分け用）
-        print(json.dumps({"event": "answered", "ids": ids,
+        print(json.dumps({"event": "answered", "req": rid, "ids": ids,
                           "ctx": hashlib.sha256(req.context.encode()).hexdigest()[:12],
                           "chars": len(req.context), "state_tokens": u.get("state_tokens"),
                           "state_tokens_dropped": u.get("state_tokens_dropped"),

@@ -7,7 +7,8 @@
   F が allow でも T が故障なら保留。再試行しない
 - 版は FT_SPEC（部品の hash・合成の規則・対象の選び方・閾値・故障の扱い）を正規化した JSON の sha256
 
-部品ごとのスコア・判定・revision・context の sha256・故障の種類は FTVerdict.components に残す（本文は残さない）。
+部品ごとのスコア・判定・revision・context の sha256・要求の番号・故障の種類は FTVerdict.components に残す（本文は残さない）。
+結果の judge_request_id は部品の番号を送った順にカンマで並べる（監査 DB の列は 1 つなので、F・T の両方をそこに残す）。
 C2 全体の時間の上限（60 秒）は呼び出し側の guarded_c2 が掛ける。部品の例外はここで故障に倒すので投げない。
 """
 from __future__ import annotations
@@ -20,7 +21,7 @@ from pydantic import ValidationError
 
 from common.provenance import RenderedMessage
 from common.schemas import SendPayload
-from judge.base import GUARD_MODEL, GUARD_REVISION, C2Verdict
+from judge.base import GUARD_MODEL, GUARD_REVISION, C2Verdict, collecting_request_ids
 from judge.c2_specs import A_KEY, B_KEY, _normalized, sha256_text, spec_hash
 from judge.http_adapter import MalformedResponse
 from judge.spec_gate import SpecC2Gate
@@ -53,7 +54,8 @@ def ft_version() -> str:
 
 
 class FTVerdict(C2Verdict):
-    # 部品ごとの記録: {"F": {"p", "decision", "revision", "question_version", "context_sha256", "fault", "error"}}
+    # 部品ごとの記録: {"F": {"p", "decision", "revision", "question_version", "context_sha256", "judge_request_id",
+    # "fault", "error"}}
     components: dict[str, dict[str, Any]] | None = None
 
 
@@ -86,6 +88,10 @@ def fault_tokens(components: dict[str, dict[str, Any]]) -> list[str]:
     return [f"{m}:{c['fault']}" for m, c in components.items() if c["fault"] is not None]
 
 
+def _joined_request_ids(components: dict[str, dict[str, Any]]) -> str | None:
+    return ",".join(c["judge_request_id"] for c in components.values() if c["judge_request_id"]) or None
+
+
 class FTC2Gate:
     def __init__(self, base_url: str, model: str, **kw: Any):
         self.label = FT_SPEC["label"]
@@ -95,21 +101,28 @@ class FTC2Gate:
         self.model = model
         self.parts = {m: SpecC2Gate(base_url, model, m, **kw) for m in FT_SPEC["combine"]["order"]}
 
+    def ready(self) -> dict[str, str]:
+        # 部品は同じサーバ・同じモデル・同じ版の決まりで作るので、1 回聞けば足りる
+        return self.parts[FT_SPEC["combine"]["order"][0]].ready()
+
     def _fault(self, components: dict[str, dict[str, Any]], tokens: list[str]) -> FTVerdict:
         return FTVerdict(decision="hold", reason=f"{self.label} fault {' '.join(tokens)}", model=GUARD_MODEL,
                          revision=GUARD_REVISION, truncated=any(c.get("truncated") for c in components.values()),
-                         question_version=self.question_version, components=components)
+                         question_version=self.question_version, components=components,
+                         judge_request_id=_joined_request_ids(components))
 
     def _ask(self, method: str, payload: SendPayload, rendered: Sequence[RenderedMessage]) -> dict[str, Any]:
+        sent: list[str] = []
         try:
-            v = self.parts[method].check_rendered(payload, rendered)
+            v = collecting_request_ids(sent, lambda: self.parts[method].check_rendered(payload, rendered))
         except Exception as e:  # noqa: BLE001  部品の失敗は故障として記録し、もう一方も必ず呼ぶ
             return {"p": None, "decision": None, "revision": None, "question_version": None,
-                    "context_sha256": None, "truncated": False, "fault": _exception_fault(e),
-                    "error": type(e).__name__}
+                    "context_sha256": None, "judge_request_id": sent[-1] if sent else None, "truncated": False,
+                    "fault": _exception_fault(e), "error": type(e).__name__}
         return {"p": v.prob_block, "decision": v.decision, "revision": v.revision,
                 "question_version": v.question_version, "context_sha256": v.context_sha256,
-                "truncated": v.truncated, "fault": _component_fault(v), "error": None}
+                "judge_request_id": v.judge_request_id, "truncated": v.truncated, "fault": _component_fault(v),
+                "error": None}
 
     def check_rendered(self, payload: SendPayload, rendered: Sequence[RenderedMessage]) -> FTVerdict:
         targets = FT_SPEC["targets"].get(payload.contract)
@@ -133,4 +146,5 @@ class FTC2Gate:
         ctx = sha256_text(_normalized({m: c["context_sha256"] for m, c in comps.items()}))
         return FTVerdict(decision=decision, reason=f"{self.label} s={s:.3f} {ps}", model=self.model,
                          revision=revisions.pop(), truncated=False, prob_block=s,
-                         question_version=self.question_version, context_sha256=ctx, components=comps)
+                         question_version=self.question_version, context_sha256=ctx, components=comps,
+                         judge_request_id=_joined_request_ids(comps))
