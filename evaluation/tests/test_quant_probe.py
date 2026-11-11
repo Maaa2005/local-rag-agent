@@ -1,0 +1,435 @@
+"""量子化の物差し (evaluation/quant_probe) のテスト。モデル・GPU・ネットは使わない。
+
+確かめること:
+- 問 360 問の数と内訳・指紋（写しが変わっていない）・渡す文の形
+- 結論の読み方と 6 つの分け方・集計
+- 検定（規程ごとの符号入れ替え・ブートストラップ・McNemar・Holm・Spearman）の値
+- KLD の出力の読み方・GPU への載り方の読み方
+- 判定の線 qp-judge-2（型 A・型 B・気づく・決められない・差が出ない・測れない・厳しく見る時・全体）
+- 全体を回す部品が、決めた順と引数でコマンドを組むこと・集計が記録をつなぐこと
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from evaluation.quant_probe import judge as J
+from evaluation.quant_probe import pipeline as P
+from evaluation.quant_probe.kld import parse_log
+from evaluation.quant_probe.questions import (HOLD, PROMPT_VERSION, build_messages, domain_text,
+                                              load_questions, load_rules, manifest)
+from evaluation.quant_probe.report import collect_model
+from evaluation.quant_probe.score import classify, parse_conclusion, score_rows, summarize
+from evaluation.quant_probe.stats import (block_bootstrap_upper, holm, mcnemar_one_sided, mcnemar_two_sided,
+                                          signflip_exact, spearman)
+from evaluation.quant_probe.texts import pick_ja_articles
+
+QS = load_questions()
+RULES = load_rules()
+# 写しの指紋。問か規程を 1 字でも変えたら変わる（変えるなら計画の版を上げる）
+MANIFEST_TOTAL = "b0161f1c54f28abf116026ca755d41a32bbd9d0f58605546af6cf7b19689cc50"
+
+
+def test_counts():
+    assert len(QS) == 360
+    assert sum(q.should_hold for q in QS) == 72
+    assert len({(q.set, q.rule_id) for q in QS}) == 24 == len(RULES)
+    per_rule = {}
+    for q in QS:
+        per_rule[(q.set, q.rule_id)] = per_rule.get((q.set, q.rule_id), 0) + 1
+    assert set(per_rule.values()) == {15}  # 規程 1 つに 15 問（検定のまとまり）
+    pairs = {}
+    for q in QS:
+        if q.pair_id:
+            pairs.setdefault(q.pair_id, []).append(q)
+    assert len(pairs) == 48 and all(len(v) == 2 for v in pairs.values())
+    assert all(a.expected == b.expected for a, b in pairs.values())
+    assert {q.kind for q in QS} == {"境目", "計算", "例外", "前提", "無関係な数", "書かれていない事", "保留"}
+
+
+def test_manifest_pinned():
+    m = manifest()
+    assert m["prompt_version"] == PROMPT_VERSION == "qp-1"
+    assert m["total"] == MANIFEST_TOTAL
+
+
+def test_messages_shape():
+    q = next(q for q in QS if q.should_hold)
+    sys_msg, user = build_messages(q, RULES)
+    assert sys_msg["role"] == "system" and "保留" in sys_msg["content"]
+    u = user["content"]
+    assert RULES[(q.set, q.rule_id)] in u and q.body in u
+    assert f"「結論: {q.options[0]}」「結論: {q.options[1]}」「結論: {HOLD}」" in u
+    assert "最後の行には「結論:" in u and u.count("最後の行には") == 1  # 元の指定の行は消えている
+    assert all("最後の行には" not in q.body for q in QS)
+
+
+def test_domain_text_has_no_answers():
+    t = domain_text()
+    assert all(r in t for r in RULES.values())
+    assert "expected_conclusion" not in t and "basis" not in t
+
+
+OPTS = ("取れる", "取れない")
+
+
+@pytest.mark.parametrize("text,want", [
+    ("理由。\n結論: 取れる", "取れる"),
+    ("理由。\n結論：取れない。", "取れない"),
+    ("**結論: 取れる**", "取れる"),
+    ("結論: 「保留」", HOLD),
+    ("結論: 保留（年収が分からない）", HOLD),
+    ("結論: 取れる\n…と思ったが\n結論: 取れない", "取れない"),
+    ("<think>結論: 取れる</think>\n結論: 取れない", "取れない"),
+    ("結論: 取れるかもしれない", None),
+    ("取れます", None),
+    ("", None),
+])
+def test_parse(text, want):
+    assert parse_conclusion(text, OPTS) == want
+
+
+def test_classify_all_five():
+    hold = next(q for q in QS if q.should_hold)
+    ans = next(q for q in QS if not q.should_hold)
+    other = [o for o in ans.options if o != ans.expected][0]
+    assert classify(hold, HOLD) == "held_ok"
+    assert classify(hold, hold.options[0]) == "wrong_assert"
+    assert classify(ans, ans.expected) == "correct"
+    assert classify(ans, other) == "wrong_assert"
+    assert classify(ans, HOLD) == "over_hold"
+    assert classify(ans, None) == "format"
+
+
+def test_score_and_summarize_missing_is_separate():
+    rows = {q.id: {"text": f"結論: {q.expected}", "finish_reason": "stop"} for q in QS}
+    first = QS[0]
+    del rows[first.id]
+    s = summarize(QS, score_rows(QS, rows))
+    assert s["missing"] == 1 and s["format"] == 0
+    assert s["correct"] + s["held_ok"] == 359 and s["wrong_assert"] == 0
+    assert s["pairs"] == 48 and s["pairs_both_correct"] >= 47
+
+
+def test_stats():
+    assert mcnemar_one_sided(5, 0) == pytest.approx(1 / 32)
+    assert mcnemar_one_sided(0, 0) == 1.0
+    assert mcnemar_one_sided(3, 7) > 0.9
+    assert mcnemar_two_sided(5, 0) == pytest.approx(1 / 16)
+    h = holm({"a": 0.01, "b": 0.04, "c": 0.03})
+    assert h == {"a": pytest.approx(0.03), "c": pytest.approx(0.06), "b": pytest.approx(0.06)}
+    assert spearman([1, 2, 3, 4], [10, 20, 30, 40]) == pytest.approx(1.0)
+    assert spearman([1, 2, 3, 4], [4, 3, 2, 1]) == pytest.approx(-1.0)
+
+
+def test_signflip_and_bootstrap():
+    assert signflip_exact([1, 1, 1]) == pytest.approx(1 / 8)
+    assert signflip_exact([1, 1, 1, 0, 0]) == pytest.approx(1 / 8)  # 差の無い規程は数に入れない
+    assert signflip_exact([2, -1]) == pytest.approx(0.5)  # 合計 3,1,-1,-3 のうち 1 以上
+    assert signflip_exact([2, -1], "two-sided") == pytest.approx(1.0)
+    assert signflip_exact([0, 0]) == 1.0
+    assert signflip_exact([5, 5, 5]) == pytest.approx(1 / 8)  # 3 規程に集まった増えは小さい p にならない
+    assert signflip_exact([1] * 12) == pytest.approx(2 ** -12)
+    with pytest.raises(ValueError):
+        signflip_exact([1], "less")
+    assert block_bootstrap_upper([0] * 24) == 0.0
+    a = block_bootstrap_upper([1, -1] * 12, n=2000)
+    assert a == block_bootstrap_upper([1, -1] * 12, n=2000)  # 種が決まっているので同じ値
+    assert 0 < a < 10
+    assert block_bootstrap_upper([4] * 4 + [0] * 20, n=2000) >= 10  # 集まった増えは「同じ」と言えない
+
+
+KLD_LOG = """\
+kl_divergence: computing over 80 chunks, n_ctx=512, batch_size=2048, n_seq=4
+kl_divergence: 1.23 seconds per pass - ETA 0.20 minutes
+====== Perplexity statistics ======
+Mean PPL(Q)                   :  10.123456 ±   0.123456
+Mean PPL(base)                :   9.876543 ±   0.120000
+Cor(ln(PPL(Q)), ln(PPL(base))):  99.12%
+Mean ln(PPL(Q)/PPL(base))     :   0.024693 ±   0.001234
+Mean PPL(Q)/PPL(base)         :   1.025000 ±   0.001265
+Mean PPL(Q)-PPL(base)         :   0.246913 ±   0.012345
+
+====== KL divergence statistics ======
+Mean    KLD:   0.031273 ±   0.000350
+Maximum KLD:   5.123456
+99.9%   KLD:   1.234567
+99.0%   KLD:   0.345678
+95.0%   KLD:   0.112233
+Median  KLD:   0.009876
+Minimum KLD:  -0.000001
+
+====== Token probability statistics ======
+Mean    Δp: -0.512 ± 0.030 %
+RMS Δp    :  5.012 ± 0.060 %
+Same top p: 91.234 ± 0.170 %
+"""
+
+
+def test_parse_kld_log():
+    d = parse_log(KLD_LOG)
+    assert d["chunks"] == 80
+    assert d["kld_mean"] == pytest.approx(0.031273) and d["kld_mean_err"] == pytest.approx(0.00035)
+    assert d["kld_p99"] == pytest.approx(0.345678) and d["kld_median"] == pytest.approx(0.009876)
+    assert d["ln_ppl_ratio"] == pytest.approx(0.024693) and d["ppl_ratio"] == pytest.approx(1.025)
+    assert d["same_top_p"] == pytest.approx(91.234) and d["rms_dp"] == pytest.approx(5.012)
+    assert parse_log("Final estimate: PPL = 9.8765 +/- 0.1200")["ppl"] == pytest.approx(9.8765)
+
+
+def test_offload_from_log():
+    assert P.offload_from_log("load_tensors: offloaded 30/37 layers to GPU\n") == (30, 37)
+    assert P.offload_from_log("nothing here") is None
+
+
+# ---- 判定の線 ----
+IDS = [f"q{i:03d}" for i in range(360)]
+HOLD_IDS = set(IDS[:72])
+SH = {i: i in HOLD_IDS for i in IDS}
+BLOCKS = {i: f"r{k // 15:02d}" for k, i in enumerate(IDS)}  # 24 規程 × 15 問
+REF_WA = {IDS[b * 15] for b in range(10)}  # 規程 0〜9 の 1 問目
+ANSWERABLE = [i for i in IDS if i not in HOLD_IDS]
+
+
+def outcomes(wa: set[str], over: set[str] = frozenset()) -> dict[str, str]:
+    out = {}
+    for i in IDS:
+        if i in wa:
+            out[i] = "wrong_assert"
+        elif i in over:
+            out[i] = "over_hold"
+        else:
+            out[i] = "held_ok" if i in HOLD_IDS else "correct"
+    return out
+
+
+def spread(n: int) -> set[str]:
+    """規程ごとに 1 問ずつ、24 規程に散らして n 問（足りなければ 2 問目へ）。"""
+    order = [IDS[b * 15 + (14 - k)] for k in range(14) for b in range(24)]
+    return set(order[:n])
+
+
+def packed(n_blocks: int, per: int, first: int = 10) -> set[str]:
+    """規程 first から n_blocks 個に per 問ずつ集めた増え。"""
+    return {IDS[b * 15 + (14 - k)] for b in range(first, first + n_blocks) for k in range(per)}
+
+
+def kmetrics(kld: float) -> dict:
+    d = {"kld_mean": kld, "ln_ppl_ratio": kld / 2, "chunks": 80}
+    return {s: d for s in J.METRICS}
+
+
+def variant(name, extra: set[str], kld, over: set[str] = frozenset()):
+    return {"name": name, "outcomes": outcomes(REF_WA | extra, over), "metrics": kmetrics(kld)}
+
+
+def judge(vs, ref2=None, **kw):
+    return J.judge_model(outcomes(REF_WA), outcomes(REF_WA) if ref2 is None else ref2, vs, SH, BLOCKS, **kw)
+
+
+def test_pattern_a_missed():
+    vs = [variant("Q4_K_M-en", spread(12), 0.03), variant("Q6_K-en", set(), 0.005), variant("Q2_K-en", spread(30), 0.4)]
+    r = judge(vs)
+    assert r["valid"] and r["noise"] == 0
+    assert set(r["worse"]) == {"Q4_K_M-en", "Q2_K-en"}
+    b = r["by_metric"]["kld_en"]
+    assert b["pattern_a"] == ["Q4_K_M-en"] and b["verdict"] == "気づかない" and not b["exploratory"]
+    assert r["by_metric"]["kld_ja"]["exploratory"]
+
+
+def test_noticed_when_only_high_kld_worse():
+    vs = [variant("Q4_K_M-en", spread(1), 0.03), variant("Q6_K-en", set(), 0.005), variant("Q2_K-en", spread(30), 0.4)]
+    r = judge(vs)
+    assert r["worse"] == ["Q2_K-en"] and r["by_metric"]["kld_en"]["verdict"] == "気づく"
+    assert all(r["variants"][n]["same"] for n in ("Q4_K_M-en", "Q6_K-en"))
+
+
+def test_cannot_decide_when_safe_variant_not_shown_same():
+    # 安全域の Q6_K-en が 4 規程に 4 問ずつ集まって増えた: 検定では悪化と言えないが、同じとも言えない
+    vs = [variant("Q4_K_M-en", set(), 0.03), variant("Q6_K-en", packed(4, 4), 0.005),
+          variant("Q2_K-en", spread(30), 0.4)]
+    r = judge(vs)
+    assert r["worse"] == ["Q2_K-en"] and not r["variants"]["Q6_K-en"]["same"]
+    b = r["by_metric"]["kld_en"]
+    assert b["verdict"] == "決められない" and b["safe_not_same"] == ["Q6_K-en"]
+
+
+def test_min_delta_and_noise():
+    vs = [variant("Q4_K_M-en", spread(2), 0.03), variant("Q2_K-en", spread(8), 0.4)]
+    # 揺れ 4 問: 8 問増えても 2 倍 (8) を超えないので悪化にしない
+    ref2 = outcomes(REF_WA - {IDS[b * 15] for b in range(4)})
+    r = judge(vs, ref2)
+    assert r["noise"] == 4 and r["worse"] == []
+    assert r["by_metric"]["kld_en"]["verdict"] == "差が出ない"
+
+
+def test_noise_pairs_raise_noise():
+    vs = [variant("Q4_K_M-en", set(), 0.03), variant("Q2_K-en", spread(12), 0.4)]
+    a, b = outcomes(REF_WA), outcomes(REF_WA | spread(6))
+    r = judge(vs, noise_pairs=[(P.RERUN, a, b)])
+    assert r["noise_each"] == {"ref": 0, P.RERUN: 6} and r["noise"] == 6 and r["worse"] == []
+
+
+def test_pattern_b_same_kld_different_wa():
+    vs = [variant("Q4_K_M-en", set(), 0.03), variant("Q3_K_M-en", set(), 0.100), variant("Q3_K_M-ja", spread(15), 0.105)]
+    r = judge(vs)
+    b = r["by_metric"]["kld_en"]
+    assert b["pattern_a"] == [] and b["pattern_b"] == ["Q3_K_M-en|Q3_K_M-ja"]
+    assert b["verdict"] == "気づかない"
+
+
+def test_pattern_b_needs_responsive_lower_side():
+    # WA の少ない方が保留ばかりしている（保留しすぎが 10 点増えた）なら、型 B に数えない
+    over = set(ANSWERABLE[100:130])
+    vs = [variant("Q4_K_M-en", set(), 0.03), variant("Q3_K_M-en", set(), 0.100, over),
+          variant("Q3_K_M-ja", spread(15), 0.105)]
+    r = judge(vs)
+    b = r["by_metric"]["kld_en"]
+    assert b["pattern_b"] == [] and "Q3_K_M-en" in r["unresponsive"]
+    assert b["verdict"] == "気づく"
+
+
+def test_weak_reference_not_measurable():
+    weak = set(IDS[72:300])  # 答えられる問の大半を誤る
+    vs = [{"name": "Q4_K_M-en", "outcomes": outcomes(weak), "metrics": kmetrics(0.03)}]
+    r = J.judge_model(outcomes(weak), outcomes(weak), vs, SH, BLOCKS)
+    assert not r["valid"] and r["by_metric"]["kld_en"]["verdict"] == "測れない"
+
+
+def test_reference_must_hold_half():
+    bad_hold = REF_WA | set(IDS[30:72])  # 保留すべき問の多くで言い切る
+    vs = [variant("Q4_K_M-en", set(), 0.03)]
+    r = J.judge_model(outcomes(REF_WA), outcomes(bad_hold), vs, SH, BLOCKS)
+    assert r["ref_quality"][1]["held"] < 0.5 and not r["valid"]
+
+
+def test_anchor_required():
+    with pytest.raises(ValueError):
+        judge([variant("Q2_K-en", spread(1), 0.4)])
+
+
+def test_strict_stops():
+    vs = [variant("Q4_K_M-en", set(), 0.03)]
+    with pytest.raises(J.StrictError, match="15"):
+        judge(vs, strict=True)
+    full = [variant(n, set(), 0.01 * (k + 1)) for k, n in enumerate(P.ALL_VARIANTS)]
+    assert judge(full, strict=True)["valid"]
+    miss = [dict(v) for v in full]
+    miss[0] = {**miss[0], "outcomes": {**miss[0]["outcomes"], IDS[300]: "missing"}}
+    with pytest.raises(J.StrictError, match="答えの無い"):
+        judge(miss, strict=True)
+    nan = [dict(v) for v in full]
+    nan[1] = {**nan[1], "metrics": kmetrics(float("nan"))}
+    with pytest.raises(J.StrictError, match="数でない"):
+        judge(nan, strict=True)
+
+
+def _res(verdict, valid=True):
+    return {"valid": valid, "by_metric": {J.PRIMARY: {"verdict": verdict}}}
+
+
+@pytest.mark.parametrize("vs,want", [
+    (["気づかない", "気づかない", "気づく"], "はい"),
+    (["気づかない", "気づく", "気づく"], "モデルによる"),
+    (["気づく", "気づく", "差が出ない"], "いいえ"),
+    (["気づく", "決められない", "決められない"], "測れず"),
+    (["気づく", "差が出ない", "差が出ない"], "測れず"),
+    (["気づかない"], "測れず"),
+])
+def test_overall(vs, want):
+    assert J.judge_overall({str(i): _res(v) for i, v in enumerate(vs)}) == want
+
+
+def test_overall_skips_invalid():
+    r = {"a": _res("気づかない", valid=False), "b": _res("気づく"), "c": _res("気づく")}
+    assert J.judge_overall(r) == "いいえ"
+
+
+def test_alpha_bounds_two_false_of_three():
+    # 3 モデルで 2 つ以上誤る確率 <= 3*α/2（依存によらない）
+    assert 3 * J.ALPHA_MODEL / 2 <= 0.05 + 1e-12
+    assert J.ALPHA_A + J.ALPHA_B == pytest.approx(J.ALPHA_MODEL)
+
+
+# ---- 全体を回す部品 ----
+def test_variant_names():
+    assert len(P.ALL_VARIANTS) == 15 and "Q4_K_M-en" in P.ALL_VARIANTS
+    assert P.variant_parts("Q4_K_M-ja") == ("Q4_K_M", "ja")
+    with pytest.raises(ValueError):
+        P.variant_parts("Q4_K-en")
+
+
+def _dry(tmp_path, capsys, *extra):
+    bf16 = tmp_path / "m-bf16.gguf"
+    texts = tmp_path / "texts"
+    rc = P.main(["--model", "m", "--bf16", str(bf16), "--texts", str(texts), "--work", str(tmp_path / "w"),
+                 "--launcher", "bash", "llama_noble.sh", "--dry-run", *extra])
+    assert rc == 0
+    return [l[2:] for l in capsys.readouterr().err.splitlines() if l.startswith("$ ")]
+
+
+def test_pipeline_dry_run(tmp_path, capsys):
+    cmds = _dry(tmp_path, capsys, "--variants", "Q4_K_M-en,Q2_K-none")
+    q = [c for c in cmds if " llama-quantize " in c]
+    assert q[0].endswith("Q8_0") and "--imatrix" not in q[0]
+    assert "--imatrix" in q[1] and "imatrix-en.gguf" in q[1] and q[1].endswith("Q4_K_M")
+    assert "--imatrix" not in q[2] and q[2].endswith("Q2_K")
+    im = [c for c in cmds if " llama-imatrix " in c]
+    assert len(im) == 2 and all("--chunks 128" in c and "-c 512" in c for c in im)
+    base = [c for c in cmds if "--kl-divergence-base" in c and "--kl-divergence " not in c + " "]
+    kl = [c for c in cmds if c.rstrip().endswith("--kl-divergence")]
+    assert len(base) == 3 and len(kl) == 6 and all("--chunks 80" in c for c in base + kl)
+    srv = [c for c in cmds if " llama-server " in c]
+    # 基準 2 回・Q4_K_M-en・その 2 回目・Q2_K-none
+    assert len(srv) == 5 and all("-np 1" in c and "--cache-ram 0" in c and "--seed 1" in c for c in srv)
+
+
+def test_pipeline_place_and_bf16_check(tmp_path, capsys):
+    cmds = _dry(tmp_path, capsys, "--variants", "Q6_K-none", "--bf16-imatrix-check")
+    srv = [c for c in cmds if " llama-server " in c]
+    assert len(srv) == 4 and "-ngl 0" in srv[-1]  # 置き方だけ変えた Q6_K-none
+    im = [c for c in cmds if " llama-imatrix " in c]
+    assert len(im) == 3 and "m-bf16.gguf" in im[-1] and "imatrix-en-bf16.gguf" in im[-1]
+    kl = [c for c in cmds if c.rstrip().endswith("--kl-divergence")]
+    assert len(kl) == 6  # Q6_K-none の 3 つと BF16 の imatrix の Q4_K_M の 3 つ
+    cmds = _dry(tmp_path / "b", capsys, "--variants", "Q4_K_M-en", "--no-noise-reruns")
+    assert len([c for c in cmds if " llama-server " in c]) == 3
+
+
+def _write_run(path: Path, answers: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps({"id": i, "text": f"理由。\n結論: {a}", "finish_reason": "stop"},
+                                       ensure_ascii=False) + "\n" for i, a in answers.items()), encoding="utf-8")
+
+
+def test_report_collect_model(tmp_path):
+    good = {q.id: (HOLD if q.should_hold else q.expected) for q in QS}
+    m = tmp_path / "m"
+    for n in (f"{P.REF}-r1", f"{P.REF}-r2", "Q4_K_M-en", P.RERUN):
+        _write_run(m / "runs" / f"{n}.jsonl", good)
+    (m / "logs").mkdir(parents=True, exist_ok=True)
+    for x in P.TEXTS:
+        (m / "logs" / f"Q4_K_M-en-kld-{x}.log").write_text(KLD_LOG, encoding="utf-8")
+        (m / "logs" / f"{P.REF}-base-{x}.log").write_text(KLD_LOG.splitlines()[0].replace("kl_divergence", "perplexity"),
+                                                          encoding="utf-8")
+    for lang in ("en", "ja"):
+        (m / "logs" / f"imatrix-{lang}.log").write_text("compute_imatrix: computing over 128 chunks", encoding="utf-8")
+    res = collect_model(m)
+    j = res["judge"]
+    assert j["valid"] and j["worse"] == [] and set(j["noise_each"]) == {"ref", P.RERUN}
+    assert j["by_metric"]["kld_en"]["verdict"] == "差が出ない"
+    assert res["base_chunks"] == {"en": 80, "ja": 80, "dom": 80} and res["imatrix_chunks"] == {"en": 128, "ja": 128}
+    strict = collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=128)
+    assert "15" in strict["judge_error"]
+    assert "区切り" in collect_model(m, strict=True, min_chunks=100)["judge_error"]
+    assert "imatrix" in collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=200)["judge_error"]
+
+
+def test_pick_ja_articles():
+    rows = [{"title": "短い", "text": "あ" * 100}, {"title": "東京の一覧", "text": "い" * 3000},
+            {"title": "A", "text": "う" * 2500}, {"title": "B", "text": "え" * 2500}, {"title": "C", "text": "お" * 9}]
+    text, titles = pick_ja_articles(rows, min_chars=2000, total_chars=4000)
+    assert titles == ["A", "B"] and text.count("う") == 2500
+    with pytest.raises(ValueError):
+        pick_ja_articles(rows, min_chars=2000, total_chars=10_000)
