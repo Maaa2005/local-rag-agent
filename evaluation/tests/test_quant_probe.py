@@ -141,9 +141,26 @@ def test_signflip_and_bootstrap():
     assert block_bootstrap_upper([4] * 4 + [0] * 20, n=2000) >= 10  # 集まった増えは「同じ」と言えない
 
 
-KLD_LOG = """\
+def _kld_rows(n: int) -> str:
+    return "".join(f"{i:4d}      10.1234 ±    1.2345      -0.01234 ±    0.01234       0.03123 ±    0.00123"
+                   f"     5.123 ±  0.123 %   91.234 ±  1.234 %\n" for i in range(1, n + 1))
+
+
+def _progress_log(head: str, n: int, done: int | None = None, final: bool = True) -> str:
+    """perplexity・imatrix の記録の形: 予定の行・[n] の途中経過・終わりの印。"""
+    done = n if done is None else done
+    return (f"{head}: computing over {n} chunks, n_ctx=512, batch_size=2048, n_seq=4\n"
+            + "".join(f"[{i}]9.8765," for i in range(1, done + 1)) + "\n"
+            + ("Final estimate: PPL = 9.8765 +/- 0.1200\n" if final else ""))
+
+
+KLD_HEAD = """\
 kl_divergence: computing over 80 chunks, n_ctx=512, batch_size=2048, n_seq=4
 kl_divergence: 1.23 seconds per pass - ETA 0.20 minutes
+chunk             PPL               ln(PPL(Q)/PPL(base))          KL Divergence              Δp RMS            Same top p
+"""
+KLD_LOG = KLD_HEAD + _kld_rows(80) + """\
+
 ====== Perplexity statistics ======
 Mean PPL(Q)                   :  10.123456 ±   0.123456
 Mean PPL(base)                :   9.876543 ±   0.120000
@@ -176,6 +193,13 @@ def test_parse_kld_log():
     assert d["ln_ppl_ratio"] == pytest.approx(0.024693) and d["ppl_ratio"] == pytest.approx(1.025)
     assert d["same_top_p"] == pytest.approx(91.234) and d["rms_dp"] == pytest.approx(5.012)
     assert parse_log("Final estimate: PPL = 9.8765 +/- 0.1200")["ppl"] == pytest.approx(9.8765)
+    assert d["complete"] and d["chunks_done"] == 80
+    cut = parse_log(KLD_HEAD + _kld_rows(40))  # 途中で止まった KLD
+    assert cut["chunks"] == 80 and cut["chunks_done"] == 40 and not cut["complete"]
+    b = parse_log(_progress_log("perplexity", 80))
+    assert b["chunks"] == 80 and b["chunks_done"] == 80 and b["complete"]
+    b = parse_log(_progress_log("perplexity", 80, done=79, final=False))
+    assert b["chunks_done"] == 79 and not b["complete"]
 
 
 def test_offload_from_log():
@@ -438,42 +462,108 @@ def _write_run(path: Path, answers: dict[str, str]) -> None:
                                        ensure_ascii=False) + "\n" for i, a in answers.items()), encoding="utf-8")
 
 
-def test_report_collect_model(tmp_path):
+def _model_dir(tmp_path: Path, answers: dict[str, str] | None = None) -> Path:
     good = {q.id: (HOLD if q.should_hold else q.expected) for q in QS}
     m = tmp_path / "m"
     for n in (f"{P.REF}-r1", f"{P.REF}-r2", "Q4_K_M-en", P.RERUN):
-        _write_run(m / "runs" / f"{n}.jsonl", good)
+        _write_run(m / "runs" / f"{n}.jsonl", answers if answers is not None and n.startswith(P.REF) else good)
     (m / "logs").mkdir(parents=True, exist_ok=True)
     for x in P.TEXTS:
         (m / "logs" / f"Q4_K_M-en-kld-{x}.log").write_text(KLD_LOG, encoding="utf-8")
-        (m / "logs" / f"{P.REF}-base-{x}.log").write_text(KLD_LOG.splitlines()[0].replace("kl_divergence", "perplexity"),
-                                                          encoding="utf-8")
+        (m / "logs" / f"{P.REF}-base-{x}.log").write_text(_progress_log("perplexity", 80), encoding="utf-8")
     for lang in ("en", "ja"):
-        (m / "logs" / f"imatrix-{lang}.log").write_text("compute_imatrix: computing over 128 chunks", encoding="utf-8")
+        (m / "logs" / f"imatrix-{lang}.log").write_text(_progress_log("compute_imatrix", 128), encoding="utf-8")
+    return m
+
+
+def test_report_collect_model(tmp_path):
+    m = _model_dir(tmp_path)
     res = collect_model(m)
     j = res["judge"]
+    assert res["status"] == "適格"
     assert j["valid"] and j["worse"] == [] and set(j["noise_each"]) == {"ref", P.RERUN}
     assert j["by_metric"]["kld_en"]["verdict"] == "差が出ない"
     assert res["base_chunks"] == {"en": 80, "ja": 80, "dom": 80} and res["imatrix_chunks"] == {"en": 128, "ja": 128}
-    assert "載り" in collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=128)["judge_error"]
+    no_off = collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=128)
+    assert no_off["status"] == "データ欠損" and "載り" in no_off["judge_error"]
     (m / "ref_offload.json").write_text(json.dumps({"offloaded": [37, 37]}), encoding="utf-8")
     strict = collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=128)
-    assert "15" in strict["judge_error"]
+    assert strict["status"] == "データ欠損" and "15" in strict["judge_error"]
     assert "区切り" in collect_model(m, strict=True, min_chunks=100)["judge_error"]
     assert "imatrix" in collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=200)["judge_error"]
 
 
+def test_report_strict_checks_completion(tmp_path):
+    m = _model_dir(tmp_path)
+    (m / "ref_offload.json").write_text(json.dumps({"offloaded": [37, 37]}), encoding="utf-8")
+    kw = {"strict": True, "min_chunks": 80, "min_imatrix_chunks": 128}
+    (m / "logs" / "Q4_K_M-en-kld-ja.log").write_text(KLD_HEAD + _kld_rows(79), encoding="utf-8")
+    e = collect_model(m, **kw)["judge_error"]
+    assert "Q4_K_M-en" in e and "済んでいない" in e
+    (m / "logs" / "Q4_K_M-en-kld-ja.log").write_text(KLD_LOG, encoding="utf-8")
+    (m / "logs" / f"{P.REF}-base-en.log").write_text(_progress_log("perplexity", 80, final=False), encoding="utf-8")
+    assert "比べ元 en" in collect_model(m, **kw)["judge_error"]
+    (m / "logs" / f"{P.REF}-base-en.log").write_text(_progress_log("perplexity", 80), encoding="utf-8")
+    (m / "logs" / "imatrix-ja.log").write_text(_progress_log("compute_imatrix", 128, done=100), encoding="utf-8")
+    assert "imatrix ja" in collect_model(m, **kw)["judge_error"]
+
+
+def test_report_status_unconvertible_and_weak_ref(tmp_path):
+    m = _model_dir(tmp_path, answers={q.id: ("A" if q.should_hold else HOLD) for q in QS})
+    kw = {"strict": True, "min_chunks": 80, "min_imatrix_chunks": 128}
+    weak = collect_model(m, **kw)
+    assert weak["status"] == "基準不適格" and not weak["judge"]["valid"]
+    assert all(v["verdict"] == "測れない" for v in weak["judge"]["by_metric"].values())
+    (m / "unconvertible.txt").write_text("変換で落ちる", encoding="utf-8")
+    gone = collect_model(m, **kw)
+    assert gone["status"] == "変換不能" and gone["reason"] == "変換で落ちる"
+    assert collect_model(m)["status"] != "変換不能"  # 試しでは印を見ない
+
+
+def test_report_missing_ref_answers(tmp_path):
+    m = _model_dir(tmp_path, answers={q.id: (HOLD if q.should_hold else q.expected) for q in QS[:300]})
+    res = collect_model(m, strict=True, min_chunks=80, min_imatrix_chunks=128)
+    assert res["status"] == "データ欠損" and "360" in res["judge_error"]
+    (m / "runs" / f"{P.REF}-r2.jsonl").unlink()
+    assert collect_model(m)["status"] == "データ欠損"
+
+
+def test_report_main_keeps_minimums(tmp_path):
+    from evaluation.quant_probe import report
+    with pytest.raises(SystemExit):
+        report.main(["--work", str(tmp_path), "--models", "x", "--out", str(tmp_path / "o"), "--min-chunks", "20"])
+    with pytest.raises(SystemExit):
+        report.main(["--work", str(tmp_path), "--models", "x", "--out", str(tmp_path / "o"),
+                     "--min-imatrix-chunks", "64"])
+
+
+def _ok(verdict="気づく"):
+    return {"status": "適格", "judge": _res(verdict)}
+
+
 def test_overall_block_and_spare():
-    ok = {m: {"judge": _res("気づく")} for m in PLANNED}
+    ok = {m: _ok() for m in PLANNED}
     assert overall_block(ok) is None and set(overall_models(ok)) == set(PLANNED)
-    lost = {**ok, PLANNED[0]: {"judge_error": "答えの無い問が 3"}}
+    lost = {**ok, PLANNED[0]: {"status": "データ欠損", "judge_error": "答えの無い問が 3"}}
     assert "データ欠損" in overall_block(lost) and "答えの無い" in overall_block(lost)
     assert "決めたモデル" in overall_block({m: ok[m] for m in PLANNED[:2]})
-    assert "替える理由" in overall_block({**ok, SPARE: {"judge": _res("気づく")}})
-    weak = {**ok, PLANNED[1]: {"judge": _res("気づかない", valid=False)}, SPARE: {"judge": _res("気づく")}}
+    assert "決めたモデル" in overall_block({**ok, "other": _ok()})
+    # 替えは変換不能がちょうど 1 つの時だけ
+    assert SPARE in overall_block({**ok, SPARE: _ok()})
+    gone = {**ok, PLANNED[1]: {"status": "変換不能", "reason": "x"}}
+    assert SPARE in overall_block(gone)
+    swap = {**gone, SPARE: _ok()}
+    assert overall_block(swap) is None
+    use = overall_models(swap)
+    assert PLANNED[1] not in use and SPARE in use and len(use) == 3
+    two = {**swap, PLANNED[2]: {"status": "変換不能", "reason": "y"}}
+    assert "2 つ以上" in overall_block(two)
+    # 基準不適格は替えずに「測れない」として残す
+    weak = {**ok, PLANNED[1]: {"status": "基準不適格", "judge": _res("測れない", valid=False)}}
     assert overall_block(weak) is None
     use = overall_models(weak)
-    assert PLANNED[1] not in use and SPARE in use and len(use) == 3
+    assert PLANNED[1] in use and not use[PLANNED[1]]["valid"] and len(use) == 3
+    assert SPARE in overall_block({**weak, SPARE: _ok()})
 
 
 def test_power_runs_end_to_end():
@@ -483,6 +573,27 @@ def test_power_runs_end_to_end():
     assert power.one_model(w, "null", 0, 24) in ("差が出ない", "決められない", "気づく", "気づかない")
     o = power.combine([{v: (1.0 if v == "気づく" else 0.0) for v in power.VERDICTS}] * 3)
     assert o["いいえ（この 360 問で）"] == pytest.approx(1.0)
+    info = {}
+    assert power.one_model(w, "miss_B", 30, 8, info=info) in power.VERDICTS
+    assert info["added"] == 30 and 1 <= info["touched"] <= 8
+    assert power.joint(w, [("notice", 0)] * 3, 24) in power.OVERALL
+    assert power.joint(w, [("miss_A", 20)] * 2 + [("notice", 0)], 8) in power.OVERALL
+
+
+def test_power_skew_is_mean_zero():
+    from evaluation.quant_probe import power
+    import random
+    w = power.World(random.Random(2))
+    _, base = w.ref()
+    tot, n = 0, 400
+    for _ in range(n):
+        o = power.skew(w, base)
+        tot += sum(v == "wrong_assert" for v in o.values()) - sum(v == "wrong_assert" for v in base.values())
+    # 動く規程ごとに +3（1/4）か -1（3/4）。平均 0、1 回あたりの標準偏差は高々 sqrt(3 * 24) ≒ 8.5
+    assert abs(tot / n) < 3 * 8.5 / n ** 0.5
+    up = {b: True for b in w.order}
+    o = power.skew(w, base, coins=up)
+    assert sum(v == "wrong_assert" for v in o.values()) > sum(v == "wrong_assert" for v in base.values())
 
 
 def test_pick_ja_articles():

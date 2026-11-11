@@ -10,6 +10,9 @@ import re
 _NUM = r"(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)"
 _ROW = re.compile(r"^\s*(?P<key>[^:]+?)\s*:\s*" + _NUM + r"\s*%?\s*(?:±\s*" + _NUM + r")?")
 _CHUNKS = re.compile(r"over\s+(\d+)\s+chunks")
+_PROGRESS = re.compile(r"\[(\d+)\]")
+_KLD_ROW = re.compile(r"^\s*(\d+)\s+-?\d+(?:\.\d+)?\s+±")
+_DONE_MARKS = ("Final estimate", "KL divergence statistics")
 _FINAL = re.compile(r"Final estimate:\s*PPL\s*=\s*" + _NUM + r"\s*\+/-\s*" + _NUM)
 
 KEYS = {
@@ -29,8 +32,18 @@ KEYS = {
 
 
 def parse_log(text: str) -> dict[str, float]:
+    """chunks = 予定の区切りの数（最初の「over N chunks」）。chunks_done = 済んだ区切りの数（途中経過の [n] か、
+    KLD の表の行の番号の最大）。complete = 終わりの印（Final estimate か KL divergence statistics）がある。"""
     out: dict[str, float] = {}
+    done = 0
+    out["complete"] = any(k in text for k in _DONE_MARKS)
     for line in text.splitlines():
+        for m in _PROGRESS.finditer(line):
+            done = max(done, int(m.group(1)))
+        m = _KLD_ROW.match(line)
+        if m:
+            done = max(done, int(m.group(1)))
+            continue
         m = _CHUNKS.search(line)
         if m and "chunks" not in out:
             out["chunks"] = int(m.group(1))
@@ -48,4 +61,5 @@ def parse_log(text: str) -> dict[str, float]:
             out[name] = float(m.group(2))
             if m.group(3) is not None:
                 out[name + "_err"] = float(m.group(3))
+    out["chunks_done"] = done
     return out

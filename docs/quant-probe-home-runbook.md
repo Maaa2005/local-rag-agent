@@ -1,6 +1,6 @@
 # 量子化の物差し: 自宅 PC で本番を回す手順（life#24）
 
-計画は `docs/quant-probe-plan.md`（版 3）。**判定の線は変えない。** ここは回し方だけ。
+計画は `docs/quant-probe-plan.md`（版 4）。**判定の線は変えない。** ここは回し方だけ。
 
 ## 0. 前提と止める条件
 
@@ -38,6 +38,7 @@ python -m evaluation.quant_probe.texts --wikitext-test src/wikitext2-test.parque
 | gemma4-12b | `google/gemma-4-12B-it` | 載らない（約 24GB） | なし |
 
 1. 変換: `python convert_hf_to_gguf.py --remote <作者の置き場> --outtype bf16 --outfile models/<名前>-bf16.gguf`
+   変換か `llama-quantize` がどうしても通らない時だけ（同じ失敗で 2 回直しても通らない）、答えを 1 問も流す前に `work/<名前>/unconvertible.txt` に理由を書き、そのモデルの代わりに `Qwen/Qwen3-14B`（作業の名前 `qwen3-14b`・`--bf16-imatrix-check` なし）を回す。替えは 1 回まで。
 2. 回す（途中で止めても同じ命令で続きから）:
    ```bash
    python -m evaluation.quant_probe.pipeline --model <名前> --bf16 models/<名前>-bf16.gguf --texts texts --work work --bin <llama.cpp の exe のフォルダ> [足す引数]
@@ -47,10 +48,10 @@ python -m evaluation.quant_probe.texts --wikitext-test src/wikitext2-test.parque
    ```bash
    python -m evaluation.quant_probe.report --work work --models <名前> --out results/<名前>
    ```
-   ここで「判定なし」なら直してから次へ。基準が線 0 を割った時だけ、**低い bit の答えを見る前に** `Qwen/Qwen3-14B` に替える（1 回まで）。
+   表の頭の「状態」を見る。「データ欠損」なら理由を直してから次へ（決めた 3 つの全体の答えは、この時点では「決めたモデルと違う」で出ないのが正しい）。「基準不適格」（基準が線 0 を割った）は**替えずにそのまま**次のモデルへ（そのモデルは「測れない」と数える・計画 4 章）。
 4. 3 つそろったら全体の集計:
    ```bash
-   python -m evaluation.quant_probe.report --work work --models qwen3-8b swallow-8b gemma4-12b --out results/final
+   python -m evaluation.quant_probe.report --work work --models qwen3-8b swallow-8b gemma4-12b [qwen3-14b] --out results/final
    ```
    `results/final/README.md` を枝に入れ、要点を life#24 に書く。
 
