@@ -20,7 +20,7 @@ from evaluation.quant_probe import pipeline as P
 from evaluation.quant_probe.kld import parse_log
 from evaluation.quant_probe.questions import (HOLD, PROMPT_VERSION, build_messages, domain_text,
                                               load_questions, load_rules, manifest)
-from evaluation.quant_probe.report import PLANNED, SPARE, collect_model, overall_block, overall_models
+from evaluation.quant_probe.report import PLANNED, SPARE, collect_model, markdown, overall_block, overall_models
 from evaluation.quant_probe.score import classify, parse_conclusion, score_rows, summarize
 from evaluation.quant_probe.stats import (block_bootstrap_upper, holm, mcnemar_one_sided, mcnemar_two_sided,
                                           signflip_exact, spearman)
@@ -200,6 +200,11 @@ def test_parse_kld_log():
     assert b["chunks"] == 80 and b["chunks_done"] == 80 and b["complete"]
     b = parse_log(_progress_log("perplexity", 80, done=79, final=False))
     assert b["chunks_done"] == 79 and not b["complete"]
+    # 2 回分をつないだ記録（80 済み＋次の実行が 1 区切りで止まった）は済んだと見ない
+    two = parse_log(_progress_log("perplexity", 80) + _progress_log("perplexity", 80, done=1, final=False))
+    assert two["runs"] == 2 and not two["complete"]
+    # 数の付かない [n] は途中経過に数えない
+    assert parse_log("perplexity: computing over 80 chunks\nsave [80] done\n")["chunks_done"] == 0
 
 
 def test_offload_from_log():
@@ -514,10 +519,40 @@ def test_report_status_unconvertible_and_weak_ref(tmp_path):
     weak = collect_model(m, **kw)
     assert weak["status"] == "基準不適格" and not weak["judge"]["valid"]
     assert all(v["verdict"] == "測れない" for v in weak["judge"]["by_metric"].values())
+    # 基準不適格なら、壊れた変種の記録があっても読まずに返す
+    (m / "runs" / "Q2_K-en.jsonl").write_text("{壊れた行\n", encoding="utf-8")
+    assert collect_model(m, **kw)["status"] == "基準不適格"
+    # 答えがあるのに置いた変換不能の印は受け付けない
     (m / "unconvertible.txt").write_text("変換で落ちる", encoding="utf-8")
-    gone = collect_model(m, **kw)
+    late = collect_model(m, **kw)
+    assert late["status"] == "データ欠損" and "替え" in late["judge_error"]
+    assert "データ欠損" in markdown("m", late, False)
+    fresh = tmp_path / "fresh"
+    (fresh / "runs").mkdir(parents=True)
+    (fresh / "unconvertible.txt").write_text("変換で落ちる", encoding="utf-8")
+    gone = collect_model(fresh, **kw)
     assert gone["status"] == "変換不能" and gone["reason"] == "変換で落ちる"
-    assert collect_model(m)["status"] != "変換不能"  # 試しでは印を見ない
+    assert collect_model(fresh)["status"] != "変換不能"  # 試しでは印を見ない
+
+
+def test_report_broken_record_is_missing_data(tmp_path):
+    m = _model_dir(tmp_path)
+    (m / "ref_offload.json").write_text(json.dumps({"offloaded": [37, 37]}), encoding="utf-8")
+    (m / "runs" / "Q2_K-en.jsonl").write_text("{壊れた行\n", encoding="utf-8")
+    res = collect_model(m, strict=True)
+    assert res["status"] == "データ欠損" and "読めない" in res["judge_error"]
+    assert "データ欠損" in markdown("m", res, False)
+    (m / "runs" / "Q2_K-en.jsonl").unlink()
+    (m / "ref_offload.json").write_text("{", encoding="utf-8")
+    assert "読めない" in collect_model(m, strict=True)["judge_error"]
+
+
+def test_report_strict_keeps_minimum_inside(tmp_path):
+    m = _model_dir(tmp_path)
+    (m / "ref_offload.json").write_text(json.dumps({"offloaded": [37, 37]}), encoding="utf-8")
+    for x in P.TEXTS:
+        (m / "logs" / f"{P.REF}-base-{x}.log").write_text(_progress_log("perplexity", 40), encoding="utf-8")
+    assert "区切り" in collect_model(m, strict=True, min_chunks=20, min_imatrix_chunks=20)["judge_error"]
 
 
 def test_report_missing_ref_answers(tmp_path):
@@ -594,6 +629,19 @@ def test_power_skew_is_mean_zero():
     up = {b: True for b in w.order}
     o = power.skew(w, base, coins=up)
     assert sum(v == "wrong_assert" for v in o.values()) > sum(v == "wrong_assert" for v in base.values())
+    # 逆向き: 動かせる規程ごとに 3/4 で +1・1/4 で -3。入力を固定した期待値はちょうど 0
+    rich = {i: ("wrong_assert" if k % 3 == 0 else v) for k, (i, v) in enumerate(base.items())}
+    movable = 0
+    for b in w.order:
+        ids = [i for i in w.ids if w.block[i] == b]
+        on = sum(rich[i] == "wrong_assert" for i in ids)
+        movable += on >= 3 and len(ids) - on >= 1
+    rare = power.skew(w, rich, coins=up, reverse=True)
+    common = power.skew(w, rich, coins={b: False for b in w.order}, reverse=True)
+    n_wa = lambda o: sum(v == "wrong_assert" for v in o.values())
+    assert n_wa(rare) - n_wa(rich) == -3 * movable and n_wa(common) - n_wa(rich) == movable
+    assert 0.25 * (-3 * movable) + 0.75 * movable == 0
+    assert power.base_delta("notice", "Q4_K_M-ja") == 0 and power.base_delta("notice", "Q3_K_M-ja") == 12
 
 
 def test_pick_ja_articles():

@@ -10,9 +10,9 @@ import re
 _NUM = r"(-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)"
 _ROW = re.compile(r"^\s*(?P<key>[^:]+?)\s*:\s*" + _NUM + r"\s*%?\s*(?:±\s*" + _NUM + r")?")
 _CHUNKS = re.compile(r"over\s+(\d+)\s+chunks")
-_PROGRESS = re.compile(r"\[(\d+)\]")
-_KLD_ROW = re.compile(r"^\s*(\d+)\s+-?\d+(?:\.\d+)?\s+±")
-_DONE_MARKS = ("Final estimate", "KL divergence statistics")
+_PROGRESS = re.compile(r"\[(\d+)\]-?\d+(?:\.\d+)?")  # 途中経過「[n]9.8765」の形だけ
+_KLD_ROW = re.compile(r"^\s*(\d+)\s+-?\d+(?:\.\d+)?\s+±", re.M)
+_DONE = re.compile(r"Final estimate|KL divergence statistics")
 _FINAL = re.compile(r"Final estimate:\s*PPL\s*=\s*" + _NUM + r"\s*\+/-\s*" + _NUM)
 
 KEYS = {
@@ -32,21 +32,22 @@ KEYS = {
 
 
 def parse_log(text: str) -> dict[str, float]:
-    """chunks = 予定の区切りの数（最初の「over N chunks」）。chunks_done = 済んだ区切りの数（途中経過の [n] か、
-    KLD の表の行の番号の最大）。complete = 終わりの印（Final estimate か KL divergence statistics）がある。"""
+    """chunks = 予定の区切りの数（「over N chunks」）。runs = その行の数（1 つの記録に 1 回の実行のはず）。
+    chunks_done = 済んだ区切りの数（途中経過「[n]数」か、KLD の表の行の番号の最大）。
+    complete = 実行が 1 回だけで、終わりの印（Final estimate か KL divergence statistics）が最後の途中経過より後にある。"""
     out: dict[str, float] = {}
-    done = 0
-    out["complete"] = any(k in text for k in _DONE_MARKS)
+    starts = list(_CHUNKS.finditer(text))
+    out["runs"] = len(starts)
+    if starts:
+        out["chunks"] = int(starts[0].group(1))
+    marks = [(m.end(), int(m.group(1))) for m in _PROGRESS.finditer(text)]
+    marks += [(m.end(), int(m.group(1))) for m in _KLD_ROW.finditer(text)]
+    out["chunks_done"] = max((n for _, n in marks), default=0)
+    last = max((pos for pos, _ in marks), default=-1)
+    done_at = [m.start() for m in _DONE.finditer(text)]
+    out["complete"] = len(starts) == 1 and bool(done_at) and max(done_at) > last
     for line in text.splitlines():
-        for m in _PROGRESS.finditer(line):
-            done = max(done, int(m.group(1)))
-        m = _KLD_ROW.match(line)
-        if m:
-            done = max(done, int(m.group(1)))
-            continue
-        m = _CHUNKS.search(line)
-        if m and "chunks" not in out:
-            out["chunks"] = int(m.group(1))
+        if _KLD_ROW.match(line) or _CHUNKS.search(line):
             continue
         m = _FINAL.search(line)
         if m:
@@ -61,5 +62,4 @@ def parse_log(text: str) -> dict[str, float]:
             out[name] = float(m.group(2))
             if m.group(3) is not None:
                 out[name + "_err"] = float(m.group(3))
-    out["chunks_done"] = done
     return out

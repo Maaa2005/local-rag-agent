@@ -1,4 +1,4 @@
-"""判定の線 qp-judge-4 の検出力と誤りの率を、測る前に見積もる。judge_model を端から端まで通す。結果は計画 6 章に写す。
+"""判定の線 qp-judge-5 の検出力と誤りの率を、測る前に見積もる。judge_model を端から端まで通す。結果は計画 6 章に写す。
 
     python -m evaluation.quant_probe.power --sims 2000 [--joint-sims 2000]
 
@@ -12,17 +12,22 @@
 - ずれ（全部の物差しで同じ値）: bit ごと Q6 .004・Q5 .010・Q4 .030・Q3 .090・Q2 .35 に校正の倍率 none 1.25・en 1.0・ja 1.08。
   安全域（<= Q4_K_M-en）は Q6 と Q5 の 6 つと Q4_K_M-en。10% 以内の近い対は同じ bit の en と ja。
 場面:
-- notice（気づくモデル）: Δ = Q6/Q5/Q4_K_M-en 0・Q4_K_M-ja/none 2・Q3 12・Q2 40。
+- notice（気づくモデル・本当の見逃しは 0）: Δ = Q6・Q5・Q4 0・Q3 12・Q2 40。安全域と近い対（同じ bit の en と ja）の
+  Δ はどれも同じなので、家族 A の安全域と家族 B の近い対は全部が本当の帰無（μ = 0）。
 - miss_A: notice に加え Q5_K_M-ja（安全域）に d。
 - miss_B: notice に加え Q3_K_M-ja に d（Q3_K_M-en と KLD が 10% 以内）。Q3_K_M-ja の NOTICE 12 は 24 規程に散らし、
   d だけを広さの規程に集める。
 - null: Δ 全部 0。
 - skew（偏った帰無）: notice に加え、Q5_K_M-ja（安全域）だけ、WA が 1 問以上あり WA でない問が 3 問以上ある規程ごとに、
   1/4 の確率で WA を 3 問足し、3/4 の確率で 1 問消す。どの規程でも増えの平均はちょうど 0 で、分布は 0 の回りで対称でない。
-  符号の入れ替えの前提が崩れた時の、誤った「気づかない」の率を見る。
+- skew_rev（逆向きの偏った帰無）: 同じ規程の選び方を逆にして、WA が 3 問以上あり WA でない問が 1 問以上ある規程ごとに、
+  3/4 の確率で 1 問足し、1/4 の確率で 3 問消す（小さな正が多く、まれに大きな負。符号の入れ替えに危ない向き）。
+  どちらも、符号の入れ替えの前提が崩れた時の、誤った「気づかない」の率を見る。
 1 モデルの表のあと、3 モデルを一緒に作る見積り（joint）も出す。3 モデルは規程の難しさを分け合う（p_b の 0.10 からの
-ずれの半分の分散を共通に引く）。見逃しの d を足す規程と、skew の規程ごとの向きも 3 モデルで同じにする（最も悪い向きの相関）。
-足した問の数と触れた規程の数は、実際に足せた数を数える（規程の空きが足りない時は少なくなる）。
+ずれの半分の分散を共通に引き、残りの半分を各モデルで引く。1 モデルの分布は独立の時と同じ）。見逃しの d を足す規程と、
+skew の規程ごとの向きも 3 モデルで同じにする（相関を強める向きの一例で、最も悪い場合とは限らない）。
+足した問の数と触れた規程の数は、実際に足せた数を数える（規程の空きが足りない時は少なくなる）。差が正／負の規程の数は、
+狙いの変種と基準 1 回目の差と、狙いの変種と同じ bit の en の変種（近い対の相手）の差の両方を数える。
 """
 from __future__ import annotations
 
@@ -38,7 +43,7 @@ from .questions import load_questions
 KLD_BIT = {"Q6_K": 0.004, "Q5_K_M": 0.010, "Q4_K_M": 0.030, "Q3_K_M": 0.090, "Q2_K": 0.35}
 CAL = {"none": 1.25, "en": 1.0, "ja": 1.08}
 CHURN = {"Q6_K": 0.01, "Q5_K_M": 0.02, "Q4_K_M": 0.04, "Q3_K_M": 0.08, "Q2_K": 0.15}
-NOTICE = {"Q6_K": 0, "Q5_K_M": 0, "Q4_K_M": 2, "Q3_K_M": 12, "Q2_K": 40}
+NOTICE = {"Q6_K": 0, "Q5_K_M": 0, "Q4_K_M": 0, "Q3_K_M": 12, "Q2_K": 40}
 TARGET = {"miss_A": "Q5_K_M-ja", "miss_B": "Q3_K_M-ja"}
 SKEWED = "Q5_K_M-ja"
 RERUN_NOISE = 0.01
@@ -57,22 +62,27 @@ def base_delta(scene: str, name: str) -> int:
     return 0 if scene == "null" or name == ANCHOR else NOTICE[_split(name)[0]]
 
 
-def skew(w: "World", o: dict[str, str], coins: dict[str, bool] | None = None) -> dict[str, str]:
-    """規程ごとの増えの平均がちょうど 0 で、0 の回りで対称でない揺れ。coins は規程ごとの向き（True で 3 問足す）。"""
+def skew(w: "World", o: dict[str, str], coins: dict[str, bool] | None = None,
+         reverse: bool = False) -> dict[str, str]:
+    """規程ごとの増えの平均がちょうど 0 で、0 の回りで対称でない揺れ。coins は規程ごとの、確率 1/4 の向きを引いたか。
+    reverse でない時: 1/4 で 3 問足す・3/4 で 1 問消す。reverse の時: 1/4 で 3 問消す・3/4 で 1 問足す。"""
     o = dict(o)
+    big, small = (-3, 1) if reverse else (3, -1)
     for b in w.order:
         ids = [i for i in w.ids if w.block[i] == b]
         on = [i for i in ids if o[i] == "wrong_assert"]
         off = [i for i in ids if o[i] != "wrong_assert"]
-        if not on or len(off) < 3:
-            continue  # 足すも消すもできる規程だけ動かす（向きは答えと無関係に引くので、平均はちょうど 0）
-        up = coins[b] if coins is not None else w.rng.random() < 0.25
-        if up:
-            for i in w.rng.sample(off, 3):
+        need_on, need_off = (3, 1) if reverse else (1, 3)
+        if len(on) < need_on or len(off) < need_off:
+            continue  # 両方の向きに動かせる規程だけ動かす（向きは答えと無関係に引くので、平均はちょうど 0）
+        rare = coins[b] if coins is not None else w.rng.random() < 0.25
+        k = big if rare else small
+        if k > 0:
+            for i in w.rng.sample(off, k):
                 o[i] = "wrong_assert"
         else:
-            i = w.rng.choice(on)
-            o[i] = "held_ok" if w.hold[i] else "correct"
+            for i in w.rng.sample(on, -k):
+                o[i] = "held_ok" if w.hold[i] else "correct"
     return o
 
 
@@ -151,16 +161,19 @@ def one_model(w: World, scene: str, d: int, spread: int, shared: dict | None = N
             o, added, touched = w.add_wa(o, d, blocks)
             if info is not None:
                 info["added"], info["touched"] = added, touched
-        if scene == "skew" and n == SKEWED:
-            o = skew(w, o, shared["coins"] if shared else None)
-        if info is not None and n == TARGET.get(scene, SKEWED if scene == "skew" else None):
-            diff = {b: 0 for b in w.order}
-            for i in w.ids:
-                diff[w.block[i]] += (o[i] == "wrong_assert") - (r1[i] == "wrong_assert")
-            info["pos"] = sum(v > 0 for v in diff.values())
-            info["neg"] = sum(v < 0 for v in diff.values())
+        if scene in ("skew", "skew_rev") and n == SKEWED:
+            o = skew(w, o, shared["coins"] if shared else None, reverse=scene == "skew_rev")
         outs[n] = o
         variants.append({"name": n, "outcomes": o, "metrics": _metrics(n)})
+    tgt = TARGET.get(scene, SKEWED if scene in ("skew", "skew_rev") else None)
+    if info is not None and tgt:
+        partner = _split(tgt)[0] + "-en"
+        for key, other in (("", r1), ("pair_", outs[partner])):
+            diff = {b: 0 for b in w.order}
+            for i in w.ids:
+                diff[w.block[i]] += (outs[tgt][i] == "wrong_assert") - (other[i] == "wrong_assert")
+            info[key + "pos"] = sum(v > 0 for v in diff.values())
+            info[key + "neg"] = sum(v < 0 for v in diff.values())
     noise = [(RERUN, outs[ANCHOR], w.redraw(outs[ANCHOR], rate, RERUN_NOISE)),
              (PLACE, outs["Q6_K-none"], w.redraw(outs["Q6_K-none"], rate, RERUN_NOISE))]
     j = judge_model(r1, r2, variants, w.hold, w.block, noise, strict=True, need_place=True, boot_n=0)
@@ -189,9 +202,10 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
 def rates(scene: str, d: int, spread: int, sims: int, seed: int) -> tuple[dict[str, int], dict[str, float]]:
     w = World(random.Random(f"{seed}-{scene}-{d}-{spread}"))
     cnt = {v: 0 for v in VERDICTS}
-    tot = {"added": 0, "touched": 0, "pos": 0, "neg": 0}
+    keys = ("added", "touched", "pos", "neg", "pair_pos", "pair_neg")
+    tot = {k: 0 for k in keys}
     for _ in range(sims):
-        info = {"added": 0, "touched": 0, "pos": 0, "neg": 0}
+        info = {k: 0 for k in keys}
         cnt[one_model(w, scene, d, spread, info=info)] += 1
         for x in tot:
             tot[x] += info[x]
@@ -229,7 +243,8 @@ def _cells(cnt: dict[str, int], keys, n: int) -> str:
 def joint_scenes() -> list[tuple[str, list[tuple[str, int]], int]]:
     """（名前・3 モデルの場面・広さ）。見逃すモデルの数 k は 0〜3。"""
     out = [("notice k=0", [("notice", 0)] * 3, 24), ("null", [("null", 0)] * 3, 24),
-           ("skew×3（向きをそろえる）", [("skew", 0)] * 3, 24)]
+           ("skew×3（向きをそろえる）", [("skew", 0)] * 3, 24),
+           ("skew_rev×3（向きをそろえる）", [("skew_rev", 0)] * 3, 24)]
     for s in ("miss_A", "miss_B"):
         for d in (10, 20, 30):
             for k in (1, 2, 3):
@@ -247,19 +262,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--seed", type=int, default=20261111)
     a = ap.parse_args(argv)
     js = a.sims if a.joint_sims is None else a.joint_sims
-    scenes = [("notice", 0, 24), ("null", 0, 24), ("skew", 0, 24)]
+    scenes = [("notice", 0, 24), ("null", 0, 24), ("skew", 0, 24), ("skew_rev", 0, 24)]
     scenes += [(s, d, sp) for s in ("miss_A", "miss_B") for sp in (24, 8) for d in (10, 20, 30)]
     table = {}
     print(f"1 モデルの判定の割合（主の物差し {PRIMARY}・{a.sims} 回・括弧は Wilson 95%。足した問・触れた規程・差が正／負の規程は"
-          "狙いの変種（skew は Q5_K_M-ja）の平均。差は基準 1 回目との規程ごとの WA の差）")
-    print("| 場面 | 増え d | 広さ | 足した問 | 触れた規程 | 差が正の規程 | 差が負の規程 | " + " | ".join(VERDICTS) + " |")
+          "狙いの変種（skew は Q5_K_M-ja）の平均。差は規程ごとの WA の差で、基準 1 回目との差と、同じ bit の en との差）")
+    print("| 場面 | 増え d | 広さ | 足した問 | 触れた規程 | 基準との差 正／負 | en との差 正／負 | " + " | ".join(VERDICTS) + " |")
     print("|---|---|---|---|---|---|---|" + "---|" * len(VERDICTS))
     for s, d, sp in scenes:
         cnt, info = rates(s, d, sp, a.sims, a.seed)
         table[(s, d, sp)] = {v: c / a.sims for v, c in cnt.items()}
         miss = s.startswith("miss")
         print(f"| {s} | {d or '-'} | {sp if miss else '-'} | {info['added']:.1f} | {info['touched']:.1f} | "
-              f"{info['pos']:.1f} | {info['neg']:.1f} | "
+              f"{info['pos']:.1f}／{info['neg']:.1f} | {info['pair_pos']:.1f}／{info['pair_neg']:.1f} | "
               + _cells(cnt, VERDICTS, a.sims) + " |", flush=True)
     print("\n3 モデルの全体の答えの割合（独立とみなした数え上げ。見逃すモデルの数 k・見逃すモデルは 24 規程）")
     print("| 見逃しの型 | d | k | " + " | ".join(OVERALL) + " |")

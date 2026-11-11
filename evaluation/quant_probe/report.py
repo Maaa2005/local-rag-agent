@@ -88,17 +88,16 @@ def _strict_tokens(res: dict, min_chunks: int, min_imatrix_chunks: int) -> str |
     return None
 
 
-def collect_model(mdir: Path, ids: set[str] | None = None, strict: bool = False, min_chunks: int = 0,
-                  min_imatrix_chunks: int = 0) -> dict:
-    qs = [q for q in load_questions() if ids is None or q.id in ids]
-    if strict and (mdir / UNCONVERTIBLE).exists():
-        return {"status": "変換不能", "reason": (mdir / UNCONVERTIBLE).read_text(encoding="utf-8").strip()}
-    runs = {p.stem: _rows(p) for p in sorted((mdir / "runs").glob("*.jsonl"))}
+READ_ERRORS = (OSError, ValueError, KeyError, TypeError)
+
+
+def _read_rest(mdir: Path, qs, res: dict, skip: set[str]) -> dict[str, dict]:
+    """基準の 2 回のほかの記録（変種の答え・KLD・比べ元・imatrix・載り・時間）を読む。変種の採点を返す。"""
+    runs = {p.stem: _rows(p) for p in sorted((mdir / "runs").glob("*.jsonl")) if p.stem not in skip}
     scored = {n: score_rows(qs, r) for n, r in runs.items()}
-    summaries = {n: summarize(qs, s) for n, s in scored.items()}
-    metrics = {n: _metrics(mdir, n) for n in [*ALL_VARIANTS, BF16IMX]
-               if (mdir / "logs" / f"{n}-kld-en.log").exists() or n in runs}
-    res = {"summaries": summaries, "metrics": metrics, "base_logs": {}, "imatrix_logs": {}}
+    res["summaries"].update({n: summarize(qs, sc) for n, sc in scored.items()})
+    res["metrics"] = {n: _metrics(mdir, n) for n in [*ALL_VARIANTS, BF16IMX]
+                      if (mdir / "logs" / f"{n}-kld-en.log").exists() or n in runs}
     for x in TEXTS:
         d = _log(mdir / "logs" / f"{REF}-base-{x}.log")
         if d is not None:
@@ -113,36 +112,69 @@ def collect_model(mdir: Path, ids: set[str] | None = None, strict: bool = False,
     if off.exists():
         res["ref_offload"] = json.loads(off.read_text(encoding="utf-8"))["offloaded"]
     for f in ("timing.jsonl", "variants.jsonl"):
-        p = mdir / f
-        if p.exists():
-            res[f.split(".")[0]] = [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
-    r1, r2 = f"{REF}-r1", f"{REF}-r2"
-    if r1 not in scored or r2 not in scored:
-        res["status"], res["judge_error"] = "データ欠損", "基準の 2 回の答えが無い"
+        fp = mdir / f
+        if fp.exists():
+            res[f.split(".")[0]] = [json.loads(l) for l in fp.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return scored
+
+
+def collect_model(mdir: Path, ids: set[str] | None = None, strict: bool = False, min_chunks: int = 0,
+                  min_imatrix_chunks: int = 0) -> dict:
+    """読む順番（計画 5 章の 11）: 変換不能の印 → 基準の 2 回だけ → 360 問 → 基準不適格なら返す → 残りの記録 →
+    区切りと終わりの印 → 載り → 判定。読めない記録はデータ欠損にする。本番（strict）は区切りの下限を下げない。"""
+    qs = [q for q in load_questions() if ids is None or q.id in ids]
+    if strict:
+        min_chunks = max(min_chunks, MAIN_MIN_CHUNKS)
+        min_imatrix_chunks = max(min_imatrix_chunks, MAIN_MIN_IMATRIX_CHUNKS)
+    answered = sorted((mdir / "runs").glob("*.jsonl"))
+    if strict and (mdir / UNCONVERTIBLE).exists():
+        reason = (mdir / UNCONVERTIBLE).read_text(encoding="utf-8").strip()
+        if answered:
+            return {"status": "データ欠損", "reason": reason, "summaries": {}, "metrics": {},
+                    "judge_error": f"変換不能の印があるのに答えの記録が {len(answered)} 本ある（答えを流した後の替えは受け付けない）"}
+        return {"status": "変換不能", "reason": reason}
+    res = {"summaries": {}, "metrics": {}, "base_logs": {}, "imatrix_logs": {}}
+
+    def lost(why: str) -> dict:
+        res["status"], res["judge_error"] = "データ欠損", why
         return res
-    outcomes = {n: {k: v["outcome"] for k, v in s.items()} for n, s in scored.items()}
+
+    r1, r2 = f"{REF}-r1", f"{REF}-r2"
     hold = {q.id: q.should_hold for q in qs}
+    try:
+        ref_rows = {r: _rows(mdir / "runs" / f"{r}.jsonl") for r in (r1, r2) if (mdir / "runs" / f"{r}.jsonl").exists()}
+        if len(ref_rows) < 2:
+            return lost("基準の 2 回の答えが無い")
+        scored = {r: score_rows(qs, rows) for r, rows in ref_rows.items()}
+    except READ_ERRORS as e:
+        return lost(f"基準の答えが読めない（{type(e).__name__}: {e}）")
+    res["summaries"] = {r: summarize(qs, sc) for r, sc in scored.items()}
+    outcomes = {n: {k: v["outcome"] for k, v in sc.items()} for n, sc in scored.items()}
     if strict:
         for r in (r1, r2):
             miss = sum(v == "missing" for v in outcomes[r].values())
             if len(outcomes[r]) != 360 or miss:
-                res["status"], res["judge_error"] = "データ欠損", f"{r} の答えが 360 問そろっていない（欠け {miss}）"
-                return res
+                return lost(f"{r} の答えが 360 問そろっていない（欠け {miss}）")
         q12 = [quality(outcomes[r1], hold), quality(outcomes[r2], hold)]
         if not (ref_ok(q12[0]) and ref_ok(q12[1])):
-            # 基準不適格: 変種は見ない。全体ではこのモデルを「測れない」に数える
+            # 基準不適格: 変種の記録は読まない。全体ではこのモデルを「測れない」に数える
             res["status"] = "基準不適格"
             res["judge"] = {"version": JUDGE_VERSION, "valid": False, "ref_quality": q12,
                             "by_metric": {s: {"verdict": "測れない"} for s in METRICS}}
             return res
+    try:
+        scored_v = _read_rest(mdir, qs, res, {r1, r2})
+    except READ_ERRORS as e:
+        return lost(f"記録が読めない（{type(e).__name__}: {e}）")
+    outcomes.update({n: {k: v["outcome"] for k, v in sc.items()} for n, sc in scored_v.items()})
+    if strict:
         err = _strict_tokens(res, min_chunks, min_imatrix_chunks)
         if err is None and not res.get("ref_offload"):
             err = "基準の GPU への載りが読めない（ref_offload.json）"
         if err:
-            res["status"], res["judge_error"] = "データ欠損", err
-            return res
+            return lost(err)
     need_place = bool(res.get("ref_offload")) and res["ref_offload"][0] < res["ref_offload"][1]
-    variants = [{"name": n, "outcomes": outcomes[n], "metrics": metrics.get(n, {})}
+    variants = [{"name": n, "outcomes": outcomes[n], "metrics": res["metrics"].get(n, {})}
                 for n in ALL_VARIANTS if n in outcomes]
     noise_pairs = [(n, outcomes[base], outcomes[n]) for n, base in NOISE_OF.items()
                    if n in outcomes and base in outcomes]
@@ -151,7 +183,7 @@ def collect_model(mdir: Path, ids: set[str] | None = None, strict: bool = False,
                                    {q.id: f"{q.set}/{q.rule_id}" for q in qs}, noise_pairs, strict, need_place)
         res["status"] = "適格" if res["judge"]["valid"] else "基準不適格"
     except (StrictError, ValueError) as e:
-        res["status"], res["judge_error"] = "データ欠損", str(e)
+        return lost(str(e))
     return res
 
 
@@ -171,7 +203,7 @@ def markdown(model: str, res: dict, trial: bool) -> str:
     weak = st == "基準不適格" and "variants" not in (res.get("judge") or {})
     L += ["| 回 | 誤った断定 | うち保留すべき問 | 正答 | 保留できた | 保留しすぎ | 形式違反 | 欠け | 打ち切り | 対の両方正答 |",
           "|---|---|---|---|---|---|---|---|---|---|"]
-    for n, s in res["summaries"].items():
+    for n, s in res.get("summaries", {}).items():
         if weak and not n.startswith(REF):
             continue  # 基準不適格: 変種の答えは見ない
         L.append(f"| {n} | {s['wrong_assert']} | {s['wrong_assert_hold']} | {s['correct']}/{s['answerable']} | "
@@ -184,7 +216,7 @@ def markdown(model: str, res: dict, trial: bool) -> str:
         return "\n".join(L) + "\n"
     L += ["", "| 変種 | KLD 英 | KLD 日 | KLD 規程 | ln PPL比 英 | ln PPL比 日 | Same top p 英 | 区切り 英 |",
           "|---|---|---|---|---|---|---|---|"]
-    for n, m in res["metrics"].items():
+    for n, m in res.get("metrics", {}).items():
         g = lambda k, f: (m.get(k) or {}).get(f)
         L.append(f"| {n} | {_fmt(g('kld_en', 'kld_mean'))} | {_fmt(g('kld_ja', 'kld_mean'))} | "
                  f"{_fmt(g('kld_dom', 'kld_mean'))} | {_fmt(g('ppl_en', 'ln_ppl_ratio'))} | "
@@ -270,7 +302,7 @@ def main(argv: list[str] | None = None) -> int:
             md += [f"| {s}{'' if s == PRIMARY else '（探索）'} | {judge_overall(judged, s)} |" for s in METRICS]
             md += ["", "基準不適格（線 0 を割った・測れない）: " + (", ".join(m for m, j in judged.items() if not j["valid"]) or "なし"),
                    "変換不能（替えを使った）: " + (", ".join(m for m in PLANNED if allres[m].get("status") == "変換不能") or "なし"),
-                   f"主の物差し（{PRIMARY}）の「はい」だけ、計画 5 章の前提（各比較の規程ごとの差が独立で 0 の回りで対称）の下で、"
+                   f"主の物差し（{PRIMARY}）の「はい」だけ、計画 5 章の前提（各比較の帰無の下で、固定したモデル・文章・KLD を条件に、規程ごとの差の揺れが 0 の回りで対称・規程の間は独立）の下で、"
                    "誤りの確率 0.05 以下。探索の物差しには保証が無い。「いいえ」はこの 360 問の上での記述で、保証は無い。", ""]
     md += [markdown(m, r, a.trial) for m, r in allres.items()]
     (a.out / "summary.json").write_text(json.dumps(allres, ensure_ascii=False, indent=1), encoding="utf-8")
