@@ -139,3 +139,11 @@ def test_summarize_values_and_m6():
     assert summ["se_cluster"] is not None
     assert score.summarize(st, use_cluster=False)["se_cluster"] is None
     assert score.clusters_of(ROWS) == {"Q1": "貸与規程", "Q2": "貸与規程", "Q3": "出張規程", "Q4": "出張規程"}
+
+
+def test_head_marks_truncation():
+    """頭の 80 字で切った時は「…」が付き、短い答えはそのまま。"""
+    from evaluation.nugget.score import _head
+    assert _head("短い") == "短い"
+    long = "あ" * 79 + "結論: 対象外"
+    assert _head(long).endswith("…") and len(_head(long)) == 81

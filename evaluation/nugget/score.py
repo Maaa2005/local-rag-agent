@@ -18,6 +18,13 @@ from evaluation.nugget import stats
 FACT_POINTS = {"full": 1.0, "partial": 0.5, "none": 0.0}
 
 
+HEAD_CHARS = 80
+
+
+def _head(text: str) -> str:
+    return text if len(text) <= HEAD_CHARS else text[:HEAD_CHARS] + "…"
+
+
 def vital_keywords(row: Mapping) -> list[str]:
     """vital の事実の keywords を重複なしでまとめた一覧（M6 と並べる用）。"""
     seen: list[str] = []
@@ -42,7 +49,8 @@ def score_record(rec: Mapping, row: Mapping) -> dict:
         "label_counts": {k: 0 for k in LABELS},
         "points": {},
         "contradictions": [],
-        "head": (rec.get("answer") or "")[:80],
+        # 途中で切ると「対象外」が「対象」に見える事があるので、切った時は「…」を付ける
+        "head": _head(rec.get("answer") or ""),
     }
     if rec.get("status") != "ok" or not vitals:
         return out

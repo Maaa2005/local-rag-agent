@@ -1,0 +1,36 @@
+{"run": "A-s1", "qid": "X038", "facts": {"X038-n1": "full", "X038-n2": "none", "X038-n3": "full", "X038-n4": "none"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X031", "facts": {"X031-n1": "full", "X031-n2": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X058", "facts": {"X058-n1": "full", "X058-n2": "partial", "X058-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X049", "facts": {"X049-n1": "full", "X049-n2": "full", "X049-n3": "partial", "X049-n4": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X028", "facts": {"X028-n1": "full", "X028-n2": "partial", "X028-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X015", "facts": {"X015-n1": "full", "X015-n2": "partial", "X015-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X048", "facts": {"X048-n1": "full", "X048-n2": "full", "X048-n3": "full", "X048-n4": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X087", "facts": {"X087-n1": "full", "X087-n2": "full", "X087-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X035", "facts": {"X035-n1": "full", "X035-n2": "partial", "X035-n3": "partial", "X035-n4": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X068", "facts": {"X068-n1": "full", "X068-n2": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X046", "facts": {"X046-n1": "full", "X046-n2": "full", "X046-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s1", "qid": "X021", "facts": {"X021-n1": "partial", "X021-n2": "full", "X021-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X038", "facts": {"X038-n1": "full", "X038-n2": "none", "X038-n3": "full", "X038-n4": "none"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X031", "facts": {"X031-n1": "full", "X031-n2": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X058", "facts": {"X058-n1": "partial", "X058-n2": "full", "X058-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X049", "facts": {"X049-n1": "partial", "X049-n2": "full", "X049-n3": "full", "X049-n4": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X028", "facts": {"X028-n1": "full", "X028-n2": "full", "X028-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X015", "facts": {"X015-n1": "full", "X015-n2": "partial", "X015-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X048", "facts": {"X048-n1": "full", "X048-n2": "full", "X048-n3": "full", "X048-n4": "none"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X087", "facts": {"X087-n1": "full", "X087-n2": "none", "X087-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X035", "facts": {"X035-n1": "full", "X035-n2": "full", "X035-n3": "partial", "X035-n4": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X068", "facts": {"X068-n1": "full", "X068-n2": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X046", "facts": {"X046-n1": "partial", "X046-n2": "full", "X046-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "A-s2", "qid": "X021", "facts": {"X021-n1": "partial", "X021-n2": "full", "X021-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X038", "facts": {"X038-n1": "full", "X038-n2": "none", "X038-n3": "none", "X038-n4": "none"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X031", "facts": {"X031-n1": "partial", "X031-n2": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X058", "facts": {"X058-n1": "partial", "X058-n2": "full", "X058-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X049", "facts": {"X049-n1": "partial", "X049-n2": "full", "X049-n3": "none", "X049-n4": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X028", "facts": {"X028-n1": "full", "X028-n2": "partial", "X028-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X015", "facts": {"X015-n1": "full", "X015-n2": "partial", "X015-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X048", "facts": {"X048-n1": "full", "X048-n2": "partial", "X048-n3": "none", "X048-n4": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X087", "facts": {"X087-n1": "full", "X087-n2": "none", "X087-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X035", "facts": {"X035-n1": "full", "X035-n2": "full", "X035-n3": "none", "X035-n4": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X068", "facts": {"X068-n1": "full", "X068-n2": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X046", "facts": {"X046-n1": "partial", "X046-n2": "partial", "X046-n3": "full"}, "by": "claude-opus-5-5（作業役）"}
+{"run": "B-s1", "qid": "X021", "facts": {"X021-n1": "partial", "X021-n2": "full", "X021-n3": "full"}, "by": "claude-opus-5-5（作業役）"}

@@ -22,13 +22,16 @@ python -m evaluation.nugget.cli report  --nuggets set/nuggets.jsonl --a ... --b 
 
 - `nuggets.jsonl`: 1 行 1 問。`importance` は vital/okay、vital は 1 つ以上、`quote` は規程本文（`<set>/corpus/<rule_id>.md`）に逐語で含まれる（改行・空白の違いは無視）。質問文は行の `question`（draft が入れる）か `judge --questions`。
 - freeze と合わない `nuggets.jsonl` では judge / score / compare / report は止まる。同じ版の中身は変えられない。直したら `version` を上げて freeze し直す（前の版の判定ファイルは sha256 が合わず読めない）。
-- 判定の JSONL には判定の版（`NJ-1`）・判定役のモデル名・seed・nuggets の sha256 が入る。版やモデルが混ざった比較は止める。
+- 判定の JSONL には判定の版（`NJ-3`、`--judge-version` で `NJ-2` も選べる）・判定役のモデル名・seed・nuggets の sha256 が入る。版やモデルが混ざった比較は止める。
 - A/A（`--aa`）は **設定 A を seed だけ替えて流し直した K 回分**。A とその差で揺れ幅 w を出す。温度 0・seed 固定のままだと w がほぼ 0 になり揺れを小さく見誤るので、本番と同じ設定で seed を替える。
 
 ## 判定（2 回の呼び出し）
 
 1. 答えを文に分け（`split_sentences` + 改行でも分ける）、文ごとに 必須 / 補足 / 定型 / 不要 / 記載なし / 相反（内部名 vital / okay / boilerplate / irrelevant / not_stated / contradiction）。
-2. vital の事実ごとに full / partial / none。
+2. vital の事実ごとに full / partial / none と、回答からそのまま写した根拠（`evidence`）。数値・条件・境目が回答に無ければ full にしない。
+- 機械の検査（NJ-2）: full / partial なのに `evidence` が空、または回答に（空白・改行・全角空白を除いて）部分一致しない事実は none に下げる。下げた事実の nid は記録の `downgraded` に残る（`evidence` も残る）。none は `evidence` が無くてよい。
+- NJ-3（既定。`judge --judge-version {NJ-2,NJ-3}` で選ぶ。記録の `judge_version` に選んだ版が入る）: 呼び出し 2 は回答を番号付きの文で渡し、事実ごとに `{"nid", "score", "sentences": [番号]}` を返させる。full / partial なのに番号が空、または 1..文の数 の範囲外だけなら none に下げ、nid を `downgraded` に残す。`evidence` には引いた文の本文をつないだものが入る（人が読む用）。8B の判定役は答えでなく事実や規程の文を写してしまい NJ-2 で答えにある事実まで下がったため、写しでなく番号にした。
+- 呼び出し 1 は「結論: …」の行を定型にしない（規程に合えば 必須、食い違えば 相反）。
 - JSON が読めない・長さが合わない・知らないラベルは 1 回だけ頼み直す。それでも駄目な回は「判定できず」。点にも数にも入れない（0 点にしない）。
 
 ## 式

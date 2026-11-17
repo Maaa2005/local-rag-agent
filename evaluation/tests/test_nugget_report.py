@@ -73,7 +73,7 @@ def test_judge_records_carry_version_model_and_sha(world):
     recs = [json.loads(l) for l in Path(world["judged"]["a1"]).read_text(encoding="utf-8").splitlines()]
     assert len(recs) == 4
     r = recs[0]
-    assert r["judge_version"] == "NJ-1" and r["judge_model"] == "fake-model"
+    assert r["judge_version"] == "NJ-3" and r["judge_model"] == "fake-model"
     assert r["nuggets_sha256"] == schema.sha256_lf(world["nug"])
     assert r["status"] == "ok" and r["run"] == "a1" and r["qid"] == "Q1"
     assert r["labels"] == ["vital"] and r["facts"] == {"Q1-n1": "full", "Q1-n2": "partial"}
@@ -106,7 +106,7 @@ def test_compare_command_numbers(world, capsys):
                        {"q0": "x", "q1": "x", "q2": "y", "q3": "y"})
     assert got["aa_width"] == pytest.approx(stats.aa_width(aa))
     assert got["verdict"] in (stats.VERDICT_BELIEVE, stats.VERDICT_NOISE)
-    assert got["judge_version"] == "NJ-1" and got["judge_model"] == "fake-model"
+    assert got["judge_version"] == "NJ-3" and got["judge_model"] == "fake-model"
 
 
 def test_compare_without_aa_withholds_verdict(world, capsys):
@@ -125,7 +125,7 @@ def test_report_command_worst_first_and_columns(world, capsys, tmp_path):
     md = out.read_text(encoding="utf-8")
     assert "## 設定ごとの要約" in md and "## 比較" in md and "## 悪化した問" in md
     assert "| base |" in md and "| new |" in md
-    assert "NJ-1" in md and "fake-model" in md
+    assert "NJ-3" in md and "fake-model" in md
     worst = md.split("## 悪化した問")[1]
     rows = [l for l in worst.splitlines() if l.startswith("| Q")]
     assert [r.split("|")[1].strip() for r in rows] == ["Q2", "Q1", "Q4"]  # 差 -1, -0.375, 0 の順で上位 3 つ

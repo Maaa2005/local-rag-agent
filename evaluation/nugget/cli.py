@@ -157,13 +157,14 @@ def cmd_judge(args, send) -> int:
                     question=question,
                     answer=a["text"],
                     nuggets=row["nuggets"],
+                    version=args.judge_version,
                 )
                 rec = {
                     "qid": a["qid"],
                     "run": a["run"],
                     "answer": a["text"],
                     **res,
-                    "judge_version": judge_mod.JUDGE_VERSION,
+                    "judge_version": args.judge_version,
                     "judge_model": args.model,
                     "judge_seed": args.seed,
                     "nuggets_sha256": sha,
@@ -302,6 +303,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--answers", nargs="+", required=True, help="答えの JSONL（1 ファイル = 1 回分）")
     p.add_argument("--questions", help="質問文の JSONL（nuggets の行に question が無い時）")
     p.add_argument("--out-dir", required=True)
+    p.add_argument("--judge-version", choices=judge_mod.JUDGE_VERSIONS, default=judge_mod.JUDGE_VERSION,
+                   help="判定の手順の版（既定 NJ-3: 文の番号で根拠を示す。NJ-2: 答えからの写し）")
     _add_http(p)
     p.set_defaults(fn=cmd_judge)
 
