@@ -18,6 +18,7 @@ class FakeJudge:
     - always: {1|2: 文字列} 呼び出し種別ごとに常にその文字列を返す。
     - 自動応答: 文に「矛盾」→相反、「要点」→必須、それ以外→補足。
       事実の判定は回答中の <<nid:full|partial|none>> から読む（無ければ none）。
+      full/partial の evidence は、その印そのもの（回答に一字一句ある部分）を写す。
     """
 
     def __init__(self, queue=None, always=None):
@@ -53,7 +54,8 @@ class FakeJudge:
         out = []
         for nid in nids:
             m = re.search(r"<<" + re.escape(nid) + r":(full|partial|none)>>", answer)
-            out.append({"nid": nid, "score": m.group(1) if m else "none"})
+            score = m.group(1) if m else "none"
+            out.append({"nid": nid, "score": score, "evidence": m.group(0) if m and score != "none" else ""})
         return json.dumps({"facts": out}, ensure_ascii=False)
 
 
@@ -141,12 +143,79 @@ def test_prompts_carry_version_rule_question_and_numbered_sentences():
     run_judge("第一文です。第二文です。", fake)
     p1 = fake.calls[0][1]["content"]
     p2 = fake.calls[1][1]["content"]
-    assert judge.JUDGE_VERSION == "NJ-1"
+    assert judge.JUDGE_VERSION == "NJ-2"
     for p in (p1, p2):
-        assert "NJ-1" in p and CORPUS["貸与規程"] in p and ROW1["question"] in p
+        assert "NJ-2" in p and CORPUS["貸与規程"] in p and ROW1["question"] in p
     assert "1. 第一文です。" in p1 and "2. 第二文です。" in p1 and "全 2 文" in p1
     assert "Q1-n3" in p1 and "Q1-n3" not in p2  # 呼び出し 1 は全事実、呼び出し 2 は vital だけ
     assert "JSON だけ" in p1 and "JSON だけ" in p2
+
+
+def test_prompt1_says_conclusion_line_is_not_boilerplate():
+    fake = FakeJudge()
+    run_judge("要点です。\n結論: 貸与できる", fake)
+    p1 = fake.calls[0][1]["content"]
+    assert "「結論: …」の行は定型ではない" in p1
+    assert "規程に合う結論なら 必須" in p1 and "食い違う結論なら 相反" in p1
+
+
+def test_prompt2_asks_for_verbatim_evidence():
+    fake = FakeJudge()
+    run_judge("要点です。", fake)
+    p2 = fake.calls[1][1]["content"]
+    assert '"evidence"' in p2 and "一字一句そのまま写す" in p2
+    assert "full にしない" in p2 and "partial か none" in p2
+
+
+# ─── evidence の機械の検査 ──────────────────────────────────────
+def facts_reply(*items):
+    return json.dumps({"facts": [{"nid": n, "score": sc, "evidence": ev} for n, sc, ev in items]}, ensure_ascii=False)
+
+
+def test_evidence_not_in_answer_is_downgraded_to_none():
+    reply = facts_reply(("Q1-n1", "full", "勤続1年11か月"), ("Q1-n2", "partial", "貸与は6か月"))
+    res = run_judge("貸与は6か月です。", FakeJudge(always={2: reply}))
+    assert res["status"] == "ok"
+    assert res["facts"] == {"Q1-n1": "none", "Q1-n2": "partial"}
+    assert res["downgraded"] == ["Q1-n1"]
+    assert res["evidence"] == {"Q1-n1": "勤続1年11か月", "Q1-n2": "貸与は6か月"}  # 下げても記録に残す
+
+
+@pytest.mark.parametrize("level", ["full", "partial"])
+def test_empty_evidence_is_downgraded(level):
+    reply = facts_reply(("Q1-n1", level, ""), ("Q1-n2", level, "   "))
+    res = run_judge("貸与は6か月です。", FakeJudge(always={2: reply}))
+    assert res["facts"] == {"Q1-n1": "none", "Q1-n2": "none"}
+    assert res["downgraded"] == ["Q1-n1", "Q1-n2"]
+
+
+def test_missing_evidence_key_is_downgraded():
+    reply = json.dumps({"facts": [{"nid": "Q1-n1", "score": "full"}, {"nid": "Q1-n2", "score": "none"}]})
+    res = run_judge("貸与は6か月です。", FakeJudge(always={2: reply}))
+    assert res["facts"] == {"Q1-n1": "none", "Q1-n2": "none"} and res["downgraded"] == ["Q1-n1"]
+
+
+def test_whitespace_only_difference_is_not_downgraded():
+    ans = "貸与は 6か月\n延長は\u30001回\u3000までです。"
+    reply = facts_reply(("Q1-n1", "full", "貸与は6か月延長は1回"), ("Q1-n2", "partial", "1回 まで"))
+    res = run_judge(ans, FakeJudge(always={2: reply}))
+    assert res["facts"] == {"Q1-n1": "full", "Q1-n2": "partial"}
+    assert res["downgraded"] == []
+
+
+def test_none_may_have_no_evidence_and_is_not_counted_as_downgraded():
+    reply = facts_reply(("Q1-n1", "none", ""), ("Q1-n2", "none", "回答に無い文"))
+    res = run_judge("貸与は6か月です。", FakeJudge(always={2: reply}))
+    assert res["status"] == "ok"
+    assert res["facts"] == {"Q1-n1": "none", "Q1-n2": "none"}
+    assert res["downgraded"] == []
+
+
+def test_downgraded_is_empty_list_when_all_evidence_ok_and_for_empty_answer():
+    res = run_judge("要点です<<Q1-n1:full>><<Q1-n2:full>>。", FakeJudge())
+    assert res["downgraded"] == [] and res["facts"] == {"Q1-n1": "full", "Q1-n2": "full"}
+    assert res["evidence"] == {"Q1-n1": "<<Q1-n1:full>>", "Q1-n2": "<<Q1-n2:full>>"}
+    assert run_judge("", FakeJudge())["downgraded"] == []
 
 
 def test_broken_json_is_retried_once_then_ok():
