@@ -1,0 +1,42 @@
+{
+  "format": "rule-card@1",
+  "id": "fukuri-jutaku-teate",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/福利厚生規程.md",
+    "section": "第1条（住宅手当）",
+    "quote": "勤続年数が3年以上の社員は、住宅手当の対象とする。"
+  },
+  "target": "住宅手当の対象",
+  "match": {
+    "conclusions": [
+      "対象になる",
+      "対象にならない"
+    ],
+    "keywords": [
+      "住宅手当"
+    ]
+  },
+  "slots": {
+    "勤続年数": {
+      "type": "number",
+      "unit": "年",
+      "describe": "社員の勤続年数"
+    }
+  },
+  "conditions": [
+    {
+      "name": "勤続年数が3年以上",
+      "left": "勤続年数",
+      "op": ">=",
+      "right": 3
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "対象になる",
+    "else": "対象にならない"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "format": "rule-card@1",
+  "id": "keihi-buchou-shounin",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/経費精算規程.md",
+    "section": "承認",
+    "quote": "10万円を超える申請は部門長の承認を追加で要する。"
+  },
+  "target": "経費精算の部門長承認",
+  "match": {
+    "conclusions": [
+      "必要",
+      "不要"
+    ],
+    "keywords": [
+      "部門長"
+    ]
+  },
+  "slots": {
+    "申請額": {
+      "type": "number",
+      "unit": "円",
+      "describe": "経費精算で申請する金額"
+    }
+  },
+  "conditions": [
+    {
+      "name": "申請額が10万円を超える",
+      "left": "申請額",
+      "op": ">",
+      "right": 100000
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "必要",
+    "else": "不要"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "format": "rule-card@1",
+  "id": "bihin-shinsei-kigen",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/備品購入規程.md",
+    "section": "第3条（申請期限）",
+    "quote": "購入日の翌日から数えて14日を過ぎた購入申請は受け付けない。"
+  },
+  "target": "備品の購入申請の期限",
+  "match": {
+    "conclusions": [
+      "受け付けられない",
+      "受け付けられる"
+    ],
+    "keywords": [
+      "購入申請"
+    ]
+  },
+  "slots": {
+    "購入日": {
+      "type": "date",
+      "describe": "備品を購入した日"
+    },
+    "申請日": {
+      "type": "date",
+      "describe": "購入申請を出した日"
+    }
+  },
+  "conditions": [
+    {
+      "name": "購入日の翌日から数えて14日を過ぎた",
+      "left": "申請日",
+      "op": ">",
+      "right": {
+        "add_days": [
+          "購入日",
+          14
+        ]
+      }
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "受け付けられない",
+    "else": "受け付けられる"
+  }
+}

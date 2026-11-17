@@ -40,7 +40,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "backend"))
 
 from app.config import settings  # noqa: E402
-from app.services.llm import stream_answer  # noqa: E402
+from app.services.llm import pop_rule_card_record, stream_answer  # noqa: E402
 from app.services import numeric_check  # noqa: E402
 from app.services.providers import (  # noqa: E402
     get_meta,
@@ -115,6 +115,8 @@ async def evaluate_question(
         res.retrieval_latency = t.retrieval_latency
         if settings.numeric_check_enabled:
             res.numeric_check = numeric_check_record(item["question"], chunks)
+        if settings.rule_cards_enabled:
+            res.rule_card = pop_rule_card_record()
 
         # M1, M2, M6, M7, M8
         res.recall_at_5 = metrics.recall_at_k(sources, item.get("expected_sources", []), k=5)

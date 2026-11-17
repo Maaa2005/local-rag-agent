@@ -1,0 +1,685 @@
+{
+  "issue": 16,
+  "ctx": 3072,
+  "measure": [
+    {
+      "max_prompt_tokens": 1967,
+      "max_id": "N05",
+      "n": 12
+    },
+    {
+      "max_prompt_tokens": 829,
+      "max_id": "D13",
+      "n": 24
+    }
+  ],
+  "server_extra": [
+    "--cache-ram",
+    "1024"
+  ],
+  "arms": {
+    "c0": {
+      "arm": "c0",
+      "env": {},
+      "ctx": 3072,
+      "baseline_mib": 1448,
+      "rounds": {
+        "n1": {
+          "rc": 0,
+          "available_before_mib": 5854,
+          "launch_seconds": 5.3,
+          "eval_seconds": 26.7,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4693,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N09",
+              "N11"
+            ],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [
+              "N09",
+              "N11"
+            ],
+            "total_p50": 0.851,
+            "total_p95": 2.77,
+            "total_max": 4.964,
+            "ftl_p50": 0.773,
+            "after_retrieval_p50": 0.657,
+            "decode_tps_median": 79.1
+          }
+        },
+        "n2": {
+          "rc": 0,
+          "available_before_mib": 6469,
+          "launch_seconds": 4.9,
+          "eval_seconds": 25.3,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4693,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N09",
+              "N11"
+            ],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [
+              "N09",
+              "N11"
+            ],
+            "total_p50": 0.842,
+            "total_p95": 2.696,
+            "total_max": 4.757,
+            "ftl_p50": 0.766,
+            "after_retrieval_p50": 0.624,
+            "decode_tps_median": 79.7
+          }
+        },
+        "dev": {
+          "rc": 0,
+          "available_before_mib": 6818,
+          "launch_seconds": 4.8,
+          "eval_seconds": 26.1,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4678,
+          "numbers": {
+            "ok": 24,
+            "n": 24,
+            "wrong": [],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 0.452,
+            "total_p95": 0.571,
+            "total_max": 3.897,
+            "ftl_p50": 0.378,
+            "after_retrieval_p50": 0.299,
+            "decode_tps_median": 80.9
+          }
+        }
+      },
+      "min_available_mib": 259,
+      "peak_rss_mib": {
+        "llama": 4295,
+        "qdrant": 119,
+        "eval": 1816
+      }
+    },
+    "norm": {
+      "arm": "norm",
+      "env": {
+        "NUMERIC_NORMALIZE_ENABLED": "true"
+      },
+      "ctx": 3072,
+      "baseline_mib": 1432,
+      "rounds": {
+        "n1": {
+          "rc": 0,
+          "available_before_mib": 6852,
+          "launch_seconds": 4.9,
+          "eval_seconds": 25.8,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4678,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N09",
+              "N11"
+            ],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [
+              "N09",
+              "N11"
+            ],
+            "total_p50": 0.846,
+            "total_p95": 2.655,
+            "total_max": 4.709,
+            "ftl_p50": 0.771,
+            "after_retrieval_p50": 0.665,
+            "decode_tps_median": 79.4
+          }
+        },
+        "n2": {
+          "rc": 0,
+          "available_before_mib": 6984,
+          "launch_seconds": 4.9,
+          "eval_seconds": 21.7,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4678,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N09",
+              "N11"
+            ],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [
+              "N09",
+              "N11"
+            ],
+            "total_p50": 0.849,
+            "total_p95": 1.846,
+            "total_max": 2.885,
+            "ftl_p50": 0.772,
+            "after_retrieval_p50": 0.648,
+            "decode_tps_median": 79.4
+          }
+        },
+        "dev": {
+          "rc": 0,
+          "available_before_mib": 6872,
+          "launch_seconds": 4.9,
+          "eval_seconds": 24.3,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4678,
+          "numbers": {
+            "ok": 24,
+            "n": 24,
+            "wrong": [],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 0.444,
+            "total_p95": 1.118,
+            "total_max": 3.573,
+            "ftl_p50": 0.369,
+            "after_retrieval_p50": 0.296,
+            "decode_tps_median": 80.9
+          }
+        }
+      },
+      "min_available_mib": 881,
+      "peak_rss_mib": {
+        "llama": 4315,
+        "qdrant": 120,
+        "eval": 1815
+      }
+    },
+    "contrast": {
+      "arm": "contrast",
+      "env": {
+        "NUMERIC_CONTRAST_ENABLED": "true"
+      },
+      "ctx": 3072,
+      "baseline_mib": 1432,
+      "rounds": {
+        "n1": {
+          "rc": 0,
+          "available_before_mib": 6833,
+          "launch_seconds": 4.9,
+          "eval_seconds": 23.3,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4678,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N09",
+              "N11"
+            ],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [
+              "N09",
+              "N11"
+            ],
+            "total_p50": 0.831,
+            "total_p95": 2.415,
+            "total_max": 4.159,
+            "ftl_p50": 0.769,
+            "after_retrieval_p50": 0.639,
+            "decode_tps_median": 79.1
+          }
+        },
+        "n2": {
+          "rc": 0,
+          "available_before_mib": 6818,
+          "launch_seconds": 4.9,
+          "eval_seconds": 22.0,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4678,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N09",
+              "N11"
+            ],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [
+              "N09",
+              "N11"
+            ],
+            "total_p50": 0.784,
+            "total_p95": 2.401,
+            "total_max": 4.135,
+            "ftl_p50": 0.708,
+            "after_retrieval_p50": 0.599,
+            "decode_tps_median": 79.2
+          }
+        },
+        "dev": {
+          "rc": 0,
+          "available_before_mib": 6705,
+          "launch_seconds": 4.9,
+          "eval_seconds": 24.6,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4686,
+          "numbers": {
+            "ok": 24,
+            "n": 24,
+            "wrong": [],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 0.434,
+            "total_p95": 1.069,
+            "total_max": 3.627,
+            "ftl_p50": 0.369,
+            "after_retrieval_p50": 0.285,
+            "decode_tps_median": 81.7
+          }
+        }
+      },
+      "min_available_mib": 796,
+      "peak_rss_mib": {
+        "llama": 4273,
+        "qdrant": 119,
+        "eval": 1816
+      }
+    },
+    "codeform": {
+      "arm": "codeform",
+      "env": {
+        "NUMERIC_CODEFORM_ENABLED": "true"
+      },
+      "ctx": 3072,
+      "baseline_mib": 1432,
+      "rounds": {
+        "n1": {
+          "rc": 0,
+          "available_before_mib": 6905,
+          "launch_seconds": 4.9,
+          "eval_seconds": 23.6,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4678,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N09",
+              "N11"
+            ],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [
+              "N09",
+              "N11"
+            ],
+            "total_p50": 0.831,
+            "total_p95": 2.45,
+            "total_max": 4.219,
+            "ftl_p50": 0.769,
+            "after_retrieval_p50": 0.641,
+            "decode_tps_median": 79.6
+          }
+        },
+        "n2": {
+          "rc": 0,
+          "available_before_mib": 6730,
+          "launch_seconds": 4.9,
+          "eval_seconds": 23.7,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4678,
+          "numbers": {
+            "ok": 10,
+            "n": 12,
+            "wrong": [
+              "N09",
+              "N11"
+            ],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [
+              "N09",
+              "N11"
+            ],
+            "total_p50": 0.847,
+            "total_p95": 2.392,
+            "total_max": 4.094,
+            "ftl_p50": 0.772,
+            "after_retrieval_p50": 0.652,
+            "decode_tps_median": 79.2
+          }
+        },
+        "dev": {
+          "rc": 0,
+          "available_before_mib": 6702,
+          "launch_seconds": 4.9,
+          "eval_seconds": 29.0,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4686,
+          "numbers": {
+            "ok": 24,
+            "n": 24,
+            "wrong": [],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 0.451,
+            "total_p95": 1.206,
+            "total_max": 4.529,
+            "ftl_p50": 0.386,
+            "after_retrieval_p50": 0.297,
+            "decode_tps_median": 80.7
+          }
+        }
+      },
+      "min_available_mib": 747,
+      "peak_rss_mib": {
+        "llama": 4379,
+        "qdrant": 118,
+        "eval": 1817
+      }
+    },
+    "cards": {
+      "arm": "cards",
+      "env": {
+        "RULE_CARDS_ENABLED": "true",
+        "RULE_CARDS_DIR": "evaluation/v2/rule_cards",
+        "RULE_CARDS_ALLOW_DRAFT": "true",
+        "RULE_CARDS_EXTRACT_MODEL": "local-llm"
+      },
+      "ctx": 3072,
+      "baseline_mib": 1433,
+      "rounds": {
+        "n1": {
+          "rc": 0,
+          "available_before_mib": 6458,
+          "launch_seconds": 4.9,
+          "eval_seconds": 41.0,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4676,
+          "numbers": {
+            "ok": 11,
+            "n": 12,
+            "wrong": [
+              "N09"
+            ],
+            "held": [
+              "N09"
+            ],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 2.521,
+            "total_p95": 4.013,
+            "total_max": 5.509,
+            "ftl_p50": 2.521,
+            "after_retrieval_p50": 2.067,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 26,
+            "slots_all": 27,
+            "whole_ok": 11,
+            "whole_all": 12,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": [
+              {
+                "id": "N09",
+                "slots": [
+                  "欠勤日数"
+                ],
+                "hold": "抽出の検査に通らない: 欠勤日数: value 10 is not the number in its quote"
+              }
+            ]
+          }
+        },
+        "n2": {
+          "rc": 0,
+          "available_before_mib": 6871,
+          "launch_seconds": 4.9,
+          "eval_seconds": 40.1,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4676,
+          "numbers": {
+            "ok": 11,
+            "n": 12,
+            "wrong": [
+              "N09"
+            ],
+            "held": [
+              "N09"
+            ],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 2.546,
+            "total_p95": 3.612,
+            "total_max": 4.635,
+            "ftl_p50": 2.546,
+            "after_retrieval_p50": 2.092,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 26,
+            "slots_all": 27,
+            "whole_ok": 11,
+            "whole_all": 12,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": [
+              {
+                "id": "N09",
+                "slots": [
+                  "欠勤日数"
+                ],
+                "hold": "抽出の検査に通らない: 欠勤日数: value 10 is not the number in its quote"
+              }
+            ]
+          }
+        },
+        "dev": {
+          "rc": 0,
+          "available_before_mib": 6867,
+          "launch_seconds": 4.9,
+          "eval_seconds": 48.4,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4692,
+          "numbers": {
+            "ok": 24,
+            "n": 24,
+            "wrong": [],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 1.357,
+            "total_p95": 2.47,
+            "total_max": 3.112,
+            "ftl_p50": 1.357,
+            "after_retrieval_p50": 1.2,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 30,
+            "slots_all": 30,
+            "whole_ok": 24,
+            "whole_all": 24,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": []
+          }
+        }
+      },
+      "min_available_mib": 931,
+      "peak_rss_mib": {
+        "llama": 4016,
+        "qdrant": 120,
+        "eval": 1821
+      }
+    },
+    "cards_direct": {
+      "arm": "cards_direct",
+      "env": "検索なし・カードの抽出だけ",
+      "ctx": 4096,
+      "baseline_mib": 1470,
+      "rounds": {
+        "n1": {
+          "rc": 0,
+          "available_before_mib": 2309,
+          "launch_seconds": 8.9,
+          "eval_seconds": 24.7,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4709,
+          "numbers": {
+            "ok": 11,
+            "n": 12,
+            "wrong": [
+              "N09"
+            ],
+            "held": [
+              "N09"
+            ],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 2.207,
+            "total_p95": 2.501,
+            "total_max": 2.616,
+            "ftl_p50": 2.207,
+            "after_retrieval_p50": 2.207,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 26,
+            "slots_all": 27,
+            "whole_ok": 11,
+            "whole_all": 12,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": [
+              {
+                "id": "N09",
+                "slots": [
+                  "欠勤日数"
+                ],
+                "hold": "抽出の検査に通らない: 欠勤日数: value 10 is not the number in its quote"
+              }
+            ]
+          }
+        },
+        "n2": {
+          "rc": 0,
+          "available_before_mib": 3973,
+          "launch_seconds": 8.1,
+          "eval_seconds": 21.3,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4709,
+          "numbers": {
+            "ok": 11,
+            "n": 12,
+            "wrong": [
+              "N09"
+            ],
+            "held": [
+              "N09"
+            ],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 1.741,
+            "total_p95": 2.417,
+            "total_max": 2.456,
+            "ftl_p50": 1.741,
+            "after_retrieval_p50": 1.741,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 26,
+            "slots_all": 27,
+            "whole_ok": 11,
+            "whole_all": 12,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": [
+              {
+                "id": "N09",
+                "slots": [
+                  "欠勤日数"
+                ],
+                "hold": "抽出の検査に通らない: 欠勤日数: value 10 is not the number in its quote"
+              }
+            ]
+          }
+        },
+        "dev": {
+          "rc": 0,
+          "available_before_mib": 4264,
+          "launch_seconds": 7.0,
+          "eval_seconds": 29.1,
+          "oom_lines": 0,
+          "overflow_lines": 0,
+          "peak_gpu_mib": 4709,
+          "numbers": {
+            "ok": 24,
+            "n": 24,
+            "wrong": [],
+            "held": [],
+            "failed": [],
+            "wrong_decided": [],
+            "total_p50": 1.026,
+            "total_p95": 2.109,
+            "total_max": 2.138,
+            "ftl_p50": 1.026,
+            "after_retrieval_p50": 1.026,
+            "decode_tps_median": null
+          },
+          "card": {
+            "slots_ok": 30,
+            "slots_all": 30,
+            "whole_ok": 24,
+            "whole_all": 24,
+            "reasoning_leaked": [],
+            "cut_by_length": [],
+            "not_card": [],
+            "wrong": []
+          }
+        }
+      },
+      "min_available_mib": 264,
+      "peak_rss_mib": {
+        "llama": 4012
+      }
+    }
+  }
+}

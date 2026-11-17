@@ -43,3 +43,5 @@ class QuestionResult:
     completion_tokens: int | None = None
     # C (数の比べをコードで) が ON の時だけ: 足したか・保留の理由など (本文は入れない)。OFF では None
     numeric_check: dict | None = None
+    # カード方式が ON で、カードに合った問だけ: 拾った値・結論・保留の理由 (値の一致率を出すため)。それ以外は None
+    rule_card: dict | None = None

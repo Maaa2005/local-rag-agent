@@ -1,0 +1,42 @@
+{
+  "format": "rule-card@1",
+  "id": "fukuri-tsukin-teate",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/福利厚生規程.md",
+    "section": "第3条（通勤手当）",
+    "quote": "通勤距離が2km以下の社員には、通勤手当を支給しない。"
+  },
+  "target": "通勤手当の支給",
+  "match": {
+    "conclusions": [
+      "支給されない",
+      "支給される"
+    ],
+    "keywords": [
+      "通勤手当"
+    ]
+  },
+  "slots": {
+    "通勤距離": {
+      "type": "number",
+      "unit": "km",
+      "describe": "社員の通勤距離"
+    }
+  },
+  "conditions": [
+    {
+      "name": "通勤距離が2km以下",
+      "left": "通勤距離",
+      "op": "<=",
+      "right": 2
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "支給されない",
+    "else": "支給される"
+  }
+}

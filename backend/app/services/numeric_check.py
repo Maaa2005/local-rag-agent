@@ -602,6 +602,51 @@ def _hold(reason: str) -> CheckResult:
     return CheckResult(hold_reason=reason)
 
 
+# ---------------------------------------------------------------- 比べ方の見せ方（Issue #16 の安い腕）
+# どちらも check の結果から作るだけで、比べ方は変えない。結論はモデルが書く（C と同じ）。
+
+
+def _step(*vs: Decimal) -> Decimal:
+    """境目の前後の例の刻み。値と境目の小数の桁の多い方に合わせる（整数なら 1）。"""
+    places = max((-v.normalize().as_tuple().exponent for v in vs if v.normalize().as_tuple().exponent < 0), default=0)
+    return Decimal(1).scaleb(-places)
+
+
+def contrast_lines(result: CheckResult) -> list[str]:
+    """境界の対比例: 境目の 1 つ下・ちょうど・1 つ上で、規程の条件に当てはまるかを並べる。保留なら空。"""
+    if result.sentence is None or result.op is None:
+        return []
+    b = result.boundary
+    if isinstance(b, date):
+        points = [b - timedelta(days=1), b, b + timedelta(days=1)]
+    else:
+        st = _step(b, result.value)
+        points = [b - st, b, b + st]
+    kind = result.kind or ""
+    out = [f"規程の「{result.rule_span}」の境目の前後:"]
+    for x in points:
+        out.append(f"- {_fmt_value(kind, x)} なら{'当てはまる' if _holds(x, result.op, b) else '当てはまらない'}")
+    return out
+
+
+def code_form(result: CheckResult) -> str | None:
+    """コード形式の提示: 規程の条件と質問の値を、実行しない Python の式で見せる。保留なら None。"""
+    if result.sentence is None or result.op is None:
+        return None
+    if isinstance(result.boundary, date):
+        lit = lambda d: f"date({d.year}, {d.month}, {d.day})"  # noqa: E731
+        unit = "日付"
+    else:
+        lit = lambda v: format(v.normalize(), "f") if v != v.to_integral() else str(int(v))  # noqa: E731
+        unit = _KIND_LABEL.get(result.kind or "", result.kind or "")
+    return "\n".join([
+        "規程の条件をコードにすると（実行はしない）:",
+        f"境目 = {lit(result.boundary)}  # {unit}（規程「{result.rule_span}」）",
+        f"値 = {lit(result.value)}  # {unit}（質問の値）",
+        f"当てはまる = 値 {result.op} 境目  # → {result.applies}",
+    ])
+
+
 # ---------------------------------------------------------------- 本体
 
 

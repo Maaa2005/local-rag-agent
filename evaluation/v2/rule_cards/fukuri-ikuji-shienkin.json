@@ -1,0 +1,50 @@
+{
+  "format": "rule-card@1",
+  "id": "fukuri-ikuji-shienkin",
+  "status": "draft",
+  "drafted_by": "claude-opus-5-5（2026-11-02・規程の文だけから下書き）",
+  "confirmed_by": null,
+  "doc": {
+    "source": "general/福利厚生規程.md",
+    "section": "第5条（育児支援金）",
+    "quote": "育児支援金の申請は、子の誕生日の翌日から数えて60日以内に行ったものに限り受け付ける。"
+  },
+  "target": "育児支援金の申請期限",
+  "match": {
+    "conclusions": [
+      "受け付けられる",
+      "受け付けられない"
+    ],
+    "keywords": [
+      "育児支援金"
+    ]
+  },
+  "slots": {
+    "誕生日": {
+      "type": "date",
+      "describe": "子が生まれた日"
+    },
+    "申請日": {
+      "type": "date",
+      "describe": "育児支援金を申請した日"
+    }
+  },
+  "conditions": [
+    {
+      "name": "誕生日の翌日から数えて60日以内に申請した",
+      "left": "申請日",
+      "op": "<=",
+      "right": {
+        "add_days": [
+          "誕生日",
+          60
+        ]
+      }
+    }
+  ],
+  "combine": "all",
+  "conclusion": {
+    "then": "受け付けられる",
+    "else": "受け付けられない"
+  }
+}
