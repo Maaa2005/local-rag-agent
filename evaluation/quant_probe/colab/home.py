@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import os
 import subprocess
 import sys
 import tarfile
@@ -33,6 +34,7 @@ CD = D / "colab"
 COLAB = [str(Path.home() / ".local" / "bin" / "colab.exe"), "--config", str(CD / "sessions.json")]
 BUNDLE = CD / "qp8-bundle.tgz"
 SKIP_RESTORE = ("setup-logs", "fail", "smoke-")
+ENV = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}  # Windows の CLI は既定で cp932 で読む
 
 
 def log(*a: object) -> None:
@@ -46,7 +48,7 @@ def log(*a: object) -> None:
 def colab(*a: str, tee: Path | None = None) -> int:
     log("$ colab", *a)
     p = subprocess.Popen([*COLAB, *a], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                         encoding="utf-8", errors="replace")
+                         encoding="utf-8", errors="replace", env=ENV)
     assert p.stdout is not None
     for line in p.stdout:
         line = line.rstrip()
@@ -119,7 +121,7 @@ def fetch(name: str) -> int:
     m = MODELS[name]; s = m["session"]; loc = CD / name; loc.mkdir(parents=True, exist_ok=True)
     rem = f"/content/out/{name}"
     for f in ("status.txt", "index.txt", "smoke.json", "job.log", "setup-logs.tgz", "pipeline.log"):
-        subprocess.run([*COLAB, "download", "-s", s, f"{rem}/{f}", str(loc / f)], capture_output=True)
+        subprocess.run([*COLAB, "download", "-s", s, f"{rem}/{f}", str(loc / f)], capture_output=True, env=ENV)
     idx = loc / "index.txt"
     names = list(dict.fromkeys(idx.read_text(encoding="utf-8").split())) if idx.exists() else []
     got = 0
