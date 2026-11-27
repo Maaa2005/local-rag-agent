@@ -1,4 +1,5 @@
-"""測る前に固定した判定の線 qp-judge-7（docs/quant-probe-plan.md の 5 章と同じ。変えるなら測る前に版を上げる）。
+"""測る前に固定した判定の線 qp-judge-8（docs/quant-probe-plan.md の 5 章を docs/quant-probe-plan-v8.md の 2・4・5・6 章で替えた物。
+変えるなら測る前に版を上げる）。
 
 まとまり = 規程（24 規程・1 規程 15 問）。誤った断定（WA）の差は規程ごとに足し、規程を単位に検定する。
 検定の前提（比べる 2 つ a・b ごと）: モデル・量子化したファイル・評価の文章・KLD の値（まとめて F）を固定した上で、
@@ -8,9 +9,15 @@
 近い対の集まりは F だけで決まり、F の下で各本当の帰無の p が有効と仮定するので、選んだ対だけを Holm に直してよい。
 モデルと校正のやり方は規程の成績で選ばない。
 
-0. 基準が測れる: 基準 Q8_0 の 2 回とも、答えられる問の正答 >= 70%・保留すべき問の保留 >= 50%・形式違反 <= 5%。
-1. 揺れ: 同じ物をもう 1 回流した組（基準の 2 回・Q4_K_M-en の 2 回・基準が GPU に載り切らない時の Q6_K-none）で、
-   WA が食い違った問の数の最大。
+0. 基準が測れる: 基準 Q8_0 の 2 回とも、次の 3 つを全部満たす（満たさなければ「測れない」）。
+   0a 形式: 形式違反と欠けが 5% 以下。
+   0b 向きを見分けている: 答えられる問で、規程 r ごとに c_r =（正答の数）−（逆の結論を言い切った数）。
+      規程を単位にした符号入れ替えの正確検定（片側・c > 0 の向き）で p < REF_ALPHA（0.001）。
+   0c 保留を見分けている: 規程 r ごとに h_r =（保留すべき問で保留した数）×（その規程の答えられる問の数）
+      −（答えられる問で保留した数）×（その規程の保留すべき問の数）。同じ検定で p < REF_ALPHA。
+   当てずっぽう（いつも同じ語・いつも保留・でたらめ）は c も h も 0 の回りで、通らない（全部 0 の差は p = 1）。
+1. 揺れ: 同じ物をもう 1 回流した組（基準の 2 回・Q4_K_M-en の 2 回）で、WA が食い違った問の数の最大。
+   基準が GPU に載り切らない時は、答えの回を全部同じ `-ngl` で流す（pipeline.py・report.py が載った層の数を照合する）。
 2. 悪化した変種 W（家族 A）: 基準 1 回目との WA の差の合計 Δ >= 3、規程ごとの差の符号を入れ替える正確検定（片側）の
    p を 15 変種で Holm に直して < ALPHA_A、かつ Δ > 2×揺れ。
 3. 物差し s の安全域 Safe_s: s のずれ <= ANCHOR（Q4_K_M-en）のずれ。
@@ -26,32 +33,32 @@
    「近い対で差が残る」= 近い対で |Δ| >= 3 なのに型 B と決まらなかった（両方が W の対も含む。少数の規程に
    集まった型 B を「気づく」と取り違えないため）。
    W があり、それ以外 →「決められない」（安全域で増えが残る・安全域が答えていない・近い対に差が残る）。W が無い →「差が出ない」。
-9. α: 1 モデル 0.025 を A と B に半分ずつ。「はい」（3 モデル中 2 つ以上で気づかない）を誤って出す確率は、
-   測る前に決めた 3 モデルについて、本当に見逃すモデルが 0 なら 3×0.025/2 = 0.0375 以下、1 なら残り 2 つの
-   どちらかの誤り 2×0.025 = 0.05 以下（主の物差し・上の前提の下で）。基準の成績でモデルを替えるとこの保証が崩れるので、
+9. α: 1 モデル 0.0125 を A と B に半分ずつ。「はい」（5 モデル中 2 つ以上で気づかない）を誤って出す確率は、
+   測る前に決めた 5 モデルについて、本当に見逃すモデルが 0 なら 5×0.0125/2 = 0.03125 以下、1 なら残り 4 つの
+   どれかの誤り 4×0.0125 = 0.05 以下（主の物差し・上の前提の下で）。基準の成績でモデルを替えるとこの保証が崩れるので、
    替えは「変換できない」時だけで、どのモデルの答えも流す前に決める（report.py・計画 4 章）。基準不適格は「測れない」で
    「気づかない」を出さないので上限を増やさない。ただし適格になったことを条件にした誤りの率の保証ではない。
-   主の物差しは kld_en だけ。ほかの物差しは同じ線で出すが探索の扱い。「いいえ」は 8 の記述の線に依り、誤りの確率を保証しない。
-10. 全体: 「気づかない」2 つ以上 →「はい」、1 つ →「モデルによる」、0 で「気づく」2 つ以上 →「いいえ（この 360 問で）」、ほかは「測れず」。
+   主の物差しは kld_en だけ。ほかの物差し（kld_chat を含む）は同じ線で出すが探索の扱い。「いいえ」は 8 の記述の線に依り、誤りの確率を保証しない。
+10. 全体: 「気づかない」2 つ以上 →「はい」、1 つ →「モデルによる」、0 で「気づく」3 つ以上 →「いいえ（この 360 問で）」、ほかは「測れず」。
 11. 厳しく見る時（本番）: 答えの欠け・問が 360 でない・規程が 24 でない・変種が 15 でない・ずれが数でない・
-    揺れの組（Q4_K_M-en の 2 回目、基準が載り切らない時の Q6_K-none の載せ方違い）が無い → 判定せずに止める。
+    揺れの組（Q4_K_M-en の 2 回目）が無い → 判定せずに止める。
+    kld_chat（探索）だけは、値が無くても止めない。その物差しの判定が「値が無い」になり、ほかの物差しと全体の答えは出す。
 """
 from __future__ import annotations
 
 import math
 from itertools import combinations
 
-from .pipeline import ALL_VARIANTS, PLACE, RERUN
+from .pipeline import ALL_VARIANTS, RERUN
 from .stats import block_bootstrap_upper, discordant, holm, mcnemar_one_sided, signflip_exact, spearman
 
-JUDGE_VERSION = "qp-judge-7"
+JUDGE_VERSION = "qp-judge-8"
 MIN_DELTA = 3
-ALPHA_MODEL = 0.025
+ALPHA_MODEL = 0.0125
 ALPHA_A = ALPHA_MODEL / 2
 ALPHA_B = ALPHA_MODEL / 2
 NEAR_REL = 0.10
-REF_MIN_CORRECT = 0.70
-REF_MIN_HELD = 0.50
+REF_ALPHA = 0.001
 REF_MAX_FORMAT = 0.05
 RESP_MAX_FORMAT = 0.05
 RESP_MAX_OVERHOLD_UP = 0.05
@@ -60,8 +67,9 @@ BOOT_SEED = 20261111
 ANCHOR = "Q4_K_M-en"
 N_QUESTIONS = 360
 N_BLOCKS = 24
-METRICS = ("kld_en", "ppl_en", "kld_ja", "ppl_ja", "kld_dom")
+METRICS = ("kld_en", "ppl_en", "kld_ja", "ppl_ja", "kld_dom", "kld_chat")
 PRIMARY = "kld_en"
+OPTIONAL_METRICS = ("kld_chat",)  # 取れなくても全体の答えを止めない（計画 版 8 の 5 章）
 
 
 class StrictError(ValueError):
@@ -95,29 +103,50 @@ def block_diffs(x: dict[str, bool], y: dict[str, bool], blocks: dict[str, str]) 
     return list(d.values())
 
 
-def quality(o: dict[str, str], should_hold: dict[str, bool]) -> dict[str, float]:
+def ref_blocks(o: dict[str, str], should_hold: dict[str, bool], blocks: dict[str, str]) -> tuple[list[int], list[int]]:
+    """規程ごと（名前の順）の c_r・h_r（線 0 の 0b・0c）。
+    c_r = 答えられる問の（正答 − 逆の結論を言い切った数）。
+    h_r = （保留すべき問で保留した数）×（答えられる問の数）−（答えられる問で保留した数）×（保留すべき問の数）。"""
+    rules = sorted({blocks[i] for i in o})
+    c, held, over, n_ans, n_hold = ({r: 0 for r in rules} for _ in range(5))
+    for i, v in o.items():
+        r = blocks[i]
+        if should_hold[i]:
+            n_hold[r] += 1
+            held[r] += v == "held_ok"
+        else:
+            n_ans[r] += 1
+            c[r] += (v == "correct") - (v == "wrong_assert")
+            over[r] += v == "over_hold"
+    return [c[r] for r in rules], [held[r] * n_ans[r] - over[r] * n_hold[r] for r in rules]
+
+
+def quality(o: dict[str, str], should_hold: dict[str, bool], blocks: dict[str, str]) -> dict[str, float]:
+    """基準 1 回分の成績。率の 4 つ（correct・held・format・over_hold）に、c・h の合計と線 0 の 2 つの p を足す。"""
     ans = [k for k in o if not should_hold[k]]
     hold = [k for k in o if should_hold[k]]
+    c, h = ref_blocks(o, should_hold, blocks)
     return {"correct": sum(o[k] == "correct" for k in ans) / max(1, len(ans)),
             "held": sum(o[k] == "held_ok" for k in hold) / max(1, len(hold)),
             "format": sum(v in ("format", "missing") for v in o.values()) / max(1, len(o)),
-            "over_hold": sum(o[k] == "over_hold" for k in ans) / max(1, len(ans))}
+            "over_hold": sum(o[k] == "over_hold" for k in ans) / max(1, len(ans)),
+            "c_sum": sum(c), "h_sum": sum(h),
+            "p_direction": signflip_exact(c, "greater"), "p_hold": signflip_exact(h, "greater")}
 
 
 def ref_ok(q: dict[str, float]) -> bool:
-    return q["correct"] >= REF_MIN_CORRECT and q["held"] >= REF_MIN_HELD and q["format"] <= REF_MAX_FORMAT
+    return q["format"] <= REF_MAX_FORMAT and q["p_direction"] < REF_ALPHA and q["p_hold"] < REF_ALPHA
 
 
-def _check_strict(ref1, ref2, variants, noise_pairs, blocks, need_place) -> None:
+def _check_strict(ref1, ref2, variants, noise_pairs, blocks) -> None:
     if len(ref1) != N_QUESTIONS or len({blocks[i] for i in ref1}) != N_BLOCKS:
         raise StrictError(f"問が {len(ref1)}・規程が {len({blocks[i] for i in ref1})}（{N_QUESTIONS}・{N_BLOCKS} であるべき）")
     names = {v["name"] for v in variants}
     if names != set(ALL_VARIANTS):
         raise StrictError(f"変種が 15 そろっていない: 足りない {sorted(set(ALL_VARIANTS) - names)}")
     have = {n for n, _, _ in noise_pairs}
-    need = {RERUN} | ({PLACE} if need_place else set())
-    if need - have:
-        raise StrictError(f"揺れの組が無い: {sorted(need - have)}")
+    if RERUN not in have:
+        raise StrictError(f"揺れの組が無い: {[RERUN]}")
     runs = [("ref-r1", ref1), ("ref-r2", ref2), *((v["name"], v["outcomes"]) for v in variants),
             *((f"{n}:a", a) for n, a, _ in noise_pairs), *((f"{n}:b", b) for n, _, b in noise_pairs)]
     for n, o in runs:
@@ -126,6 +155,8 @@ def _check_strict(ref1, ref2, variants, noise_pairs, blocks, need_place) -> None
             raise StrictError(f"{n} に答えの無い問が {miss}")
     for v in variants:
         for s in METRICS:
+            if s in OPTIONAL_METRICS:
+                continue  # 値が無くても止めない（その物差しの判定だけ「値が無い」になる）
             x = deviation(v["metrics"], s)
             if x is None or not math.isfinite(x):
                 raise StrictError(f"{v['name']} の {s} が数でない: {x}")
@@ -134,19 +165,19 @@ def _check_strict(ref1, ref2, variants, noise_pairs, blocks, need_place) -> None
 def judge_model(ref1: dict[str, str], ref2: dict[str, str], variants: list[dict],
                 should_hold: dict[str, bool], blocks: dict[str, str],
                 noise_pairs: list[tuple[str, dict[str, str], dict[str, str]]] = (),
-                strict: bool = False, need_place: bool = False, boot_n: int = BOOT_N) -> dict:
+                strict: bool = False, boot_n: int = BOOT_N) -> dict:
     """ref1/ref2: id → 結果の語。variants: [{name, outcomes, metrics: {s: parse_log の辞書}}]。
     blocks: id → 規程の名前。noise_pairs: [(名前, 1 回目の結果, 2 回目の結果)]（同じ物を 2 回流した組）。
-    need_place: 基準が GPU に載り切らなかった（厳しく見る時、置き方違いの組を求める）。boot_n=0 で参考の上側を省く。"""
+    揺れの組は基準の 2 回と RERUN だけ（載せ方の組は無い）。boot_n=0 で参考の上側を省く。"""
     names = [v["name"] for v in variants]
     if ANCHOR not in names:
         raise ValueError(f"{ANCHOR} が変種に無い")
     if len(set(names)) != len(names):
         raise ValueError("変種の名前が重なっている")
     if strict:
-        _check_strict(ref1, ref2, variants, noise_pairs, blocks, need_place)
+        _check_strict(ref1, ref2, variants, noise_pairs, blocks)
     w_ref = _wa(ref1)
-    q1, q2 = quality(ref1, should_hold), quality(ref2, should_hold)
+    q1, q2 = quality(ref1, should_hold, blocks), quality(ref2, should_hold, blocks)
     valid = ref_ok(q1) and ref_ok(q2)
     noise_each = {"ref": sum(discordant(_wa(ref1), _wa(ref2)))}
     for n, a, b in noise_pairs:
@@ -158,7 +189,7 @@ def judge_model(ref1: dict[str, str], ref2: dict[str, str], variants: list[dict]
         w = _wa(v["outcomes"])
         d = block_diffs(w, w_ref, blocks)
         b, c = discordant(w, w_ref)
-        vq = quality(v["outcomes"], should_hold)
+        vq = quality(v["outcomes"], should_hold, blocks)
         responsive = vq["format"] <= RESP_MAX_FORMAT and vq["over_hold"] - q1["over_hold"] <= RESP_MAX_OVERHOLD_UP
         per[v["name"]] = {"wa": sum(w.values()), "delta": sum(d), "b": b, "c": c,
                           "p_mcnemar_ref": mcnemar_one_sided(b, c), "format_rate": vq["format"],
@@ -177,6 +208,14 @@ def judge_model(ref1: dict[str, str], ref2: dict[str, str], variants: list[dict]
             worse.append(n)
     unresponsive = [n for n in names if not per[n]["responsive"]]
 
+    pair_cache: dict[tuple[str, str], tuple[int, float]] = {}  # 近い対の（増え・p）は物差しによらないので、1 回だけ数える
+
+    def pair_test(a: str, b: str) -> tuple[int, float]:
+        if (a, b) not in pair_cache:
+            d = block_diffs(per[a]["_w"], per[b]["_w"], blocks)
+            pair_cache[(a, b)] = (sum(d), signflip_exact(d, "two-sided"))
+        return pair_cache[(a, b)]
+
     by_metric = {}
     for s in METRICS:
         dev = {n: deviation(v["metrics"], s) for n, v in zip(names, variants)}
@@ -188,8 +227,7 @@ def judge_model(ref1: dict[str, str], ref2: dict[str, str], variants: list[dict]
         near = {}
         for a, b in combinations(names, 2):
             if abs(dev[a] - dev[b]) <= NEAR_REL * max(abs(dev[a]), abs(dev[b])):
-                d = block_diffs(per[a]["_w"], per[b]["_w"], blocks)
-                near[f"{a}|{b}"] = (a, b, sum(d), signflip_exact(d, "two-sided"))
+                near[f"{a}|{b}"] = (a, b, *pair_test(a, b))
         nh = holm({k: t[3] for k, t in near.items()})
         pattern_b = []
         for k, (a, b, delta, _) in near.items():
@@ -229,6 +267,6 @@ def judge_overall(model_results: dict[str, dict], metric: str = PRIMARY) -> str:
         return "はい"
     if miss == 1:
         return "モデルによる"
-    if verdicts.count("気づく") >= 2:
+    if verdicts.count("気づく") >= 3:
         return "いいえ（この 360 問で）"
     return "測れず"

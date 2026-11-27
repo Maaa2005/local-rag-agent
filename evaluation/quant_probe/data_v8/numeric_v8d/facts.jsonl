@@ -1,0 +1,90 @@
+{"id": "VD031", "facts": {"item": "下衣", "dept": "製造", "n_req": 2, "last_lend": "2023-09-15", "req_date": "2026-09-14", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD011", "facts": {"submit": "2025-12-15", "birth": "1961-04-01", "renew_year": 2026, "first_year": 2022, "s1": 75, "s2": 68, "skill": false}, "unknowns": {}}
+{"id": "VD078", "facts": {"dpw": 5, "join": "2026-06-02", "used": 0, "req_days": 4, "take_from": "2026-08-17", "take_to": "2026-08-20"}, "unknowns": {"nights": [0, 4, 7]}}
+{"id": "VD042", "facts": {"submit": "2025-12-05", "birth": "1959-11-03", "renew_year": 2026, "s1": 80, "s2": 78, "skill": false}, "unknowns": {}}
+{"id": "VD032", "facts": {"ordered": true, "work_date": "2026-04-12", "notify_date": "2026-04-08", "take_date": "2026-06-12", "worked_min": 480, "take_h": 8, "disaster": false, "overseas": false}, "unknowns": {}}
+{"id": "VD079", "facts": {"item": "上衣", "dept": "営業", "n_req": 1, "last_lend": "2025-09-01", "req_date": "2026-02-10", "accident": true, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD029", "facts": {"ordered": true, "work_date": "2026-11-08", "notify_date": "2026-11-02", "take_date": "2026-11-27", "take_h": 4}, "unknowns": {"worked_min": [200, 480]}}
+{"id": "VD001", "facts": {"submit": "2025-12-01", "birth": "1964-01-20", "renew_year": 2026, "first_year": 2024, "s1": 61, "s2": 63}, "unknowns": {"skill": [true, false]}}
+{"id": "VD049", "facts": {"item": "上衣", "dept": "製造", "n_req": 2, "last_lend": "2024-06-10", "req_date": "2026-06-09", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD035", "facts": {"pay": true, "amount": 4000000, "start": "2026-10-01", "end": "2028-09-30", "auto": false, "base": false}, "unknowns": {"related": [true, false]}}
+{"id": "VD016", "facts": {"pay": true, "amount": 6000000, "start": "2026-07-01", "end": "2028-06-30", "auto": false, "related": false}, "unknowns": {}}
+{"id": "VD058", "facts": {"dpw": 5, "join": "2026-06-02", "used": 0, "req_days": 3, "take_from": "2026-08-17", "take_to": "2026-08-19"}, "unknowns": {}}
+{"id": "VD046", "facts": {"designated": true, "exposures": [[87.9, 480]], "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD065", "facts": {"ordered": true, "work_date": "2026-07-12", "notify_date": "2026-07-10", "take_date": "2026-08-03", "worked_min": 510, "take_h": 8}, "unknowns": {}}
+{"id": "VD083", "facts": {"pay": true, "start": "2026-04-01", "end": "2028-03-31", "auto": false, "base": false, "related": false}, "unknowns": {"amount": [5000000, 20000000]}}
+{"id": "VD039", "facts": {"ordered": true, "work_date": "2026-04-12", "notify_date": "2026-04-08", "worked_min": 480, "take_h": 8, "disaster": false, "overseas": false}, "unknowns": {"take_date": ["2026-06-10", "2026-06-11", "2026-06-12"]}}
+{"id": "VD023", "facts": {"submit": "2025-11-15", "birth": "1959-11-03", "renew_year": 2026, "first_year": 2020, "s1": 80, "s2": 77, "skill": true}, "unknowns": {}}
+{"id": "VD054", "facts": {"pay": true, "amount": 30000000, "start": "2026-04-01", "end": "2027-03-31", "base": false, "related": false}, "unknowns": {}}
+{"id": "VD004", "facts": {"item": "作業帽", "dept": "製造", "n_req": 2, "last_lend": "2025-03-05", "req_date": "2026-03-10", "accident": false, "applied": false, "returned": true}, "unknowns": {}}
+{"id": "VD087", "facts": {"dpw": 5, "join": "2015-04-01", "used": 0, "req_days": 4, "take_from": "2026-08-24", "take_to": "2026-08-27"}, "unknowns": {}}
+{"id": "VD027", "facts": {"submit": "2025-11-20", "birth": "1962-08-15", "renew_year": 2026, "first_year": 2023, "s1": 66, "s2": 70}, "unknowns": {}}
+{"id": "VD073", "facts": {"item": "下衣", "dept": "製造", "last_lend": "2022-12-01", "req_date": "2026-03-02", "accident": false, "applied": true, "returned": true}, "unknowns": {"n_req": [2, 3, 4]}}
+{"id": "VD074", "facts": {"item": "下衣", "dept": "製造", "n_req": 3, "last_lend": "2023-08-20", "req_date": "2026-08-20", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD064", "facts": {"designated": true, "exposures": [[84.9, 600]], "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD036", "facts": {"item": "上衣", "dept": "製造", "n_req": 1, "last_lend": "2025-04-15", "req_date": "2026-02-12", "applied": true, "returned": true}, "unknowns": {"accident": [true, false]}}
+{"id": "VD080", "facts": {"pay": true, "amount": 8000000, "start": "2026-04-01", "end": "2030-03-31", "base": false, "related": false}, "unknowns": {}}
+{"id": "VD017", "facts": {"dpw": 5, "join": "2026-06-02", "nights": 0, "used": 0, "req_days": 4, "take_from": "2026-08-17", "take_to": "2026-08-20"}, "unknowns": {}}
+{"id": "VD026", "facts": {"submit": "2025-11-15", "birth": "1959-11-03", "renew_year": 2026, "first_year": 2020, "s1": 80, "s2": 77, "skill": false}, "unknowns": {}}
+{"id": "VD003", "facts": {"ordered": true, "work_date": "2026-05-10", "notify_date": "2026-05-06", "take_date": "2026-06-15", "worked_min": 480, "take_h": 8}, "unknowns": {}}
+{"id": "VD024", "facts": {"item": "作業帽", "dept": "製造", "n_req": 2, "last_lend": "2025-02-14", "req_date": "2026-03-01", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD086", "facts": {"submit": "2025-12-10", "renew_year": 2026, "first_year": 2022, "s1": 70, "s2": 66, "skill": false}, "unknowns": {"birth": ["1961-04-01", "1961-04-02"]}}
+{"id": "VD009", "facts": {"ordered": true, "work_date": "2026-01-18", "notify_date": "2026-01-14", "take_date": "2026-03-19", "worked_min": 510, "take_h": 8, "disaster": false, "overseas": false}, "unknowns": {}}
+{"id": "VD051", "facts": {"designated": true, "exposures": [[90.0, 180]], "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD068", "facts": {"pay": true, "amount": {"usd_month": 4500}, "start": "2026-07-01", "end": "2027-09-30", "auto": false, "base": false, "related": false}, "unknowns": {}}
+{"id": "VD077", "facts": {"dpw": 5, "nights": 0, "used": 0, "req_days": 4, "take_from": "2026-08-17", "take_to": "2026-08-20"}, "unknowns": {"join": ["2026-06-01", "2026-06-02"]}}
+{"id": "VD063", "facts": {"ordered": true, "work_date": "2026-03-08", "notify_date": "2026-03-02", "take_date": "2026-03-20", "worked_min": 230, "take_h": 4}, "unknowns": {}}
+{"id": "VD057", "facts": {"item": "上衣", "dept": "営業", "n_req": 1, "last_lend": "2025-09-01", "req_date": "2026-02-10", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD053", "facts": {"pay": false, "amount": 50000000, "start": "2026-04-01", "end": "2031-03-31"}, "unknowns": {}}
+{"id": "VD038", "facts": {"birth": "1962-06-15", "renew_year": 2026, "first_year": 2023, "s1": 70, "s2": 68}, "unknowns": {"submit": ["2025-12-20", null]}}
+{"id": "VD055", "facts": {"submit": "2025-12-10", "birth": "1961-04-02", "renew_year": 2026, "first_year": 2022, "s1": 72, "s2": 64}, "unknowns": {}}
+{"id": "VD059", "facts": {"designated": true, "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {"exposures": [[[89.0, 210]], [[89.0, 240]], [[89.0, 270]]]}}
+{"id": "VD037", "facts": {"submit": "2025-12-31", "birth": "1962-03-31", "renew_year": 2026, "first_year": 2022, "s1": null, "s2": 67}, "unknowns": {}}
+{"id": "VD033", "facts": {"item": "上衣", "dept": "製造", "n_req": 2, "req_date": "2026-06-10", "accident": false, "applied": true, "returned": true}, "unknowns": {"last_lend": ["2023-05-01", "2025-05-01"]}}
+{"id": "VD020", "facts": {"dpw": 5, "join": "2026-06-02", "nights": 0, "used": 0, "req_days": 4, "take_from": "2026-08-17", "take_to": "2026-08-20"}, "unknowns": {}}
+{"id": "VD067", "facts": {"pay": true, "amount": 30000000, "start": "2026-04-01", "end": "2027-03-31", "base": true, "related": false}, "unknowns": {}}
+{"id": "VD013", "facts": {"designated": true, "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {"exposures": [[[84.0, 480]], [[89.0, 480]]]}}
+{"id": "VD071", "facts": {"designated": true, "exposures": [[98.0, 480]], "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD045", "facts": {"dpw": 5, "join": "2026-06-02", "used": 0, "req_days": 2, "take_from": "2026-08-05", "take_to": "2026-08-06"}, "unknowns": {}}
+{"id": "VD052", "facts": {"dpw": 5, "join": "2019-04-01", "used": 0, "req_days": 5, "take_from": "2026-10-12", "take_to": "2026-10-16", "ext": true}, "unknowns": {}}
+{"id": "VD007", "facts": {"item": "上衣", "dept": "製造", "n_req": 2, "last_lend": "2024-06-10", "req_date": "2026-06-09", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD048", "facts": {"submit": null, "birth": "1962-06-15", "renew_year": 2026, "first_year": 2023, "s1": 70, "s2": 68}, "unknowns": {}}
+{"id": "VD069", "facts": {"submit": "2025-12-15", "birth": "1961-04-01", "renew_year": 2026, "first_year": 2022, "s1": 75, "s2": 68, "skill": false}, "unknowns": {}}
+{"id": "VD021", "facts": {"ordered": true, "work_date": "2026-04-19", "notify_date": "2026-04-14", "take_date": "2026-07-03", "worked_min": 480, "take_h": 8, "overseas": false}, "unknowns": {"disaster": [true, false]}}
+{"id": "VD044", "facts": {"pay": true, "amount": 10200000, "start": "2026-04-01", "end": "2027-03-31", "auto": false, "base": false, "related": false}, "unknowns": {}}
+{"id": "VD019", "facts": {"ordered": true, "work_date": "2026-05-10", "notify_date": "2026-05-06", "take_date": "2026-06-15", "worked_min": 480, "take_h": 8}, "unknowns": {}}
+{"id": "VD082", "facts": {"designated": true, "exposures": [[87.0, 240], [92.5, 60], [83.0, 120]], "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD090", "facts": {"submit": "2025-12-03", "birth": "1962-06-15", "renew_year": 2026, "first_year": 2023, "s1": 70}, "unknowns": {"s2": [40, 80]}}
+{"id": "VD075", "facts": {"item": "上衣", "dept": "営業", "n_req": 2, "last_lend": "2023-01-10", "req_date": "2026-02-01", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD060", "facts": {"ordered": true, "work_date": "2026-09-13", "notify_date": "2026-09-09", "take_date": "2026-10-09", "worked_min": 270, "take_h": 4}, "unknowns": {}}
+{"id": "VD010", "facts": {"dpw": 5, "join": "2020-04-01", "nights": 0, "used": 2, "req_days": 4, "take_from": "2026-08-24", "take_to": "2026-08-27"}, "unknowns": {}}
+{"id": "VD088", "facts": {"designated": true, "exposures": [[87.9, 480]], "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD089", "facts": {"dpw": 5, "join": "2018-04-01", "nights": 0, "req_days": 3, "take_from": "2026-08-10", "take_to": "2026-08-12"}, "unknowns": {"used": [0, 3]}}
+{"id": "VD062", "facts": {"pay": true, "start": "2026-04-01", "end": "2028-03-31", "auto": false, "base": false, "related": false}, "unknowns": {"amount": [9000000, 10000000, 11000000]}}
+{"id": "VD070", "facts": {"ordered": true, "work_date": "2026-10-04", "notify_date": "2026-09-29", "take_date": "2026-11-02", "worked_min": 480, "take_h": 8}, "unknowns": {"disaster": [true, false]}}
+{"id": "VD030", "facts": {"designated": true, "exposures": [[88.0, 240]], "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD034", "facts": {"ordered": true, "work_date": "2026-02-08", "notify_date": "2026-02-02", "take_date": "2026-05-05", "worked_min": 540, "take_h": 8, "disaster": true}, "unknowns": {}}
+{"id": "VD085", "facts": {"pay": true, "amount": 10000000, "start": "2026-10-01", "end": "2027-09-30", "auto": false, "base": false, "related": false}, "unknowns": {}}
+{"id": "VD002", "facts": {"designated": true, "exposures": [[83.0, 480]], "booth": null, "today": "2026-11-10"}, "unknowns": {"last_check": ["2025-01-10", "2026-07-06"]}}
+{"id": "VD061", "facts": {"submit": "2025-12-10", "birth": "1961-04-02", "renew_year": 2026, "first_year": 2022, "s1": 72, "s2": 64}, "unknowns": {}}
+{"id": "VD012", "facts": {"dpw": 3, "join": "2018-04-01", "used": 0, "req_days": 3, "take_from": "2026-08-03", "take_to": "2026-08-05"}, "unknowns": {}}
+{"id": "VD005", "facts": {"item": "下衣", "dept": "製造", "n_req": 3, "last_lend": "2023-08-20", "req_date": "2026-08-20", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD014", "facts": {"item": "上衣", "dept": "製造", "n_req": 4, "last_lend": "2023-01-10", "req_date": "2026-02-01", "accident": false, "applied": true, "returned": true}, "unknowns": {}}
+{"id": "VD025", "facts": {"designated": true, "exposures": [[84.9, 600]], "booth": null, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD022", "facts": {"pay": true, "amount": 10000000, "start": "2026-10-01", "end": "2027-09-30", "auto": false, "base": false, "related": false}, "unknowns": {}}
+{"id": "VD050", "facts": {"designated": true, "exposures": [[86.0, 120]], "booth": null, "last_check": "2025-11-09", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD008", "facts": {"designated": true, "exposures": [[98.0, 480]], "booth": 79.0, "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD066", "facts": {"submit": "2025-12-01", "birth": "1963-02-10", "renew_year": 2026, "first_year": 2023, "s1": 60, "s2": 56}, "unknowns": {}}
+{"id": "VD043", "facts": {"pay": true, "amount": 9990000, "start": "2026-04-01", "end": "2028-03-31", "auto": false, "related": false}, "unknowns": {}}
+{"id": "VD047", "facts": {"designated": false, "exposures": [[92.0, 240]], "today": "2026-11-10"}, "unknowns": {}}
+{"id": "VD084", "facts": {"ordered": true, "work_date": "2026-04-12", "notify_date": "2026-04-08", "take_date": "2026-06-12", "worked_min": 480, "take_h": 8, "disaster": false, "overseas": false}, "unknowns": {}}
+{"id": "VD056", "facts": {"ordered": false, "work_date": "2026-06-07", "notify_date": "2026-06-02", "take_date": "2026-06-26", "worked_min": 480, "take_h": 8}, "unknowns": {}}
+{"id": "VD040", "facts": {"dpw": 5, "join": "2018-04-01", "used": 0, "req_days": 5, "take_from": "2026-10-05", "take_to": "2026-10-09"}, "unknowns": {"ext": [true, false]}}
+{"id": "VD028", "facts": {"dpw": 5, "join": "2026-08-01", "nights": 9, "used": 0, "req_days": 5, "take_from": "2026-09-14", "take_to": "2026-09-18"}, "unknowns": {}}
+{"id": "VD076", "facts": {"dpw": 5, "join": "2019-04-01", "used": 0, "req_days": 5, "take_from": "2026-10-12", "take_to": "2026-10-16", "ext": false}, "unknowns": {}}
+{"id": "VD006", "facts": {"pay": true, "amount": 4000000, "start": "2026-10-01", "end": "2028-09-30", "auto": false, "related": false}, "unknowns": {"base": [true, false]}}
+{"id": "VD015", "facts": {"designated": true, "exposures": [[96.0, 480]], "last_check": "2026-07-06", "today": "2026-11-10"}, "unknowns": {"booth": [79.0, null]}}
+{"id": "VD018", "facts": {"item": "下衣", "dept": "営業", "n_req": 2, "last_lend": "2022-04-12", "req_date": "2026-04-10", "applied": true, "returned": true}, "unknowns": {"accident": [true, false]}}
+{"id": "VD041", "facts": {"dpw": 5, "join": "2026-06-02", "used": 0, "req_days": 3, "take_from": "2026-08-17", "take_to": "2026-08-19"}, "unknowns": {}}
+{"id": "VD081", "facts": {"ordered": true, "work_date": "2026-02-08", "notify_date": "2026-02-02", "take_date": "2026-05-05", "worked_min": 540, "take_h": 8, "disaster": false, "overseas": false}, "unknowns": {}}
+{"id": "VD072", "facts": {"pay": true, "amount": 9990000, "start": "2026-04-01", "end": "2028-03-31", "auto": false, "related": false}, "unknowns": {}}

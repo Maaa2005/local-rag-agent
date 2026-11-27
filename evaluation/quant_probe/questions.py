@@ -1,6 +1,8 @@
-"""開発用の問 360 問（4 組 × 90 問・24 規程）を読み、モデルに渡す文を作る。
+"""問 360 問（4 組 × 90 問・24 規程）を読み、モデルに渡す文を作る。
 
-問は local-rag-agent の枝 feat/numeric-method3（a20f3c9）の evaluation/v2/numeric_dev90{,b,c,d} の写し。
+既定は版 8 の新しい 360 問（data_v8/numeric_v8{a,b,c,d}）。まだそろっていなくても import は落ちない（読む時に落ちる）。
+版 7 の問（見済み・data/numeric_dev90{,b,c,d}）は DATA_DIR_V7・SETS_V7 で今までどおり読める。
+版 7 の問は local-rag-agent の枝 feat/numeric-method3（a20f3c9）の evaluation/v2/numeric_dev90{,b,c,d} の写し。
 封をした 240 問は使わない（このリポにも入っていない）。
 
 文の形は測る前に固定する（PROMPT_VERSION）。変えたら版を上げ、前の版の結果と混ぜない。
@@ -12,8 +14,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
-SETS = ("numeric_dev90", "numeric_dev90b", "numeric_dev90c", "numeric_dev90d")
+DATA_DIR = Path(__file__).resolve().parent / "data_v8"
+SETS = ("numeric_v8a", "numeric_v8b", "numeric_v8c", "numeric_v8d")
+DATA_DIR_V7 = Path(__file__).resolve().parent / "data"
+SETS_V7 = ("numeric_dev90", "numeric_dev90b", "numeric_dev90c", "numeric_dev90d")
 HOLD = "保留"
 PROMPT_VERSION = "qp-1"
 
@@ -85,6 +89,19 @@ def load_questions(data_dir: Path = DATA_DIR, sets: tuple[str, ...] = SETS) -> l
     if len(ids) != len(set(ids)):
         raise ValueError("問の id が重なっている")
     return out
+
+
+SMOKE_STEP = 36
+SMOKE_N = 10
+
+
+def smoke_ids_v7() -> list[str]:
+    """動作確認用の見済みの 10 問（計画 版 8 の 4 章）: 版 7 の 360 問を id の順に並べ、36 問おき（0・36・…・324 番目）に取った id。
+    版 8 の新しい問は使わない。"""
+    ids = sorted(q.id for q in load_questions(DATA_DIR_V7, SETS_V7))
+    if len(ids) != SMOKE_STEP * SMOKE_N:
+        raise ValueError(f"版 7 の問が {len(ids)} 問（{SMOKE_STEP * SMOKE_N} であるべき）")
+    return ids[::SMOKE_STEP]
 
 
 def load_rules(data_dir: Path = DATA_DIR, sets: tuple[str, ...] = SETS) -> dict[tuple[str, str], str]:
