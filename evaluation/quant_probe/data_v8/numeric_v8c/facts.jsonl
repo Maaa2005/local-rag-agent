@@ -1,0 +1,90 @@
+{"id": "VC031", "facts": {"elapsed_m": 8, "monthly": 33333, "n": 3, "rep": false}, "unknowns": {}}
+{"id": "VC011", "facts": {"ordered": true, "dist": 200, "solo": false, "accompany": 3, "notice_days": 14, "amount": 240000}, "unknowns": {}}
+{"id": "VC078", "facts": {"kind": "new", "cc": 125}, "unknowns": {"dist": ["6.0", "7.5", "9.0"]}}
+{"id": "VC042", "facts": {"ordered": true, "dist": 500, "solo": false, "accompany": 5, "notice_days": 20, "amount": 340000}, "unknowns": {}}
+{"id": "VC032", "facts": {"confirmed": true, "lead": 4320, "prior": [3600], "req": 1210, "sp": 1}, "unknowns": {}}
+{"id": "VC079", "facts": {"room": true, "elapsed_m": 10, "monthly": 60000, "n": 1}, "unknowns": {}}
+{"id": "VC029", "facts": {"confirmed": true, "lead": 2880, "req": 180, "sp": 6}, "unknowns": {"prior": [[1200], [2640]]}}
+{"id": "VC001", "facts": {"ordered": true, "dist": 120, "solo": false, "accompany": 2, "notice_days": 21, "amount": 150000}, "unknowns": {"dependents": [0, 3, 6]}}
+{"id": "VC049", "facts": {"elapsed_m": 8, "monthly": 9999, "n": 1}, "unknowns": {}}
+{"id": "VC035", "facts": {"reg": true, "usb": false, "conf": true, "days": 2, "approver": "所属長"}, "unknowns": {"enc": [true, false]}}
+{"id": "VC016", "facts": {"reg": true, "usb": false, "conf": false, "days": 3, "approver": "所属長"}, "unknowns": {}}
+{"id": "VC058", "facts": {"kind": "renew", "cc": null, "dist": "2.0", "days": 30}, "unknowns": {}}
+{"id": "VC046", "facts": {"qual": "skill", "inspected": true, "cap": 2.5, "center": 450, "load": 1500, "indoor": true, "speed": "7.2"}, "unknowns": {}}
+{"id": "VC065", "facts": {"confirmed": true, "lead": 2880, "prior": [3300], "req": 300, "sp": 6}, "unknowns": {}}
+{"id": "VC083", "facts": {"reg": true, "usb": false, "conf": false, "approver": "部門長"}, "unknowns": {"days": [10, 20]}}
+{"id": "VC039", "facts": {"confirmed": true, "lead": 2880, "prior": [2550], "sp": 6}, "unknowns": {"req": [120, 150, 180]}}
+{"id": "VC023", "facts": {"ordered": true, "dist": 80, "solo": false, "accompany": 1, "notice_days": 10, "amount": 175000}, "unknowns": {}}
+{"id": "VC054", "facts": {"reg": true, "usb": false, "conf": true, "enc": true, "days": 2, "approver": "所属長"}, "unknowns": {}}
+{"id": "VC004", "facts": {"elapsed_m": 4, "monthly": 80000, "n": 1}, "unknowns": {}}
+{"id": "VC087", "facts": {"kind": "new", "cc": 50, "dist": "6.2"}, "unknowns": {}}
+{"id": "VC027", "facts": {"ordered": true, "dist": 350, "solo": false, "accompany": 3, "notice_days": 25, "amount": 230000}, "unknowns": {}}
+{"id": "VC073", "facts": {"elapsed_m": 8, "n": 3, "rep": false}, "unknowns": {"monthly": [30000, 33333, 33334, 35000]}}
+{"id": "VC074", "facts": {"elapsed_m": 6, "monthly": 10000, "n": 1}, "unknowns": {}}
+{"id": "VC064", "facts": {"qual": "skill", "inspected": true, "cap": 2.5, "center": 520, "load": 2000, "indoor": false, "speed": 9}, "unknowns": {}}
+{"id": "VC036", "facts": {"elapsed_m": 8, "monthly": 50000, "n": 1}, "unknowns": {"room": [true, false]}}
+{"id": "VC080", "facts": {"reg": true, "usb": false, "conf": true, "enc": false, "days": 3, "approver": "所属長"}, "unknowns": {}}
+{"id": "VC017", "facts": {"kind": "renew", "cc": null, "dist": "4.0", "days": 29}, "unknowns": {}}
+{"id": "VC026", "facts": {"ordered": true, "dist": 80, "solo": false, "accompany": 1, "notice_days": 14, "amount": 175000}, "unknowns": {}}
+{"id": "VC003", "facts": {"confirmed": true, "lead": 1440, "prior": [1500], "req": 1200}, "unknowns": {}}
+{"id": "VC024", "facts": {"elapsed_m": 9, "monthly": 40000, "n": 2, "rep": false}, "unknowns": {}}
+{"id": "VC086", "facts": {"ordered": true, "solo": false, "accompany": 1, "notice_days": 31, "amount": 170000}, "unknowns": {"dist": [190, 200, 210]}}
+{"id": "VC009", "facts": {"confirmed": true, "lead": 2880, "prior": [610, 610, 610, 610], "req": 245, "sp": 6}, "unknowns": {}}
+{"id": "VC051", "facts": {"qual": "skill", "inspected": true, "cap": 2.0, "center": 480, "load": 1900, "indoor": false, "speed": 8}, "unknowns": {}}
+{"id": "VC068", "facts": {"reg": true, "usb": false, "conf": false, "days": 6, "approver": "部門長", "abroad": true}, "unknowns": {}}
+{"id": "VC077", "facts": {"kind": "new", "cc": 125}, "unknowns": {"dist": ["4.5", "4.99", "5.0", "5.5"]}}
+{"id": "VC063", "facts": {"confirmed": true, "lead": 2880, "prior": [1800], "req": 880}, "unknowns": {}}
+{"id": "VC057", "facts": {"room": false, "elapsed_m": 7, "monthly": 50000, "n": 1}, "unknowns": {}}
+{"id": "VC053", "facts": {"reg": false, "usb": false, "conf": false, "days": 2, "approver": "所属長"}, "unknowns": {}}
+{"id": "VC038", "facts": {"ordered": true, "accompany": 4, "dependents": 4, "dist": 80, "notice_days": 30, "amount": 200000}, "unknowns": {"solo": [true, false]}}
+{"id": "VC055", "facts": {"ordered": true, "dist": 120, "solo": false, "accompany": 2, "notice_days": 30, "amount": 159000}, "unknowns": {}}
+{"id": "VC059", "facts": {"qual": "skill", "inspected": true, "cap": 2.0, "center": 400, "load": 1200, "indoor": false}, "unknowns": {"speed": [9, 10, 11]}}
+{"id": "VC037", "facts": {"ordered": true, "dist": 250, "solo": true, "dependents": 5, "notice_days": 30, "amount": 230000}, "unknowns": {}}
+{"id": "VC033", "facts": {"monthly": 50000, "n": 1}, "unknowns": {"elapsed_m": [3, 12]}}
+{"id": "VC020", "facts": {"kind": "renew", "cc": null, "dist": "4.0", "days": 29}, "unknowns": {}}
+{"id": "VC067", "facts": {"reg": true, "usb": true, "conf": true, "enc": true, "days": 2, "approver": "所属長"}, "unknowns": {}}
+{"id": "VC013", "facts": {"qual": "skill", "inspected": true, "cap": 2.5, "load": 2100, "indoor": false, "speed": 8}, "unknowns": {"center": [450, 550]}}
+{"id": "VC071", "facts": {"qual": "none", "escort": "special", "inspected": true, "cap": 1.0, "center": 450, "load": 700, "indoor": false, "speed": 5}, "unknowns": {}}
+{"id": "VC045", "facts": {"kind": "new", "cc": 125, "dist": "4.99"}, "unknowns": {}}
+{"id": "VC052", "facts": {"kind": "new", "cc": null, "dist": "0.8", "handbook": true}, "unknowns": {}}
+{"id": "VC007", "facts": {"elapsed_m": 6, "monthly": 10000, "n": 1}, "unknowns": {}}
+{"id": "VC048", "facts": {"ordered": false, "dist": 300, "solo": false, "accompany": 2, "notice_days": 40, "amount": 80000}, "unknowns": {}}
+{"id": "VC069", "facts": {"ordered": true, "dist": 500, "solo": false, "accompany": 5, "notice_days": 20, "amount": 340000}, "unknowns": {}}
+{"id": "VC021", "facts": {"lead": 2880, "prior": [1800], "req": 300}, "unknowns": {"confirmed": [true, false]}}
+{"id": "VC044", "facts": {"reg": true, "usb": false, "conf": false, "days": 31, "approver": "役員"}, "unknowns": {}}
+{"id": "VC019", "facts": {"confirmed": true, "lead": 1440, "prior": [1500], "req": 1200}, "unknowns": {}}
+{"id": "VC082", "facts": {"qual": "skill", "inspected": true, "cap": 1.5, "center": 550, "load": 1300, "indoor": false, "speed": 5}, "unknowns": {}}
+{"id": "VC090", "facts": {"ordered": true, "solo": false, "accompany": 2, "notice_days": 30, "amount": 150000}, "unknowns": {"dist": [30, 120]}}
+{"id": "VC075", "facts": {"elapsed_m": 9, "monthly": 33334, "n": 1}, "unknowns": {}}
+{"id": "VC060", "facts": {"confirmed": true, "lead": 7200, "prior": [3000], "req": 360, "sp": 3}, "unknowns": {}}
+{"id": "VC010", "facts": {"kind": "new", "cc": null, "dist": "3.5", "other": true}, "unknowns": {}}
+{"id": "VC088", "facts": {"qual": "skill", "inspected": true, "cap": 2.5, "center": 520, "load": 2000, "indoor": false, "speed": 9}, "unknowns": {}}
+{"id": "VC089", "facts": {"kind": "new", "cc": 50}, "unknowns": {"dist": ["1.5", "4.0"]}}
+{"id": "VC062", "facts": {"reg": true, "usb": false, "conf": false, "approver": "役員"}, "unknowns": {"days": [28, 30, 31, 33]}}
+{"id": "VC070", "facts": {"confirmed": true, "lead": 2880, "prior": [1800], "req": 600}, "unknowns": {"sp": [0, 5, 6]}}
+{"id": "VC030", "facts": {"qual": "skill", "inspected": true, "cap": 2.5, "center": 450, "load": 1500, "indoor": true, "speed": "7.2"}, "unknowns": {}}
+{"id": "VC034", "facts": {"child_m": 24, "requested": true, "confirmed": true, "lead": 2880, "prior": [1200], "req": 600}, "unknowns": {}}
+{"id": "VC085", "facts": {"reg": true, "usb": false, "conf": true, "enc": true, "days": 14, "approver": "部門長"}, "unknowns": {}}
+{"id": "VC002", "facts": {"qual": "skill", "inspected": true, "cap": 2.0, "center": 400, "indoor": false, "speed": 6}, "unknowns": {"load": [0, 500, 999]}}
+{"id": "VC061", "facts": {"ordered": true, "dist": 200, "solo": false, "accompany": 3, "notice_days": 14, "amount": 240000}, "unknowns": {}}
+{"id": "VC012", "facts": {"kind": "new", "cc": 250, "dist": "12.0"}, "unknowns": {}}
+{"id": "VC005", "facts": {"elapsed_m": 9, "monthly": 33334, "n": 1}, "unknowns": {}}
+{"id": "VC014", "facts": {"elapsed_m": 12, "monthly": 60000, "n": 7, "rep": false}, "unknowns": {}}
+{"id": "VC025", "facts": {"qual": "skill", "inspected": true, "cap": 2.5, "center": 450, "load": 2490, "indoor": false, "speed": 8}, "unknowns": {}}
+{"id": "VC022", "facts": {"reg": true, "usb": false, "conf": false, "days": 31, "approver": "役員"}, "unknowns": {}}
+{"id": "VC050", "facts": {"qual": "skill", "inspected": true, "cap": 2.5, "center": 620, "load": 800, "indoor": false, "speed": 5}, "unknowns": {}}
+{"id": "VC008", "facts": {"qual": "none", "escort": "special", "inspected": true, "cap": "0.8", "center": 450, "load": 700, "indoor": false, "speed": 5}, "unknowns": {}}
+{"id": "VC066", "facts": {"ordered": true, "dist": 300, "solo": false, "accompany": 2, "notice_days": 31, "prev_m": 8, "amount": 150000}, "unknowns": {}}
+{"id": "VC043", "facts": {"reg": true, "usb": false, "conf": false, "days": 2, "approver": "所属長"}, "unknowns": {}}
+{"id": "VC047", "facts": {"qual": "skill", "inspected": false, "cap": 2.0, "center": 400, "load": 1200, "indoor": false, "speed": 6}, "unknowns": {}}
+{"id": "VC084", "facts": {"confirmed": true, "lead": 4320, "prior": [3600], "req": 1210, "sp": 1}, "unknowns": {}}
+{"id": "VC056", "facts": {"confirmed": false, "lead": 4320, "prior": [], "req": 480}, "unknowns": {}}
+{"id": "VC040", "facts": {"kind": "new", "cc": null, "dist": "4.0"}, "unknowns": {"other": [true, false]}}
+{"id": "VC028", "facts": {"kind": "new", "cc": 125, "dist": "5.04"}, "unknowns": {}}
+{"id": "VC076", "facts": {"kind": "new", "cc": null, "dist": "0.8", "handbook": false}, "unknowns": {}}
+{"id": "VC006", "facts": {"reg": true, "usb": false, "enc": true, "days": 5, "approver": "部門長"}, "unknowns": {"conf": [true, false]}}
+{"id": "VC015", "facts": {"qual": "skill", "cap": 2.0, "center": 400, "load": 1200, "indoor": false, "speed": 6}, "unknowns": {"inspected": [true, false]}}
+{"id": "VC018", "facts": {"monthly": 5000, "n": 1}, "unknowns": {"elapsed_m": [3, 8, 12]}}
+{"id": "VC041", "facts": {"kind": "renew", "cc": null, "dist": "2.0", "days": 30}, "unknowns": {}}
+{"id": "VC081", "facts": {"child_m": 38, "requested": true, "confirmed": true, "lead": 2880, "prior": [1200], "req": 600}, "unknowns": {}}
+{"id": "VC072", "facts": {"reg": true, "usb": false, "conf": true, "enc": true, "days": 14, "approver": "部門長"}, "unknowns": {}}

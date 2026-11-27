@@ -16,7 +16,51 @@ from math import comb
 
 def signflip_exact(diffs: list[int], alternative: str = "greater") -> float:
     """各まとまりの整数の差 d_r の符号を全部の組で入れ替えた時、合計が観測以上（両側は絶対値で以上）になる割合。
-    2^k 通りを数え上げず、合計の分布を足し込みで求める（k = 差が 0 でないまとまりの数）。"""
+    2^k 通りを数え上げず、合計の分布を数える（k = 差が 0 でないまとまりの数）。
+    数え方: 符号が正になるまとまりの集合 T の |d| の和 u の通り数を、大きな整数の桁（1 桁 = lane ビット）に持つ。
+    まとまりを 1 つ足すたびに「P + (P を |d| 桁ずらした物)」にする（桁あふれしないよう lane = k + 2 ビット）。
+    合計 = 2u − S（S = |d| の和）なので、合計 >= 観測 は u >= ceil((観測 + S)/2)。上の桁だけを残して、桁の和を
+    (2^lane − 1) の余りで求める（桁の和は 2^k 以下で 2^lane − 1 より小さいので、余りがそのまま桁の和）。
+    通り数は整数のまま数えるので、結果は 1 つずつ足し込む数え方（signflip_exact_reference）と同じ値になる。"""
+    d = [abs(int(x)) for x in diffs if x != 0]
+    obs = sum(int(x) for x in diffs if x != 0)
+    k = len(d)
+    lane = k + 2
+    mod = (1 << lane) - 1
+    poly = 1
+    for a in d:
+        poly += poly << (lane * a)
+    total_sum = sum(d)
+
+    def count_ge(u_min: int) -> int:  # 正の側の和 u が u_min 以上の通り数
+        if u_min <= 0:
+            return 1 << k
+        if u_min > total_sum:
+            return 0
+        return (poly >> (lane * u_min)) % mod
+
+    def count_le(u_max: int) -> int:  # 正の側の和 u が u_max 以下の通り数
+        if u_max < 0:
+            return 0
+        if u_max >= total_sum:
+            return 1 << k
+        return (poly & ((1 << (lane * (u_max + 1))) - 1)) % mod
+
+    if alternative == "greater":
+        hit = count_ge(-((-(obs + total_sum)) // 2))
+    elif alternative == "two-sided":
+        a = abs(obs)
+        if a == 0:
+            hit = 1 << k  # 絶対値 >= 0 は全部
+        else:
+            hit = count_ge(-((-(a + total_sum)) // 2)) + count_le((total_sum - a) // 2)  # 合計 >= a と 合計 <= -a（重ならない）
+    else:
+        raise ValueError(alternative)
+    return hit / (1 << k)
+
+
+def signflip_exact_reference(diffs: list[int], alternative: str = "greater") -> float:
+    """signflip_exact の元の書き方（合計の分布を 1 つずつ足し込む。遅いが読みやすい）。テストで同じ値になる事を確かめる。"""
     d = [int(x) for x in diffs if x != 0]
     obs = sum(d)
     dist = {0: 1}
